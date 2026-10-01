@@ -1,0 +1,377 @@
+/* ==========================================================================
+   DASHBOARD THEME OVERRIDE (v4) — RED THEME
+   ---------------------------------------------------------------------
+   Link this ONE file after assets/css/styles.css in header.php.
+   It re-skins the classes menubar.php / topnavbar.php ALREADY output —
+   .topnav, .sidenav, #layoutSidenav_nav, .nav-link, .sidenav-footer ...
+   No changes needed in any of your ~100 content pages: they only ever
+   touch #layoutSidenav_content, which this file does not restructure.
+   Verified against your actual topnavbar.php + menubar.php markup —
+   no HTML edits needed in either file.
+
+   WHY v3 BROKE (for reference)
+   ---------------------------------------------------------------------
+   1. topnavbar.php's <a class="navbar-brand d-none d-sm-block"> gets
+      `display:block !important` from Bootstrap's d-sm-block utility.
+      v3's `display:flex` had no !important, so Bootstrap won, the
+      icon/text stayed top-aligned instead of vertically centered.
+   2. #sidebarToggle carries Bootstrap's `order-1 order-lg-0` utility
+      classes, so it rendered BEFORE .navbar-brand instead of after it.
+   v4 fixes both with !important + explicit `order`.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root{
+  /* ---- Red theme colors (change these to re-theme everything) ---- */
+  --ink:          #2B0D13;   /* dark maroon: headings, strong text */
+  --primary:      #C8102E;   /* main red */
+  --primary-2:    #C8102E;   /* red used for links, hover, active states */
+  --primary-dark: #9E0C24;   /* darker red: button hover, gradients */
+  --primary-soft: #FDECEF;   /* light red tint: hover/active backgrounds */
+
+  --success:    #059669;  --success-soft:#D1FAE5;
+  --warning:    #D97706;  --warning-soft:#FEF3C7;
+  --danger:     #DC2626;  --danger-soft:#FEE2E2;
+  --info:       #0891B2;  --info-soft:#CFFAFE;
+  --muted:      #6B7280;
+  --muted-2:    #9CA3AF;
+  --border:     #EFE7E9;
+  --bg:         #FAF3F4;
+  --surface:    #FFFFFF;
+  --radius:     1rem;
+  --shadow:     0 1px 2px rgba(17,24,39,.04), 0 8px 24px -12px rgba(60,10,20,.10);
+
+  --sidenav-w:            264px;
+  --sidenav-w-collapsed:  84px;
+  --topnav-h:             80px;
+}
+
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
+  background: var(--bg) !important;
+  color: var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,h5,h6{ color: var(--ink); font-weight:700; letter-spacing:-0.01em; }
+a{ color: var(--primary-2); }
+
+/* ==========================================================================
+   TOP NAVBAR  (.topnav — output by topnavbar.php)
+   Children in DOM order: #sidebarToggle button, .navbar-brand,
+   clock/date span, .navbar-nav (ml-auto). We force .navbar-brand to
+   render FIRST (order:-1) and size it to the sidebar width, so it
+   reads as one continuous shell with the sidebar below it.
+   ========================================================================== */
+.topnav{
+  display:flex !important;
+  align-items:center;
+  flex-wrap:nowrap;
+  height: var(--topnav-h);
+  margin:0;
+  background:#fff !important;
+  border:none !important;
+  border-bottom:1px solid var(--border);
+  border-radius:0 !important;
+  box-shadow:none !important;
+  padding: 0 1.1rem 0 0 !important;
+}
+
+.topnav .navbar-brand{
+  order:-1;
+  display:flex !important;
+  align-items:center;
+  gap:.65rem;
+  flex:0 0 var(--sidenav-w);
+  width: var(--sidenav-w);
+  max-width: var(--sidenav-w);
+  height:100%;
+  margin:0 !important;
+  padding: 0 1.1rem;
+  border-right:1px solid var(--border);
+  color: var(--ink) !important;
+  font-weight:800; font-size:.85rem;
+  text-decoration:none !important;
+  white-space:nowrap; overflow:hidden;
+  transition: flex-basis .18s ease, width .18s ease;
+}
+.topnav .navbar-brand i{
+  width:42px; height:42px; border-radius:12px; flex:0 0 auto;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark)) !important;
+  color:#fff !important;
+  display:inline-flex !important; align-items:center; justify-content:center;
+  font-size:1.05rem;
+  margin:0 !important;
+}
+
+.topnav #sidebarToggle{
+  order:2 !important;
+  width:38px; height:38px; border-radius:.7rem; margin-left:1rem !important;
+  display:inline-flex; align-items:center; justify-content:center;
+  color: var(--muted); background:transparent;
+}
+.topnav #sidebarToggle:hover{ background: var(--primary-soft); color:var(--primary-2); }
+
+.topnav .btn-icon{
+  width:40px; height:40px; border-radius:.8rem;
+  display:inline-flex; align-items:center; justify-content:center;
+  color: var(--muted);
+}
+.topnav .btn-icon:hover{ background: var(--primary-soft); color:var(--primary-2); }
+
+.dropdown-user-img{
+  width:40px; height:40px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  background: var(--primary); color:#fff; font-weight:700; font-size:.8rem;
+  object-fit:cover;
+}
+.dropdown-header .dropdown-user-img{ width:44px; height:44px; }
+.dropdown-user-details-name{ font-weight:700; color:var(--ink); font-size:.85rem; }
+.dropdown-user-details-email{ font-size:.72rem; color:var(--muted-2); text-transform:uppercase; letter-spacing:.03em; }
+.dropdown-menu{ border-radius:1rem !important; border:1px solid var(--border) !important; box-shadow:0 16px 36px -12px rgba(60,10,20,.22) !important; }
+.dropdown-item{ border-radius:.6rem; font-size:.85rem; font-weight:600; padding:.55rem .7rem; }
+.dropdown-item:hover{ background:var(--primary-soft); color:var(--ink); }
+
+/* ==========================================================================
+   LAYOUT SHELL  (#layoutSidenav — output by the page, unchanged markup)
+   Flush: no padding, no gap, sidebar sticks right under the topbar.
+   ========================================================================== */
+#layoutSidenav{
+  padding:0;
+  align-items:stretch;
+  gap:0;
+}
+#layoutSidenav #layoutSidenav_nav{
+  flex-basis: var(--sidenav-w) !important;
+  position: sticky;
+  top: var(--topnav-h);
+  height: calc(100vh - var(--topnav-h));
+  max-height: calc(100vh - var(--topnav-h));
+  transition: flex-basis .18s ease;
+}
+#layoutSidenav #layoutSidenav_content{
+  margin-left:0 !important;
+  min-height: calc(100vh - var(--topnav-h));
+}
+
+/* collapse: reuse the SAME .sidenav-toggled class your existing
+   #sidebarToggle button already applies to <body> — we just redefine
+   what it does (shrink to an icon rail, instead of fully hiding),
+   and keep the topbar's brand cell in sync so the two stay aligned. */
+.sidenav-toggled #layoutSidenav #layoutSidenav_nav{
+  flex-basis: var(--sidenav-w-collapsed) !important;
+}
+.sidenav-toggled .topnav .navbar-brand{
+  flex-basis: var(--sidenav-w-collapsed);
+  width: var(--sidenav-w-collapsed);
+  max-width: var(--sidenav-w-collapsed);
+  padding: 0; justify-content:center;
+  font-size:0;
+}
+.sidenav-toggled .topnav .navbar-brand i{ margin:0 auto !important; }
+
+/* ==========================================================================
+   SIDEBAR  (.sidenav — output by menubar.php)
+   Flush full-height column, no rounding, just a right border to
+   separate it from the content — reads as one shell with the topbar.
+   ========================================================================== */
+.sidenav{
+  font-size:.85rem;
+  height:100%;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  border:none !important;
+  position:relative; /* anchors .sidenav-toggle-handle, its direct child */
+}
+.sidenav-light{ background:#fff !important; border:none !important; border-right:1px solid var(--border) !important; }
+.sidenav.d-flex{ flex-direction:column; }
+.sidenav-inner{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+
+/* Brand now lives in the topbar (see .topnav .navbar-brand above).
+   menubar.php's own .sidenav-brand block is hidden so it isn't
+   shown twice. */
+.sidenav-brand{ display:none !important; }
+
+.sidenav .sidenav-menu{ padding:1rem .75rem 1rem; overflow-y:auto; }
+.sidenav .sidenav-menu::-webkit-scrollbar{ width:5px; }
+.sidenav .sidenav-menu::-webkit-scrollbar-thumb{ background:var(--border); border-radius:10px; }
+
+.sidenav .sidenav-menu-heading{
+  padding:1.1rem .6rem .5rem !important;
+  font-size:.68rem !important;
+  color: var(--muted-2) !important;
+  letter-spacing:.08em;
+  white-space:nowrap;
+}
+
+.sidenav .nav-link{
+  display:flex !important;
+  align-items:center;
+  gap:.7rem;
+  color:#374151 !important;
+  border-radius:.65rem !important;
+  margin-bottom:.2rem;
+  padding:.68rem .75rem !important;
+  font-weight:600 !important;
+  border:1.5px solid transparent;
+  white-space:nowrap;
+}
+.sidenav .nav-link:hover{ background:var(--primary-soft); color:var(--ink) !important; }
+.sidenav .nav-link .nav-link-icon{
+  width:1.1rem; text-align:center;
+  color:var(--muted-2) !important;
+  font-size:.92rem;
+  padding-right:0 !important;
+}
+.sidenav .nav-link .sidenav-collapse-arrow{ margin-left:auto; color:var(--muted-2); font-size:.7rem; }
+
+/* "active" = current page. Add class="nav-link ... active" server-side,
+   or rely on :hover/[aria-expanded] below for parent items */
+.sidenav .nav-link.active,
+.sidenav .nav-link[aria-expanded="true"]{
+  border-color:var(--primary-2) !important;
+  color:var(--primary-2) !important;
+  background:var(--primary-soft) !important;
+}
+.sidenav .nav-link.active .nav-link-icon,
+.sidenav .nav-link[aria-expanded="true"] .nav-link-icon{ color:var(--primary-2) !important; }
+
+.sidenav .sidenav-menu-nested{
+  margin-left:1.7rem !important;
+  border-left:1px dashed var(--border) !important;
+  padding-left:.75rem !important;
+}
+.sidenav .sidenav-menu-nested .nav-link{
+  padding:.42rem .6rem !important; font-size:.8rem !important; font-weight:500 !important; color:#4B5563 !important;
+}
+.sidenav .sidenav-menu-nested .nav-link:hover{ color:var(--primary-2) !important; }
+
+/* footer */
+.sidenav-footer{
+  border-top:1px solid var(--border);
+  background:#FDFAFA !important;
+  padding:.85rem 1rem !important;
+  height:auto !important;
+  display:flex; align-items:center; gap:.65rem;
+  margin-top:auto;
+}
+.sidenav-footer-avatar{
+  width:36px; height:36px; border-radius:50%; flex:0 0 auto;
+  background:var(--primary); color:#fff; font-weight:700; font-size:.78rem;
+  display:flex; align-items:center; justify-content:center;
+}
+.sidenav-footer-subtitle{ font-size:.66rem !important; color:var(--muted-2) !important; text-transform:uppercase; letter-spacing:.03em; }
+.sidenav-footer-title{ font-size:.82rem !important; font-weight:700 !important; color:var(--ink) !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+.sidenav-footer-logout{
+  margin-left:auto; width:30px; height:30px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--danger); flex:0 0 auto;
+}
+.sidenav-footer-logout:hover{ background:var(--danger-soft); }
+
+/* floating collapse-toggle handle — direct child of .sidenav, sits on its border */
+.sidenav-toggle-handle{
+  position:absolute;
+  top:24px;
+  right:-13px;
+  width:26px; height:26px;
+  border-radius:50%;
+  background:#fff;
+  border:1px solid var(--border);
+  box-shadow:0 4px 10px rgba(17,24,39,.12);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--muted);
+  font-size:.7rem;
+  cursor:pointer;
+  z-index:5;
+  transition:transform .18s ease;
+}
+.sidenav-toggle-handle:hover{ color:var(--primary-2); border-color:var(--primary-2); }
+.sidenav-toggled .sidenav-toggle-handle{ transform:rotate(180deg); }
+
+/* ==========================================================================
+   COLLAPSED (icon-only) STATE — applies at ALL widths, driven by body.sidenav-toggled
+   ========================================================================== */
+.sidenav-toggled .sidenav-menu-heading{ text-align:center; padding-left:0 !important; padding-right:0 !important; font-size:0 !important; }
+.sidenav-toggled .sidenav-menu-heading::after{ content:'\2022'; font-size:.9rem; color:var(--muted-2); }
+
+.sidenav-toggled .nav-link{ justify-content:center !important; padding:.7rem 0 !important; }
+.sidenav-toggled .nav-link span:not(.nav-link-icon),
+.sidenav-toggled .nav-link .sidenav-collapse-arrow,
+.sidenav-toggled .collapse{ display:none !important; }
+.sidenav-toggled .nav-link{ white-space:nowrap; overflow:hidden; }
+.sidenav-toggled .nav-link.active{
+  border-radius:50%; width:40px; height:40px; padding:0 !important;
+  margin-left:auto; margin-right:auto;
+}
+
+.sidenav-toggled .sidenav-footer{ justify-content:center; padding:.85rem .5rem !important; }
+.sidenav-toggled .sidenav-footer-content,
+.sidenav-toggled .sidenav-footer-logout{ display:none; }
+
+/* ==========================================================================
+   PAGE HEADER  (.page-header — output at the top of every content page)
+   ========================================================================== */
+.page-header{
+  background:transparent !important;
+  box-shadow:none !important;
+  border-bottom:none !important;
+}
+.page-header .page-header-title{
+  font-size:1.35rem; font-weight:800; color:var(--ink);
+  display:flex; align-items:center; gap:.6rem;
+}
+.page-header .page-header-icon{
+  width:38px; height:38px; border-radius:11px;
+  background:var(--primary-soft); color:var(--primary-2);
+  display:inline-flex; align-items:center; justify-content:center; font-size:.95rem;
+}
+
+/* ==========================================================================
+   CARDS / TABLES / BUTTONS  (used across every content page unchanged)
+   ========================================================================== */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow);
+}
+.card-header{ background:transparent !important; border-bottom:1px solid var(--border) !important; font-weight:700; color:var(--ink); }
+
+.table thead th{
+  border-top:none; border-bottom:1px solid var(--border) !important;
+  color:var(--muted); text-transform:uppercase; font-size:.68rem; letter-spacing:.05em;
+  font-weight:700; background:transparent !important;
+}
+.table td{ border-color:var(--border) !important; vertical-align:middle; font-size:.83rem; }
+.table-striped tbody tr:nth-of-type(odd){ background-color:#FDFAFA; }
+
+.badge-soft-danger{ background:var(--danger-soft); color:var(--danger); font-weight:700; }
+.badge-soft-warning{ background:var(--warning-soft); color:var(--warning); font-weight:700; }
+.badge-soft-success{ background:var(--success-soft); color:var(--success); font-weight:700; }
+.badge-soft-info{ background:var(--info-soft); color:var(--info); font-weight:700; }
+.badge-soft-danger,.badge-soft-warning,.badge-soft-success,.badge-soft-info{ padding:.32rem .65rem; border-radius:999px; font-size:.7rem; }
+
+.btn-primary{ background:var(--primary) !important; border-color:var(--primary) !important; border-radius:.6rem; font-weight:600; }
+.btn-primary:hover{ background:var(--primary-dark) !important; border-color:var(--primary-dark) !important; }
+
+/* ==========================================================================
+   RESPONSIVE — under 992px, the existing off-canvas drawer transform
+   from styles.css is left in charge of show/hide; we shrink the
+   topbar's brand cell to match the collapsed rail width so it doesn't
+   reserve desktop-sidebar space on small screens.
+   ========================================================================== */
+@media (max-width: 991.98px){
+  .topnav .navbar-brand{
+    flex-basis: var(--sidenav-w-collapsed);
+    width: var(--sidenav-w-collapsed);
+    max-width: var(--sidenav-w-collapsed);
+    padding:0; justify-content:center; font-size:0;
+  }
+}

@@ -1,0 +1,699 @@
+/* ==========================================================================
+   Custom floating sidebar / topbar theme — overrides SB Admin Pro defaults
+   RED THEME
+   ========================================================================== */
+
+:root {
+    --gutter: 16px;
+    --sidebar-w: 280px;
+    --sidebar-w-collapsed: 70px;
+    --topbar-h: 64px;
+    --ink: #1f2333;
+    --muted: #9095ab;
+    --heading-muted: #a7abc3;
+
+    /* ---- Red theme colors (change these to re-theme everything) ---- */
+    --primary: #C8102E;        /* main red */
+    --primary-dark: #9E0C24;   /* darker red */
+    --primary-bg: #fdecef;     /* light red tint for active/hover backgrounds */
+    --dark: #2b0d13;           /* dark maroon for strong text */
+
+    --red: #ef4444;            /* notification dot / logout */
+    --border-soft: #f3eef0;
+    --page-bg: #faf3f4;
+    --card-shadow: 0 10px 30px rgba(60, 10, 20, 0.08);
+}
+
+body {
+    background-color: var(--page-bg) !important;
+}
+
+/* ---------------- Page header (title bar under the topnav) ---------------- */
+
+.page-header {
+    background: #fff !important;
+    border-radius: 20px !important;
+    box-shadow: var(--card-shadow) !important;
+    margin-bottom: var(--gutter) !important;
+    overflow: hidden;
+}
+
+.page-header .page-header-content {
+    padding-top: 1.75rem;
+    padding-bottom: 1.75rem;
+}
+
+/* ---------------- Topbar ---------------- */
+
+#sidenavAccordion.topnav {
+    position: fixed;
+    top: var(--gutter);
+    left: calc(var(--sidebar-w) + (var(--gutter) * 2));
+    right: var(--gutter);
+    height: var(--topbar-h);
+    background: #fff;
+    border-radius: 2rem;
+    box-shadow: var(--card-shadow);
+    border: none;
+    display: flex;
+    align-items: center;
+    padding: 0 22px;
+    z-index: 1039;
+    transition: left 0.2s ease;
+}
+
+body.sidenav-toggled #sidenavAccordion.topnav {
+    left: calc(var(--sidebar-w-collapsed) + (var(--gutter) * 2));
+}
+
+#sidenavAccordion .btn-icon.btn-transparent-dark {
+    color: var(--muted);
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin-right: 18px !important;
+}
+
+.topnav-datetime {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.topnav-datetime svg {
+    width: 17px;
+    height: 17px;
+    color: var(--muted);
+}
+
+.topnav-datetime .dt-time {
+    color: var(--dark);
+    font-weight: 700;
+}
+
+.topnav-datetime .dt-sep {
+    color: #e3d7da;
+}
+
+.topnav-datetime .dt-date {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+#sidenavAccordion .navbar-nav {
+    gap: 22px;
+}
+
+#sidenavAccordion .btn-icon-notify {
+    position: relative;
+    color: var(--muted);
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+#sidenavAccordion .btn-icon-notify .notify-dot {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+}
+
+.avatar-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+}
+
+/* ---------------- Sidebar shell ---------------- */
+/* NOTE: the stock stylesheet pins this element via
+   `.nav-fixed #layoutSidenav #layoutSidenav_nav` (2 ids + 1 class), which
+   beats a plain `#layoutSidenav_nav` rule. We match/exceed that specificity
+   AND use !important so this always wins regardless of screen width. */
+
+.nav-fixed #layoutSidenav #layoutSidenav_nav,
+#layoutSidenav #layoutSidenav_nav {
+    position: fixed !important;
+    top: var(--gutter) !important;
+    left: var(--gutter) !important;
+    right: auto !important;
+    bottom: var(--gutter) !important;
+    width: var(--sidebar-w) !important;
+    height: auto !important;
+    max-height: none !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    z-index: 1038 !important;
+    transition: width 0.2s ease !important;
+}
+
+body.sidenav-toggled #layoutSidenav #layoutSidenav_nav {
+    width: var(--sidebar-w-collapsed) !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+}
+
+/* Kill the mobile dark overlay the stock template shows behind the sidebar
+   whenever body has .sidenav-toggled — we repurpose that class to mean
+   "collapsed" on desktop and "open" on mobile, and we supply our own
+   backdrop below, so the stock one must never appear. */
+.sidenav-toggled #layoutSidenav #layoutSidenav_content:before {
+    content: none !important;
+    display: none !important;
+}
+
+#layoutSidenav_nav .sidenav {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    background: #fff;
+    border-radius: 2rem;
+    box-shadow: var(--card-shadow) !important;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    padding-top: 0 !important;
+}
+
+.sidenav-menu {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidenav-menu::-webkit-scrollbar {
+    width: 4px;
+}
+.sidenav-menu::-webkit-scrollbar-thumb {
+    background: #ecdfe2;
+    border-radius: 4px;
+}
+
+.sidenav .sidenav-menu .nav .sidenav-menu-heading::after {
+    display: none !important;
+}
+
+/* ---------------- Brand ---------------- */
+
+.sidenav-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 20px 18px 20px;
+    flex-shrink: 0;
+}
+
+@media (min-width: 992px) {
+    /* let the popover flyout override the "hide all collapses" rule above */
+    body.sidenav-toggled #accordionSidenav .collapse.qp-popover-open {
+        display: block !important;
+    }
+}
+
+.brand-icon-box {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.brand-icon-box svg {
+    width: 20px;
+    height: 20px;
+}
+
+.sidenav-brand-text {
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+.sidenav-brand-text .brand-name {
+    font-weight: 700;
+    font-size: 0.98rem;
+    color: var(--ink);
+}
+
+.sidenav-brand-text .brand-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+@media (min-width: 992px) {
+    body.sidenav-toggled .sidenav-brand-text {
+        display: none;
+    }
+}
+
+.sidenav-divider {
+    border-bottom: 1px solid var(--border-soft);
+    margin: 0 20px;
+    flex-shrink: 0;
+}
+
+body.sidenav-toggled .sidenav-divider {
+    margin: 0 16px;
+}
+
+/* ---------------- Section heading ---------------- */
+
+.sidenav-menu-heading {
+    padding: 20px 15px 10px 15px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--heading-muted);
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+@media (min-width: 992px) {
+    body.sidenav-toggled .sidenav-menu-heading {
+        padding: 20px 0 10px 0;
+        text-align: center;
+        font-size: 0;
+    }
+
+    body.sidenav-toggled .sidenav-menu-heading::after {
+        content: "";
+        display: inline-block;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--heading-muted);
+    }
+}
+
+/* ---------------- Nav links ---------------- */
+
+#accordionSidenav {
+    padding: 0 16px 16px 16px;
+}
+
+body.sidenav-toggled #accordionSidenav {
+    padding: 0 12px 16px 12px;
+}
+
+#accordionSidenav > .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    margin: 3px 0;
+    border-radius: 14px;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.92rem;
+    border: 1.5px solid transparent;
+    white-space: nowrap;
+}
+
+#accordionSidenav > .nav-link:hover {
+    background: var(--primary-bg);
+}
+
+#accordionSidenav > .nav-link .nav-link-icon {
+    color: var(--muted);
+    width: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#accordionSidenav > .nav-link .nav-link-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+#accordionSidenav > .nav-link .sidenav-collapse-arrow {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+}
+
+#accordionSidenav > .nav-link[aria-expanded="true"] .sidenav-collapse-arrow {
+    transform: rotate(180deg);
+}
+
+#accordionSidenav > .nav-link.active {
+    /* background: var(--primary-bg);
+    border-color: var(--primary); */
+    color: var(--primary);
+}
+
+#accordionSidenav > .nav-link.active .nav-link-icon {
+    color: var(--primary);
+}
+
+.sidenav-menu-nested .nav-link {
+    padding: 8px 14px 8px 52px;
+    font-size: 0.87rem;
+    color: var(--muted);
+    font-weight: 500;
+    border-radius: 10px;
+}
+
+.sidenav-menu-nested .nav-link:hover {
+    background: var(--primary-bg);
+    color: var(--primary);
+}
+
+/* Collapsed sidebar: icon-only (desktop rail only — mobile stays expanded,
+   it's a full off-canvas drawer instead, see the media query below) */
+
+@media (min-width: 992px) {
+    body.sidenav-toggled #accordionSidenav > .nav-link {
+        justify-content: center;
+        padding: 11px 0;
+        margin: 3px auto;
+        width: 52px;
+    }
+
+    body.sidenav-toggled #accordionSidenav > .nav-link span,
+    body.sidenav-toggled #accordionSidenav > .nav-link .sidenav-collapse-arrow {
+        display: none;
+    }
+
+    body.sidenav-toggled #accordionSidenav .collapse {
+        display: none !important;
+    }
+}
+
+/* ---------------- Toggle chevron button ---------------- */
+
+.sidenav-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: -14px;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    z-index: 1040;
+}
+
+.sidenav-toggle-btn:hover {
+    color: var(--primary);
+}
+
+.sidenav-toggle-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.sidenav-toggle-btn .icon-expand {
+    display: none;
+}
+
+body.sidenav-toggled .sidenav-toggle-btn .icon-collapse {
+    display: none;
+}
+
+body.sidenav-toggled .sidenav-toggle-btn .icon-expand {
+    display: block;
+}
+
+/* ---------------- Footer ---------------- */
+
+.sidenav-footer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-soft);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+@media (min-width: 992px) {
+    body.sidenav-toggled .sidenav-footer {
+        justify-content: center;
+        padding: 16px 0;
+    }
+}
+
+.sidenav-footer-content {
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.sidenav-footer-subtitle {
+    font-size: 0.66rem;
+    letter-spacing: 0.06em;
+    color: var(--heading-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.sidenav-footer-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidenav-footer-logout {
+    margin-left: auto;
+    color: var(--red);
+    flex-shrink: 0;
+    display: flex;
+}
+
+.sidenav-footer-logout svg {
+    width: 18px;
+    height: 18px;
+}
+
+@media (min-width: 992px) {
+    body.sidenav-toggled .sidenav-footer-content,
+    body.sidenav-toggled .sidenav-footer-logout {
+        display: none;
+    }
+}
+
+/* ---------------- Content area ---------------- */
+/* Same specificity fix as the sidebar: `.nav-fixed #layoutSidenav
+   #layoutSidenav_content` sets padding-left/top and must be beaten. */
+
+.nav-fixed #layoutSidenav #layoutSidenav_content,
+#layoutSidenav #layoutSidenav_content {
+    margin-left: calc(var(--sidebar-w) + (var(--gutter) * 2)) !important;
+    margin-top: calc(var(--topbar-h) + (var(--gutter) * 2)) !important;
+    padding-left: 0 !important;
+    padding-right: var(--gutter) !important;
+    padding-bottom: var(--gutter) !important;
+    top: 0 !important;
+    transition: margin-left 0.2s ease !important;
+    min-height: calc(100vh - var(--topbar-h) - (var(--gutter) * 3)) !important;
+}
+
+body.sidenav-toggled #layoutSidenav #layoutSidenav_content {
+    margin-left: calc(var(--sidebar-w-collapsed) + (var(--gutter) * 2)) !important;
+}
+
+/* ---------------- Mobile: full-height off-canvas drawer ---------------- */
+
+@media (max-width: 991px) {
+    /* Topbar always spans full width on mobile — sidebar is an overlay, not
+       a pushed panel, so the topbar never needs to shift for it. */
+    #sidenavAccordion.topnav,
+    body.sidenav-toggled #sidenavAccordion.topnav {
+        left: var(--gutter) !important;
+    }
+
+    /* Sidebar becomes a true off-canvas drawer: hidden off-screen by
+       default, slides fully over the topbar and content (higher z-index
+       than both) when opened. Full viewport height, not a floating card. */
+    .nav-fixed #layoutSidenav #layoutSidenav_nav,
+    #layoutSidenav #layoutSidenav_nav {
+        top: 0 !important;
+        bottom: 0 !important;
+        left: calc(-1 * (var(--sidebar-w) + var(--gutter))) !important;
+        width: min(var(--sidebar-w), 82vw) !important;
+        z-index: 1046 !important;
+        transition: left 0.25s ease !important;
+    }
+
+    /* Must match the specificity of the desktop collapsed-width rule
+       (body.sidenav-toggled #layoutSidenav #layoutSidenav_nav) or that
+       rule wins on !important ties and squashes the open drawer to 70px. */
+    body.sidenav-toggled #layoutSidenav #layoutSidenav_nav {
+        left: 0 !important;
+        width: min(var(--sidebar-w), 82vw) !important;
+    }
+
+    #layoutSidenav_nav .sidenav {
+        border-radius: 0 2rem 2rem 0;
+    }
+
+    /* Backdrop dims the page behind the open drawer and closes it on tap */
+    .sidenav-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(43, 13, 19, 0.45);
+        z-index: 1045;
+    }
+
+    body.sidenav-toggled .sidenav-backdrop {
+        display: block;
+    }
+
+    /* Mobile drawer always shows full labels, left-aligned — no icon-rail
+       collapse behavior (that's desktop-only, handled above). */
+    #accordionSidenav > .nav-link {
+        justify-content: flex-start;
+    }
+
+    /* The little chevron toggle button lives on the sidebar's edge for the
+       desktop rail; on mobile the hamburger in the topbar is the only
+       control, so hide it to avoid a redundant/misplaced control. */
+    .sidenav-toggle-btn {
+        display: none;
+    }
+
+    .nav-fixed #layoutSidenav #layoutSidenav_content,
+    #layoutSidenav #layoutSidenav_content,
+    body.sidenav-toggled #layoutSidenav #layoutSidenav_content {
+        margin-left: var(--gutter) !important;
+    }
+
+    body.sidenav-toggled {
+        overflow: hidden;
+    }
+}
+
+/* ==========================================================================
+   SIDEBAR SUBMENU FLYOUT — styling for sidebar-popover.js
+   ========================================================================== */
+
+/* trigger row (an <a> in this project, since there's no .sidenav-item wrapper) */
+#accordionSidenav > a.nav-link.qp-popover-open {
+    background: var(--primary-bg);
+    color: var(--primary);
+}
+#accordionSidenav > a.nav-link.qp-popover-open .nav-link-icon {
+    color: var(--primary);
+}
+
+/* the floating panel itself — position is set inline by the script
+   (position: fixed), this just supplies the look */
+.collapse.qp-popover-open {
+    width: 230px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    padding: 8px;
+    z-index: 1050; /* above topnav (1039) and sidebar (1038) */
+}
+
+.collapse.qp-popover-open::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 18px;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    transform: rotate(45deg);
+    z-index: -1;
+}
+
+.qp-popover-header {
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.qp-popover-header span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--heading-muted);
+}
+
+.collapse.qp-popover-open .sidenav-menu-nested .nav-link {
+    padding: 8px 10px !important;
+    border-radius: 10px;
+    color: var(--ink);
+}
+.collapse.qp-popover-open .sidenav-menu-nested .nav-link:hover {
+    background: var(--primary-bg);
+    color: var(--primary);
+}
+
+/* nested toggle (Service Info, Service Order Inquiry) stays inline
+   inside the flyout instead of trying to pop out sideways again */
+.collapse.qp-popover-open .sidenav-menu-nested .collapse {
+    position: static !important;
+    display: block !important; /* only applies once .show is added by Bootstrap */
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin-left: 10px;
+}
+.collapse.qp-popover-open .sidenav-menu-nested .collapse:not(.show) {
+    display: none !important;
+}
+
+/* ===== Red page header card (applies to all pages) ===== */
+.page-header.page-header-light {
+    background: linear-gradient(120deg, #C8102E 0%, #7A0F22 100%) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 24px rgba(200, 16, 46, .20) !important;
+    overflow: hidden;
+}
+
+.page-header.page-header-light .page-header-title,
+.page-header.page-header-light .page-header-title span {
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+
+.page-header.page-header-light .page-header-icon {
+    background: rgba(255, 255, 255, .18);
+    color: #fff !important;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-header.page-header-light .page-header-subtitle,
+.page-header.page-header-light .breadcrumb-item,
+.page-header.page-header-light .breadcrumb-item a {
+    color: rgba(255, 255, 255, .85) !important;
+}

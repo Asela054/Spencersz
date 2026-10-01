@@ -1,0 +1,6 @@
+# History folder (VS Code local history extension)
+.history/
+
+# Sensitive config files
+application/config/database.php
+scripts/config.php
