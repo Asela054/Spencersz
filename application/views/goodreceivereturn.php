@@ -25,7 +25,7 @@ include "include/topnavbar.php";
                         <div class="row">
                             <div class="col-12 text-right">
                                 <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
-                                    data-target="#staticBackdrop" onclick="getVat();"
+                                    data-target="#staticBackdrop"
                                     <?php if($addcheck==0){echo 'disabled';} ?>><i class="fas fa-plus mr-2"></i>Create
                                     Good Receive Return Note</button>
                                 <hr>
@@ -40,7 +40,6 @@ include "include/topnavbar.php";
                                                 <th>#</th>
                                                 <th>Batch No</th>
                                                 <th>GRN No</th>
-                                                <th>GRN Type</th>
                                                 <th>Supplier</th>
                                                 <th>Discount</th>
                                                 <th>Sub Total</th>
@@ -104,21 +103,11 @@ include "include/topnavbar.php";
                                 </div>
                             </div>
                             <div class="form-row mb-1">
-                                <div class="col">
+                                <div class="col-12">
                                     <label class="small font-weight-bold text-dark">GRN Numbers*</label>
                                     <select class="form-control form-control-sm selecter2 px-0" name="grn_no"
                                         id="grn_no" required>
                                         <option value="">Select</option>
-                                    </select>
-                                </div>
-                                <div class="col">
-                                    <label class="small font-weight-bold text-dark">GRN Type*</label>
-                                    <select class="form-control form-control-sm" name="grntype" id="grntype" required>
-                                        <option value="">Select</option>
-                                        <?php foreach($ordertypelist->result() as $rowordertypelist){ ?>
-                                        <option value="<?php echo $rowordertypelist->idtbl_material_group ?>">
-                                            <?php echo $rowordertypelist->group ?></option>
-                                        <?php } ?>
                                     </select>
                                 </div>
                             </div>
@@ -150,8 +139,8 @@ include "include/topnavbar.php";
                                         name="uom" id="uom" readonly>
                                         <option value="">Select</option>
                                         <?php foreach($measurelist->result() as $rowmeasurelist){ ?>
-                                        <option value="<?php echo $rowmeasurelist->idtbl_mesurements ?>">
-                                            <?php echo $rowmeasurelist->measure_type ?></option>
+                                        <option value="<?php echo $rowmeasurelist->idtbl_unit ?>">
+                                            <?php echo $rowmeasurelist->unit ?></option>
                                         <?php } ?>
                                     </select>
                                 </div>
@@ -282,10 +271,10 @@ include "include/topnavbar.php";
                             class="text-right">Good Recieve Return Note<span id="pr"></span>
                         </h2>
                         <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding-top: 8px;padding:0;"
-                            class="text-right">Multi Offset Printers (PVT) LTD <span id="proname"></span>
+                            class="text-right">Spencersz (Pvt) LTD <span id="proname"></span>
                         </p>
                         <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding-top: 8px;padding:0;"
-                            class="text-right">MO/GRN-0000<span id="grncode"></span>
+                            class="text-right">GRN-<span id="grncode"></span>
                         </P>
                     </div>
                 </div>
@@ -303,7 +292,6 @@ include "include/topnavbar.php";
 <?php include "include/footerscripts.php"; ?>
 <script>
 $(document).ready(function() {
-    // Company / Branch come straight from the logged-in user's session - no manual selection needed
     $('#f_company_name').val('<?php echo ($_SESSION['companyname']); ?>');
     $('#f_branch_name').val('<?php echo ($_SESSION['branchname']); ?>');
 });
@@ -349,18 +337,18 @@ $(document).ready(function() {
         "buttons": [{
                 extend: 'csv',
                 className: 'btn btn-success btn-sm',
-                title: 'Good Receive Note Information',
+                title: 'Good Receive Return Note Information',
                 text: '<i class="fas fa-file-csv mr-2"></i> CSV',
             },
             {
                 extend: 'pdf',
                 className: 'btn btn-danger btn-sm',
-                title: 'Good Receive Note Information',
+                title: 'Good Receive Return Note Information',
                 text: '<i class="fas fa-file-pdf mr-2"></i> PDF',
             },
             {
                 extend: 'print',
-                title: 'Good Receive Note Information',
+                title: 'Good Receive Return Note Information',
                 className: 'btn btn-primary btn-sm',
                 text: '<i class="fas fa-print mr-2"></i> Print',
                 customize: function(win) {
@@ -387,11 +375,8 @@ $(document).ready(function() {
             { "data": "batchno" },
             {
                 "data": function(row) {
-                    return "GRN000" + row.grn_no;
+                    return "GRN" + row.grn_no;
                 }
-            },
-            {
-                "data": "group"
             },
             { "data": "suppliername" },
             {
@@ -440,7 +425,7 @@ $(document).ready(function() {
                     var button = '';
 
                     button += '<button class="btn btn-dark btn-sm btnview mr-1" id="' + full[
-                            'idtbl_print_grn_return'] + '" data-grnid="' + full['grn_no'] +
+                            'idtbl_grn_return'] + '" data-grnid="' + full['grn_no'] +
                         '" data-toggle="tooltip" data-placement="top" title="View"><i class="fas fa-eye"></i></button>';
                     if (full['approvestatus'] == 1) {
                         button += '<button class="btn btn-success btn-sm mr-1 ';
@@ -451,7 +436,7 @@ $(document).ready(function() {
                     } else {
                         button +=
                             '<a href="<?php echo base_url() ?>Goodreceivereturn/Goodreceivereturnstatus/' +
-                            full['idtbl_print_grn_return'] +
+                            full['idtbl_grn_return'] +
                             '/1" onclick="return active_confirm()" target="_self" class="btn btn-danger btn-sm mr-1 ';
                         if (statuscheck != 1) {
                             button += 'd-none';
@@ -462,7 +447,7 @@ $(document).ready(function() {
                     if (full['approvestatus'] == 0) {
                         button +=
                             '<a href="<?php echo base_url() ?>Goodreceivereturn/Goodreceivereturnstatus/' +
-                            full['idtbl_print_grn_return'] +
+                            full['idtbl_grn_return'] +
                             '/3" onclick="return delete_confirm()" target="_self" class="btn btn-danger btn-sm mr-1 ';
                         if (statuscheck != 1) {
                             button += 'd-none';
@@ -480,7 +465,7 @@ $(document).ready(function() {
         }
     });
 
-    // Supplier -> GRN numbers (already scoped by company/branch via session inside the model)
+    // Supplier -> GRN numbers
     $('#supplier').change(function() {
         var supplierID = $(this).val();
         $('#grn_no').empty().append('<option value="">Select</option>').trigger('change');
@@ -494,21 +479,19 @@ $(document).ready(function() {
                 var obj = JSON.parse(result);
                 var html1 = '<option value="">Select</option>';
                 $.each(obj, function(i, item) {
-                    html1 += '<option value="' + obj[i].idtbl_print_grn + '">' +
-                        'GRN000' + obj[i].idtbl_print_grn + '</option>';
+                    html1 += '<option value="' + obj[i].idtbl_grn + '">' +
+                        'GRN' + obj[i].grn_no + '</option>';
                 });
                 $('#grn_no').empty().append(html1);
             }
         });
     });
 
-    // GRN number -> batch/type + product list (products always come from tbl_print_material_info
-    // via tbl_print_grndetail, the same way the GRN screen itself lists its products)
+    // GRN number -> batch + product list
     $('#grn_no').change(function() {
         var grnNo = $(this).val();
 
         $('#batchno').val('').trigger('change');
-        $('#grntype').val('').trigger('change');
         $('#product').empty().append('<option value="">Select</option>').trigger('change');
 
         $.ajax({
@@ -520,8 +503,6 @@ $(document).ready(function() {
             success: function(result) {
                 var obj = JSON.parse(result);
                 $('#batchno').val(obj.batchNo);
-                $('#grntype').val(obj.grnType);
-                $('#grntype').prop('disabled', true);
 
                 $.ajax({
                     type: "POST",
@@ -698,7 +679,7 @@ $(document).ready(function() {
 
             var supplier = $('#supplier').val();
             var grnNo = $('#grn_no').val();
-            var grnType = $('#grntype').val();
+            var grnType = $('#grn_no').find(':selected').text();
             var batchNo = $('#batchno').val();
             var discount = $('#discount').val();
             var subTotal = $('#hiddenfulltotal').val();

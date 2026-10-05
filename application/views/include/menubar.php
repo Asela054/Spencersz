@@ -67,124 +67,29 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				<span>Dashboard</span>
 			</a>
 
-			<!-- Master file Menu New Added -->
-			<!-- <?php if(in_array("Location", $permissionallowed) || in_array("Measurements", $permissionallowed) || in_array("Servicetype", $permissionallowed) || in_array("Taxcontrol", $permissionallowed) || in_array("Charges", $permissionallowed) || in_array("Chargesdetail", $permissionallowed) || in_array("Serviceitemlist", $permissionallowed) || in_array("Expences", $permissionallowed) || in_array("Uomconversions", $permissionallowed)) { ?>
+			<!-- Product Menu New Added -->
+			<?php if(in_array("Product", $permissionallowed) || in_array("Category", $permissionallowed) || in_array("Brand", $permissionallowed) || in_array("Unit", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
-				data-target="#collapsMasterfile" aria-expanded="false" aria-controls="collapsMasterfile">
-				<div class="nav-link-icon"><i class="fa fa-print"></i></div>
-				<span>Master Information</span>
+				data-target="#collapseproduct" aria-expanded="false" aria-controls="collapseproduct">
+				<div class="nav-link-icon"><i class="fas fa-boxes"></i></div>
+				<span>Product</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Location" || $functionmenu=="Measurements" || $functionmenu=="Servicetype" || $functionmenu=="Taxcontrol" || $functionmenu=="Serviceitemlist" || $functionmenu=="Charges" || $functionmenu=="Chargesdetail" || $functionmenu=="Expences" || $functionmenu=="Uomconversions"){echo 'show';} ?>"
-				id="collapsMasterfile" data-parent="#accordionSidenav">
-				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
-					<?php if(in_array("Location", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Location'; ?>">Location</a>
-					<?php } if(in_array("Measurements", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Measurements'; ?>">Measurements</a>
-					<?php } if(in_array("Servicetype", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Servicetype'; ?>">Service
-						Type</a>
-					<?php } if(in_array("Taxcontrol", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Taxcontrol'; ?>">Tax
-						Control</a>
-					<?php } if(in_array("Charges", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Charges'; ?>">Charges
-						Type</a>
-					<?php } if(in_array("Chargesdetail", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Chargesdetail'; ?>">Charges
-						Details</a>
-					<?php } if(in_array("Serviceitemlist", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Serviceitemlist'; ?>">Service Item List</a>
-					<?php } if(in_array("Expences", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Expences'; ?>">Costing
-						Types</a>
-					<?php } if(in_array("Uomconversions", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Uomconversions'; ?>">UOM
-						Conversions</a>
-					<?php } if(in_array("Warehouse", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Warehouse'; ?>">Warehouse</a>
-					<?php } ?>
-				</nav>
-			</div>
-			<?php } ?> -->
-
-			<!-- Material Menu New Added -->
-			<!-- <?php if(in_array("Materialdetail", $permissionallowed) || in_array("Materialtype", $permissionallowed) || in_array("CategoryGauge", $permissionallowed) || in_array("Color", $permissionallowed) || in_array("Foiling", $permissionallowed) || in_array("Lamination", $permissionallowed) || in_array("Rimming", $permissionallowed) || in_array("Varnish", $permissionallowed) || in_array("Plates", $permissionallowed) || in_array("Materialgroup", $permissionallowed)){ ?>
-			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
-				data-target="#collapsematerials" aria-expanded="false" aria-controls="collapsematerials">
-				<div class="nav-link-icon"><i class="fas fa-shopping-basket"></i></div>
-				<span>Material Info</span>
-				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-			</a>
-			<div class="collapse <?php if($functionmenu=="Foiling" || $functionmenu=="Lamination" || $functionmenu=="Rimming" || $functionmenu=="Varnish" || $functionmenu=="Materialtype" || $functionmenu=="Plates" || $functionmenu=="Color" || $functionmenu=="Materialdetail" || $functionmenu=="CategoryGauge" || $functionmenu=="Materialgroup"){echo 'show';} ?>"
-				id="collapsematerials" data-parent="#accordionSidenav">
+			<div class="collapse <?php if($functionmenu=="Product" || $functionmenu=="Category" || $functionmenu=="Brand" || $functionmenu=="Unit"){echo 'show';} ?>"
+				id="collapseproduct" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion">
-					<?php if(in_array("Materialgroup", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Materialgroup'; ?>">Material Group</a>
-					<?php } if(in_array("Materialdetail", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Materialdetail'; ?>">Material Details</a>
-					<?php } if(in_array("Materialtype", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Materialtype'; ?>">Material
-						Type</a>
-					<?php } if(in_array("CategoryGauge", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'CategoryGauge'; ?>">Category Gauge</a>
-					<?php } if(in_array("Color", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Color'; ?>">Material
-						Color</a>
-					<?php } if(in_array("Foiling", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Foiling'; ?>">Foiling</a>
-					<?php } if(in_array("Lamination", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Lamination'; ?>">Lamination</a>
-					<?php } if(in_array("Rimming", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Rimming'; ?>">Rimming</a>
-					<?php } if(in_array("Varnish", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Varnish'; ?>">Varnish</a>
-					<?php } if(in_array("Plates", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Plates'; ?>">Plates</a>
+					<?php if(in_array("Category", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Category'; ?>">Category</a>
+					<?php } if(in_array("Brand", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Brand'; ?>">Brand</a>
+					<?php } if(in_array("Unit", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Unit'; ?>">Unit</a>
+					<?php } if(in_array("Product", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Product'; ?>">Product</a>
 					<?php } ?>
 				</nav>
 			</div>
-			<?php } ?> -->
-
-			<!-- Job Management Menu New Added -->
-			<!-- <?php if(in_array("Customer", $permissionallowed) || in_array("Customerinquiry", $permissionallowed) || in_array("Customerinquiryforapprove", $permissionallowed) || in_array("Approvedcustomerinquiry", $permissionallowed) || in_array("NewDeliveryPlan", $permissionallowed) || in_array("OrderReconsilation", $permissionallowed) || in_array("PlanDetails", $permissionallowed) || in_array("Quatation", $permissionallowed) || in_array("Newcustomerjobs", $permissionallowed) || in_array("Jobcardissuematerial", $permissionallowed) || in_array("MaterialAllocation", $permissionallowed) || in_array("MaterialAllocationManual", $permissionallowed)){ ?>
-			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
-				data-target="#jobmanagement" aria-expanded="false" aria-controls="jobmanagement">
-				<div class="nav-link-icon"><i class="fa fa-archive"></i></div>
-				<span>Job Management</span>
-				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-			</a>
-			<div class="collapse <?php if($functionmenu=="Customer" || $functionmenu=="Customerinquiry" || $functionmenu=="Customerinquiryforapprove" || $functionmenu=="Approvedcustomerinquiry" || $functionmenu=="Quatation" || $functionmenu=="NewDeliveryPlan" || $functionmenu=="OrderReconsilation" || $functionmenu=="PlanDetails" || $functionmenu=="MaterialAllocation" || $functionmenu=="Newcustomerjobs" || $functionmenu=="Jobcardissuematerial" || $functionmenu=="MaterialAllocationManual"){echo 'show';} ?>"
-				id="jobmanagement" data-parent="#accordionSidenav">
-				<nav class="sidenav-menu-nested nav accordion">
-					<?php if(in_array("Customer", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Customer'; ?>">Customer</a>
-					<?php } if(in_array("Newcustomerjobs", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Newcustomerjobs'; ?>">Customer Jobs</a>
-					<?php } if(in_array("Customerinquiry", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Customerinquiry'; ?>">Customer Inquiry</a>
-					<?php } if(in_array("MaterialAllocation", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'MaterialAllocation'; ?>">Allocate Material</a>
-					<?php } if(in_array("Jobcardissuematerial", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Jobcardissuematerial'; ?>">Issue Material</a>
-					<?php } if(in_array("MaterialAllocationManual", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'MaterialAllocationManual'; ?>">Manual Issue Material</a>
-					<?php } ?>
-				</nav>
-			</div>
-			<?php } ?> -->
+			<?php } ?>
 
 			<!-- Supplier Menu New Added -->
 			<?php if(in_array("Supplier", $permissionallowed) || in_array("Suppliertype", $permissionallowed)){ ?>
