@@ -9,91 +9,91 @@ class PdfGRNinfo extends CI_Model {
 
         $this->db->select("
             *,
-            COALESCE(tbl_print_grn.idtbl_print_grn, 0) AS idtbl_print_grn,
-            COALESCE(tbl_print_grn.subtotalcost, 0) AS grn_subtotal,
-            COALESCE(tbl_print_grn.totalcost, 0) AS grn_total,
-            COALESCE(tbl_print_grn.vatamountcost, 0) AS vatamount,
-            COALESCE(tbl_print_grn.discount, 0) AS discount,
-            COALESCE(tbl_print_grn.remark, '') AS remark,
-            COALESCE(tbl_print_grndetail.qty, 0) AS qty,
-            COALESCE(tbl_print_grndetail.costunitprice, 0) AS costunitprice,
-            COALESCE(tbl_material_group.idtbl_material_group, 0) AS idtbl_material_group,
-            COALESCE(tbl_print_grndetail.comment, '') AS comment,
-            tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info AS grn_material_id,
+            COALESCE(tbl_grn.idtbl_grn, 0) AS idtbl_grn,
+            COALESCE(tbl_grn.subtotalcost, 0) AS grn_subtotal,
+            COALESCE(tbl_grn.totalcost, 0) AS grn_total,
+            COALESCE(tbl_grn.vatamountcost, 0) AS vatamount,
+            COALESCE(tbl_grn.discount, 0) AS discount,
+            COALESCE(tbl_grn.remark, '') AS remark,
+            COALESCE(tbl_grndetail.qty, 0) AS qty,
+            COALESCE(tbl_grndetail.costunitprice, 0) AS costunitprice,
+            COALESCE(tbl_category.idtbl_category, 0) AS idtbl_category,
+            COALESCE(tbl_grndetail.comment, '') AS comment,
+            tbl_grndetail.tbl_product_idtbl_product AS grn_product_id,
 
             (
                 SELECT COALESCE(pd.qty, 0)
-                FROM tbl_print_porder_detail pd
+                FROM tbl_porder_detail pd
                 WHERE pd.status = 1
-                AND pd.tbl_print_porder_idtbl_print_porder = tbl_print_grn.tbl_print_porder_idtbl_print_porder
-                AND pd.tbl_material_id = tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info
+                AND pd.tbl_porder_idtbl_porder = tbl_grn.tbl_porder_idtbl_porder
+                AND pd.tbl_product_idtbl_product = tbl_grndetail.tbl_product_idtbl_product
                 ORDER BY
-                    ABS(pd.qty - tbl_print_grndetail.qty) ASC,
-                    pd.idtbl_print_porder_detail ASC
+                    ABS(pd.qty - tbl_grndetail.qty) ASC,
+                    pd.idtbl_porder_detail ASC
                 LIMIT 1
             ) AS ordered_qty,
 
             (
                 SELECT COALESCE(SUM(gd.qty), 0)
-                FROM tbl_print_grn g
-                INNER JOIN tbl_print_grndetail gd
-                    ON g.idtbl_print_grn = gd.tbl_print_grn_idtbl_print_grn
-                WHERE g.tbl_print_porder_idtbl_print_porder =
-                    tbl_print_grn.tbl_print_porder_idtbl_print_porder
-                AND gd.tbl_print_material_info_idtbl_print_material_info =
-                    tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info
+                FROM tbl_grn g
+                INNER JOIN tbl_grndetail gd
+                    ON g.idtbl_grn = gd.tbl_grn_idtbl_grn
+                WHERE g.tbl_porder_idtbl_porder =
+                    tbl_grn.tbl_porder_idtbl_porder
+                AND gd.tbl_product_idtbl_product =
+                    tbl_grndetail.tbl_product_idtbl_product
                 AND g.status = 1
                 AND gd.status = 1
-                AND g.idtbl_print_grn < tbl_print_grn.idtbl_print_grn
+                AND g.idtbl_grn < tbl_grn.idtbl_grn
             ) AS prev_qty
 
         ", false);
-        $this->db->from('tbl_print_grn');
+        $this->db->from('tbl_grn');
 
         $this->db->join(
-            'tbl_print_grndetail',
-            'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail.tbl_print_grn_idtbl_print_grn',
+            'tbl_grndetail',
+            'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn',
             'left'
         );
 
         $this->db->join(
-            'tbl_print_material_info',
-            'tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info = tbl_print_material_info.idtbl_print_material_info',
+            'tbl_product',
+            'tbl_grndetail.tbl_product_idtbl_product = tbl_product.idtbl_product',
             'left'
         );
 
         $this->db->join(
             'tbl_supplier',
-            'tbl_print_grn.tbl_supplier_idtbl_supplier = tbl_supplier.idtbl_supplier',
+            'tbl_grn.tbl_supplier_idtbl_supplier = tbl_supplier.idtbl_supplier',
             'left'
         );
 
         $this->db->join(
             'tbl_location',
-            'tbl_print_grn.tbl_location_idtbl_location = tbl_location.idtbl_location',
+            'tbl_grn.tbl_location_idtbl_location = tbl_location.idtbl_location',
             'left'
         );
 
         $this->db->join(
-            'tbl_material_group',
-            'tbl_print_grn.tbl_material_group_idtbl_material_group = tbl_material_group.idtbl_material_group',
+            'tbl_category',
+            'tbl_product.tbl_category_idtbl_category = tbl_category.idtbl_category',
             'left'
         );
 
         $this->db->join(
-            'tbl_measurements',
-            'tbl_print_grndetail.tbl_measurements_idtbl_mesurements = tbl_measurements.idtbl_mesurements',
+            'tbl_unit',
+            'tbl_product.tbl_unit_idtbl_unit = tbl_unit.idtbl_unit',
             'left'
         );
 
         $this->db->join(
-            'tbl_print_porder',
-            'tbl_print_grn.tbl_print_porder_idtbl_print_porder = tbl_print_porder.idtbl_print_porder',
+            'tbl_porder',
+            'tbl_grn.tbl_porder_idtbl_porder = tbl_porder.idtbl_porder',
             'left'
         );
 
         $this->db->where(
-            'tbl_print_grn.idtbl_print_grn',
+            'tbl_grn.idtbl_grn',
             $recordID
         );
         $query = $this->db->get();
@@ -128,23 +128,23 @@ class PdfGRNinfo extends CI_Model {
             }
 
             $itemDescription = '';
-            if ($rowlist->idtbl_material_group == 4) {
+            if ($rowlist->idtbl_category == 4) {
                 $itemDescription = $rowlist->comment;
             } else {
-                $itemDescription = $rowlist->materialname;
-                if (!empty($rowlist->materialinfocode)) {
-                    $itemDescription .= ' / ' . $rowlist->materialinfocode;
+                $itemDescription = $rowlist->product_name;
+                if (!empty($rowlist->product_code)) {
+                    $itemDescription .= ' / ' . $rowlist->product_code;
                 }
             }
 
             $dataArray[$section][] = [
-                'itemcode' => $rowlist->materialinfocode,
+                'itemcode' => $rowlist->product_code,
                 'itemDescription' => $itemDescription,
                 'ordered' => (float) $rowlist->ordered_qty,
                 'prev' => (float) $rowlist->prev_qty,
                 'received' => (float) $rowlist->qty,
-                'unit' => $rowlist->measure_type,
-                'price' => !empty($rowlist->packetprice) ? $rowlist->packetprice : $rowlist->costunitprice,
+                'unit' => $rowlist->unit,
+                'price' => !empty($rowlist->unitprice) ? $rowlist->unitprice : $rowlist->costunitprice,
                 'total' => $rowlist->total,
             ];
 
@@ -162,10 +162,10 @@ class PdfGRNinfo extends CI_Model {
         $dompdf = new Dompdf($options);
 
         $this->db->select('tbl_company.company AS companyname,tbl_company.address1 As companyaddress,tbl_company.mobile AS companymobile, tbl_company.phone companyphone,tbl_company.email AS companyemail, tbl_company_branch.branch AS branchname');
-        $this->db->from('tbl_print_grn');
-        $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_print_grn.tbl_company_idtbl_company', 'left');
-        $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_print_grn.tbl_company_branch_idtbl_company_branch', 'left');
-        $this->db->where('tbl_print_grn.idtbl_print_grn', $recordID);
+        $this->db->from('tbl_grn');
+        $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_grn.tbl_company_idtbl_company', 'left');
+        $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_grn.tbl_company_branch_idtbl_company_branch', 'left');
+        $this->db->where('tbl_grn.idtbl_grn', $recordID);
         $companydetails = $this->db->get();
 
         $html = '
@@ -178,15 +178,14 @@ class PdfGRNinfo extends CI_Model {
             <style>
                 @page {
                     size: 220mm 140mm;
-                    margin: 5mm 5mm 5mm 5mm; /* top right bottom left */
+                    margin: 5mm 5mm 5mm 5mm;
                     font-family: Arial, sans-serif;
                 }
                 body {
                     font-family: Arial, sans-serif;
                     line-height: 1.5;
                     text-align:left;
-                    margin-top: 190px;   /* was 165px */
-                    /* margin-bottom: 140px; */
+                    margin-top: 190px;
                 }
 
                 header {
@@ -194,10 +193,9 @@ class PdfGRNinfo extends CI_Model {
                     top: 0px;
                     left: 0px;
                     right: 0px;
-                    height: 280px;   /* was 255px */
+                    height: 280px;
                 }
 
-                /** Define the footer rules **/
                 footer {
                     position: fixed;
                     bottom: 0px;
@@ -269,74 +267,23 @@ class PdfGRNinfo extends CI_Model {
         <footer>
             <table width="100%" style="border-collapse: collapse; table-layout: fixed;">
                 <tr>
-                    <td style="
-                        width: 33.33%;
-                        text-align: center;
-                        vertical-align: bottom;
-                        padding: 0 20px;
-                    ">
-                        <div style="
-                            border-top: 1px dotted #000;
-                            width: 75%;
-                            margin: 0 auto 8px auto;
-                            height: 1px;
-                        "></div>
-
-                        <div style="
-                            font-size: 12px;
-                            text-align: center;
-                        ">
-                            Received by
-                        </div>
+                    <td style="width: 33.33%;text-align: center;vertical-align: bottom;padding: 0 20px;">
+                        <div style="border-top: 1px dotted #000;width: 75%;margin: 0 auto 8px auto;height: 1px;"></div>
+                        <div style="font-size: 12px;text-align: center;">Received by</div>
                     </td>
-
-                    <td style="
-                        width: 33.33%;
-                        text-align: center;
-                        vertical-align: bottom;
-                        padding: 0 20px;
-                    ">
-                        <div style="
-                            border-top: 1px dotted #000;
-                            width: 75%;
-                            margin: 0 auto 8px auto;
-                            height: 1px;
-                        "></div>
-
-                        <div style="
-                            font-size: 12px;
-                            text-align: center;
-                        ">
-                            Approved by
-                        </div>
+                    <td style="width: 33.33%;text-align: center;vertical-align: bottom;padding: 0 20px;">
+                        <div style="border-top: 1px dotted #000;width: 75%;margin: 0 auto 8px auto;height: 1px;"></div>
+                        <div style="font-size: 12px;text-align: center;">Approved by</div>
                     </td>
-
-                    <td style="
-                        width: 33.33%;
-                        text-align: center;
-                        vertical-align: bottom;
-                        padding: 0 20px;
-                    ">
-                        <div style="
-                            border-top: 1px dotted #000;
-                            width: 75%;
-                            margin: 0 auto 8px auto;
-                            height: 1px;
-                        "></div>
-
-                        <div style="
-                            font-size: 12px;
-                            text-align: center;
-                        ">
-                            Accountant
-                        </div>
+                    <td style="width: 33.33%;text-align: center;vertical-align: bottom;padding: 0 20px;">
+                        <div style="border-top: 1px dotted #000;width: 75%;margin: 0 auto 8px auto;height: 1px;"></div>
+                        <div style="font-size: 12px;text-align: center;">Accountant</div>
                     </td>
                 </tr>
             </table>
         </footer>
         ';
 
-       // PHP 7.2/older-safe replacement for array_key_last()/array_key_first()
         $sectionKeys     = array_keys($dataArray);
         $firstSectionKey = reset($sectionKeys);
         $lastSectionKey  = end($sectionKeys);
@@ -358,7 +305,6 @@ class PdfGRNinfo extends CI_Model {
 
         foreach ($dataArray as $index => $section) {
 
-            // page break BEFORE every section except the first one — same pattern as VoucherPdf
             if ($index !== $firstSectionKey) {
                 $html .= '<div style="page-break-before: always;"></div>';
             }
@@ -370,7 +316,7 @@ class PdfGRNinfo extends CI_Model {
                         <tr>
                             <th rowspan="2" style="text-align:left;font-size: 12px;border: 1px thin solid;padding-left: 10px;">Item Code</th>
                             <th rowspan="2" style="text-align:center;font-size: 12px;border: 1px thin solid;">Item Description</th>
-                            <th colspan="3" style="text-align:center;font-size: 12px;border: 1px thin solid;">Quanttity</th>
+                            <th colspan="3" style="text-align:center;font-size: 12px;border: 1px thin solid;">Quantity</th>
                             <th rowspan="2" style="text-align:center;font-size: 12px;border: 1px thin solid;">Unit</th>
                             <th rowspan="2" style="text-align:center;font-size: 12px;border: 1px thin solid;">Price</th>
                             <th rowspan="2" style="text-align:center;font-size: 12px;border: 1px thin solid;">Total</th>
@@ -396,7 +342,6 @@ class PdfGRNinfo extends CI_Model {
                         }
                     $html.='</tbody>';
 
-                    // only the true last section carries the totals footer
                     if ($index === $lastSectionKey) {
                         $html .= '<tfoot>'.$totalsRowsHtml.'</tfoot>';
                     }
@@ -414,35 +359,33 @@ class PdfGRNinfo extends CI_Model {
         $dompdf->render();
         $dompdf->stream("Goods Received Note - ". $recordID .".pdf", ["Attachment"=>0]);
     }
+
     public function VoucherPdf($x){
         $recordID=$x;
-        $sql ="SELECT *, `tbl_print_grn`.`subtotal` AS `grnsubtotal` FROM `tbl_grn_vouchar_import_cost` 
-        LEFT JOIN `tbl_print_grn` ON `tbl_print_grn`.`idtbl_print_grn` = `tbl_grn_vouchar_import_cost`.`tbl_print_grn_idtbl_print_grn` 
-        LEFT JOIN `tbl_supplier` ON `tbl_supplier`.`idtbl_supplier` = `tbl_print_grn`.`tbl_supplier_idtbl_supplier` 
-        LEFT JOIN `tbl_print_porder` ON `tbl_print_porder`.`idtbl_print_porder` = `tbl_print_grn`.`tbl_print_porder_idtbl_print_porder` 
+        $sql ="SELECT *, `tbl_grn`.`subtotal` AS `grnsubtotal` FROM `tbl_grn_vouchar_import_cost` 
+        LEFT JOIN `tbl_grn` ON `tbl_grn`.`idtbl_grn` = `tbl_grn_vouchar_import_cost`.`tbl_grn_idtbl_grn` 
+        LEFT JOIN `tbl_supplier` ON `tbl_supplier`.`idtbl_supplier` = `tbl_grn`.`tbl_supplier_idtbl_supplier` 
+        LEFT JOIN `tbl_porder` ON `tbl_porder`.`idtbl_porder` = `tbl_grn`.`tbl_porder_idtbl_porder` 
         WHERE `idtbl_grn_vouchar_import_cost` = ?";
         $respond=$this->db->query($sql, array($recordID));
 
-        // print_r($this->db->last_query());
-
-        $grnID=$respond->row(0)->idtbl_print_grn;
+        $grnID=$respond->row(0)->idtbl_grn;
 
         $this->db->select('tbl_grn_vouchar_import_cost.*, tbl_company.company AS companyname,tbl_company.address1 As companyaddress,tbl_company.mobile AS companymobile, tbl_company.phone companyphone,tbl_company.email AS companyemail, tbl_company_branch.branch AS branchname');
-		$this->db->from('tbl_grn_vouchar_import_cost');
-		$this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_grn_vouchar_import_cost.tbl_company_idtbl_company', 'left');
+        $this->db->from('tbl_grn_vouchar_import_cost');
+        $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_grn_vouchar_import_cost.tbl_company_idtbl_company', 'left');
         $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_grn_vouchar_import_cost.tbl_company_branch_idtbl_company_branch', 'left');
-		$this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
-		$companydetails = $this->db->get();
+        $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
+        $companydetails = $this->db->get();
 
-        $this->db->select('*, COALESCE(tbl_print_grn.idtbl_print_grn, 0) AS idtbl_print_grn, COALESCE(tbl_print_grn.total, 0) AS grn_total, COALESCE(tbl_print_grn.discount, 0) AS discount, COALESCE(tbl_print_grndetail.qty, 0) AS qty, COALESCE(tbl_print_grndetail.costunitprice, 0) AS costunitprice');
-        $this->db->from('tbl_print_grn');
-        $this->db->join('tbl_print_grndetail', 'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail.tbl_print_grn_idtbl_print_grn', 'left');
-        $this->db->join('tbl_print_material_info', 'tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info = tbl_print_material_info.idtbl_print_material_info', 'left');
-        $this->db->join('tbl_supplier', 'tbl_print_grn.tbl_supplier_idtbl_supplier = tbl_supplier.idtbl_supplier', 'left');
-        $this->db->join('tbl_location', 'tbl_print_grn.tbl_location_idtbl_location = tbl_location.idtbl_location', 'left');
-        $this->db->join('tbl_material_group', 'tbl_print_grn.tbl_material_group_idtbl_material_group = tbl_material_group.idtbl_material_group', 'left');
-        $this->db->join('tbl_measurements', 'tbl_print_grndetail.tbl_measurements_idtbl_mesurements = tbl_measurements.idtbl_mesurements', 'left');
-        $this->db->where('tbl_print_grn.idtbl_print_grn' ,$grnID);
+        $this->db->select('*, COALESCE(tbl_grn.idtbl_grn, 0) AS idtbl_grn, COALESCE(tbl_grn.total, 0) AS grn_total, COALESCE(tbl_grn.discount, 0) AS discount, COALESCE(tbl_grndetail.qty, 0) AS qty, COALESCE(tbl_grndetail.costunitprice, 0) AS costunitprice');
+        $this->db->from('tbl_grn');
+        $this->db->join('tbl_grndetail', 'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn', 'left');
+        $this->db->join('tbl_product', 'tbl_grndetail.tbl_product_idtbl_product = tbl_product.idtbl_product', 'left');
+        $this->db->join('tbl_supplier', 'tbl_grn.tbl_supplier_idtbl_supplier = tbl_supplier.idtbl_supplier', 'left');
+        $this->db->join('tbl_location', 'tbl_grn.tbl_location_idtbl_location = tbl_location.idtbl_location', 'left');
+        $this->db->join('tbl_unit', 'tbl_product.tbl_unit_idtbl_unit = tbl_unit.idtbl_unit', 'left');
+        $this->db->where('tbl_grn.idtbl_grn' ,$grnID);
         $respondgrn = $this->db->get();
     
         $sql2="SELECT 
@@ -483,8 +426,7 @@ class PdfGRNinfo extends CI_Model {
             <title>Multi Offset Printers</title>
             <style>
                 @page {
-                    /* size: 220mm 140mm; */
-                    margin: 5mm 5mm 5mm 5mm; /* top right bottom left */
+                    margin: 5mm 5mm 5mm 5mm;
                     font-family: Arial, sans-serif;
                 }
                 body {
@@ -494,7 +436,6 @@ class PdfGRNinfo extends CI_Model {
                     margin-top: 260px;
                 }
 
-                /** Define the header rules **/
                 header {
                     position: fixed;
                     top: 0px;
@@ -503,7 +444,6 @@ class PdfGRNinfo extends CI_Model {
                     height: 350px;
                 }
 
-                /** Define the footer rules **/
                 footer {
                     position: fixed; 
                     bottom: 0px; 
@@ -530,9 +470,6 @@ class PdfGRNinfo extends CI_Model {
                             <p style="margin:0px;font-size:13px;">Tax Registration</p>
                             <p style="margin:0px;font-size:13px;font-weight:normal;">Telephone : '.$companydetails->row()->companymobile.'/'.$companydetails->row()->companyphone.'</p>
                             <p style="margin:0px;font-size:13px;font-weight:normal;"><u>E-Mail : '.$companydetails->row()->companyemail.'</u></p>
-                            <!--<p style="margin:0px;font-size:13px;font-weight:normal;">GRN No: MO/GRN-0000'. $respond->row()->idtbl_print_grn .'</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;">Date : '.$respond->row(0)->grndate.'</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;">Our Vat No : &nbsp; 103305667-7000</p>-->
                         </td>
                     </tr>
                     <tr>
@@ -617,9 +554,6 @@ class PdfGRNinfo extends CI_Model {
                 </table>
             </footer>';
 
-            // ---- Item list now renders ONCE, before the cost-split pages ----
-            // (previously this whole block was inside the per-section loop below,
-            //  so the full GRN item list was reprinted on every Importation Split page)
             $html.='
             <main>
                 <table style="width:100%;border-collapse: collapse;">
@@ -639,8 +573,8 @@ class PdfGRNinfo extends CI_Model {
                                     <th style="text-align: right;font-size: 12px;" nowrap><u>Total (Inc)</u></th>
                                 </tr>';
                                 foreach ($respondgrn->result() as $rowgrninfo) {                               
-                                        $itemcode=$rowgrninfo->materialinfocode;
-                                        $itemdesc=$rowgrninfo->materialname;
+                                        $itemcode=$rowgrninfo->product_code;
+                                        $itemdesc=$rowgrninfo->product_name;
                         
                                     $html.='
                                     <tr style="page-break-inside: avoid;">
@@ -649,7 +583,7 @@ class PdfGRNinfo extends CI_Model {
                                         <td style="text-align: center;font-size: 12px;">'.$rowgrninfo->qty.'</td>
                                         <td style="text-align: center;font-size: 12px;">0.00</td>
                                         <td style="text-align: center;font-size: 12px;">'.$rowgrninfo->qty.'</td>
-                                        <td style="text-align: center;font-size: 12px;">'.$rowgrninfo->measure_type.'</td>
+                                        <td style="text-align: center;font-size: 12px;">'.$rowgrninfo->unit.'</td>
                                         <td style="text-align: right;font-size: 12px;" nowrap>'.$rowgrninfo->costunitprice.'</td>
                                         <td style="text-align: left;font-size: 12px;" nowrap>'.$rowgrninfo->unit_discount.'</td>
                                         <td style="text-align: right;font-size: 12px;" nowrap>'.number_format($rowgrninfo->costunitprice, 2).'</td>
@@ -670,14 +604,12 @@ class PdfGRNinfo extends CI_Model {
             </main>
             ';
 
-            // PHP 7.2/older-safe replacement for array_key_last()/array_key_first()
             $sectionKeys     = array_keys($dataArray);
             $firstSectionKey = reset($sectionKeys);
             $lastSectionKey  = end($sectionKeys);
 
             foreach ($dataArray as $index => $section) {
 
-                // page break BEFORE every split-cost section except the first one
                 if ($index !== $firstSectionKey) {
                     $html .= '<div style="page-break-before: always;"></div>';
                 }
@@ -710,7 +642,6 @@ class PdfGRNinfo extends CI_Model {
                                         </tr>';
                                     }
 
-                                    // only the TRUE last section shows the split totals
                                     if ($index === $lastSectionKey) {
                                         $html .= '<tfoot>
                                             <tr>

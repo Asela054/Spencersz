@@ -4,130 +4,80 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 date_default_timezone_set('Asia/Colombo');
 
 class Purchaseorder extends CI_Controller {
+
     public function index(){
         $this->load->model('Commeninfo');
         $this->load->model('Purchaseorderinfo');
-		$result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
-		$result['companylist']=$this->Purchaseorderinfo->Getcompany();
-		$result['supplierlist']=$this->Purchaseorderinfo->Getsupplier();
-		$result['ordertypelist']=$this->Purchaseorderinfo->Getordertype();
-		$result['servicetypelist']=$this->Purchaseorderinfo->Getservicetype();
-		$result['measurelist']=$this->Purchaseorderinfo->Getmeasuretype();
-		$result['porderlist']=$this->Purchaseorderinfo->Getporder();
-		$result['contactpersonlist'] = $this->Purchaseorderinfo->Getcontactperson();
-		$this->load->view('purchaseorder', $result);
-	}
-    public function Purchaseorderinsertupdate(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderinsertupdate();
-	}
-    public function Purchaseorderstatus(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderstatus();
-	}
-	public function Purchaseordercheckstatus(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseordercheckstatus();
-	}
-	public function POmanualconfirm($x){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->POmanualconfirm($x);
-	}
-	public function Purchaseorderrejectstatus(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderrejectstatus();
-	}
-    public function Purchaseorderedit(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderedit();
-	}
-    public function Getproductaccosupplier(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductaccosupplier();
-	}
-	public function Getpordertpeaccoporderrequest(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getpordertpeaccoporderrequest();
-	}
-	public function Getmesuretpeaccorproduct(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getmesuretpeaccorproduct();
-	}
-
-	public function Getservicetyperequest(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getservicetyperequest();
-	}
-	public function Getproductforvehicle(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductforvehicle();
-	}
-	public function Getproductformachine(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductformachine();
-	}
-	public function Getproductforsparepart(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductforsparepart();
-	}
-	public function Getproductaccoporder(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductaccoporder();
-	}
-	public function Getsupplieraccoporderreq(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getsupplieraccoporderreq();
-	}
-	public function Getporderreqdetails(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getporderreqdetails();
-	}
-	public function Getproductinfoaccoproduct(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductinfoaccoproduct();
-	}
-	public function Getproductinfoamachine(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductinfoamachine();
-	}
-	public function Getproductinfosparepart(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getproductinfosparepart();
-	}
-		public function Getproductinfoservice(){
-			$this->load->model('Purchaseorderinfo');
-			$result=$this->Purchaseorderinfo->Getproductinfoservice();
-		}
-    public function Purchaseorderview(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderview();
-	}
-	public function porderviewheader(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->porderviewheader();
-	}
-	public function Getvatpresentage(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getvatpresentage();
-	}
-	public function Printinvoice($x){
-		$this->load->model('InvoicePrintinfo');
-        $result=$this->InvoicePrintinfo->Printinvoice($x);
-	}
-	public function GetProductList() {
-        $this->load->model('Purchaseorderinfo');
-        $products = $this->Purchaseorderinfo->getProductsByType();
+        $result['menuaccess']   = $this->Commeninfo->Getmenuprivilege();
+        $result['supplierlist'] = $this->Purchaseorderinfo->Getsupplier();
+        $result['porderlist']   = $this->Purchaseorderinfo->Getporder();
+        $this->load->view('purchaseorder', $result);
     }
-	public function Getpiecesforqty(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Getpiecesforqty();
-	}
-	public function Purchaseorderupdate(){
-		$this->load->model('Purchaseorderinfo');
-        $result=$this->Purchaseorderinfo->Purchaseorderupdate();
-	}
-	public function Getsupplierlist(){
-		$searchTerm=$this->input->post('searchTerm');
-        $result=SearchSupplierList($searchTerm);
-	}
+
+    public function Purchaseorderinsertupdate(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseorderinsertupdate();
+    }
+
+    public function Purchaseorderupdate(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseorderupdate();
+    }
+
+    public function Purchaseorderstatus(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseorderstatus();
+    }
+
+    public function Purchaseordercheckstatus(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseordercheckstatus();
+    }
+
+    public function POmanualconfirm($x){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->POmanualconfirm($x);
+    }
+
+    public function Purchaseorderedit(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseorderedit();
+    }
+
+    public function Purchaseorderview(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Purchaseorderview();
+    }
+
+    public function porderviewheader(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->porderviewheader();
+    }
+
+    public function Getporderreqdetails(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Getporderreqdetails();
+    }
+
+    public function Getproductprice(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->Getproductprice();
+    }
+
+    public function GetProductList(){
+        $this->load->model('Purchaseorderinfo');
+        $term = trim((string)$this->input->post('searchTerm'));
+        echo json_encode($this->Purchaseorderinfo->searchProducts($term));
+    }
+
+    public function Getsupplierlist(){
+        $this->load->model('Purchaseorderinfo');
+        $term = trim((string)$this->input->post('searchTerm'));
+        echo json_encode($this->Purchaseorderinfo->searchSuppliers($term));
+    }
+
+    public function Printinvoice($x){
+        $this->load->model('PorderPrintinfo');
+        $this->PorderPrintinfo->Printinvoice($x);
+    }
 }

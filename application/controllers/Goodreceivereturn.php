@@ -7,10 +7,9 @@ class Goodreceivereturn extends CI_Controller {
     public function index(){
         $this->load->model('Commeninfo');
         $this->load->model('Goodreceivereturninfo');
-        $result['menuaccess']  = $this->Commeninfo->Getmenuprivilege();
-        $result['supplierlist']= $this->Goodreceivereturninfo->Getsupplier();
-        $result['ordertypelist']=$this->Goodreceivereturninfo->Getordertype();
-        $result['measurelist'] = $this->Goodreceivereturninfo->Getmeasuretype();
+        $result['menuaccess']   = $this->Commeninfo->Getmenuprivilege();
+        $result['supplierlist'] = $this->Goodreceivereturninfo->Getsupplier();
+        $result['measurelist']  = $this->Goodreceivereturninfo->Getmeasuretype();
         $this->load->view('goodreceivereturn', $result);
     }
 

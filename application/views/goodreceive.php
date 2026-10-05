@@ -38,7 +38,6 @@ include "include/topnavbar.php";
                                             <tr>
                                                 <th>GRN No</th>
                                                 <th>GRN Date</th>
-                                                <th>GRN Type</th>
                                                 <th>Batch No</th>
                                                 <th>Supplier</th>
                                                 <th>Total</th>
@@ -90,20 +89,10 @@ include "include/topnavbar.php";
                             </div>
 
                             <div class="form-row mb-1">
-                            <div class="col-6">
+                            <div class="col-12">
                                     <label class="small font-weight-bold text-dark">Supplier*</label>
                                     <select class="form-control form-control-sm selecter2 px-0" name="supplier"
                                         id="supplier" required readonly>
-                                    </select>
-                                </div>
-                                <div class="col-6">
-                                    <label class="small font-weight-bold text-dark">GRN Type*</label>
-                                    <select class="form-control form-control-sm" name="grntype" id="grntype" required>
-                                        <option value="">Select</option>
-                                        <?php foreach($ordertypelist->result() as $rowordertypelist){ ?>
-                                        <option value="<?php echo $rowordertypelist->idtbl_material_group ?>">
-                                            <?php echo $rowordertypelist->group ?></option>
-                                        <?php } ?>
                                     </select>
                                 </div>
                             </div>
@@ -145,16 +134,9 @@ include "include/topnavbar.php";
                             </div>
 
                             <div class="form-group mb-1">
-                                <label class="small font-weight-bold text-dark">Material*</label>
+                                <label class="small font-weight-bold text-dark">Products*</label>
                                 <select class="form-control form-control-sm selecter2 px-0" name="product"
                                     id="product" required>
-                                    <option value="">Select</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group mb-1" id="servicematerialDiv" style="display: none;">
-                                <label class="small font-weight-bold text-dark">Service Material</label>
-                                <select class="form-control form-control-sm" name="servicematerial" id="servicematerial">
                                     <option value="">Select</option>
                                 </select>
                             </div>
@@ -165,8 +147,8 @@ include "include/topnavbar.php";
                                     name="uom" id="uom">
                                     <option value="">Select</option>
                                     <?php foreach($measurelist->result() as $rowmeasurelist){ ?>
-                                    <option value="<?php echo $rowmeasurelist->idtbl_mesurements ?>">
-                                        <?php echo $rowmeasurelist->measure_type ?></option>
+                                    <option value="<?php echo $rowmeasurelist->idtbl_unit ?>">
+                                        <?php echo $rowmeasurelist->unit ?></option>
                                     <?php } ?>
                                 </select>
                             </div>
@@ -185,11 +167,6 @@ include "include/topnavbar.php";
                                     <input type="text" id="newqty" name="newqty" class="form-control form-control-sm"
                                         required >
                                 </div>
-                                <div class="col">
-            						<label class="small font-weight-bold text-dark">Pieces (Sheets)</label>
-            						<input type="text" id="piecesper_qty" name="piecesper_qty"
-            							class="form-control form-control-sm" value="0" readonly>
-            					</div>
                             </div>
 
                             <div class="form-row mb-1">
@@ -521,14 +498,6 @@ $(document).ready(function() {
         dropdownParent: $('#staticBackdrop'),
         width: '100%',
     });
-    $('#porder').select2({
-        dropdownParent: $('#staticBackdrop'),
-        width: '100%',
-    });
-    $('#grntype').change(function() {
-        toggleServiceMaterial();
-    });
-    
 
     $('#porder').select2({
         dropdownParent: $('#staticBackdrop'),
@@ -552,15 +521,6 @@ $(document).ready(function() {
             cache: true
         }
     });
-
-    function toggleServiceMaterial() {
-        if ($('#grntype').val() == '4') {
-            $('#servicematerialDiv').show();
-        } else {
-            $('#servicematerialDiv').hide();
-            $('#servicematerial').val('').trigger('change');
-        }
-    }
 
     var addcheck = '<?php echo $addcheck; ?>';
     var editcheck = '<?php echo $editcheck; ?>';
@@ -601,11 +561,10 @@ $(document).ready(function() {
                         .css('font-size', 'inherit');
                 },
             },
-            // 'copy', 'csv', 'excel', 'pdf', 'print'
         ],
         ajax: {
             url: "<?php echo base_url() ?>scripts/goodreceivelist.php",
-            type: "POST", // you can use GET
+            type: "POST",
             "data": function(d) {
                 return $.extend({}, d, {
                     "company_id": '<?php echo ($_SESSION['company_id']); ?>',
@@ -616,14 +575,11 @@ $(document).ready(function() {
             [0, "desc"]
         ],
         "columns": [
-             {
+            {
             	"data": "grn_no"
             },
             {
                 "data": "grndate"
-            },
-            {
-                "data": "group"
             },
             {
                 "data": "batchno"
@@ -642,7 +598,7 @@ $(document).ready(function() {
             {
                 "data": "porder_no"
             },
-                        {
+            {
                 "targets": -1,
                 "className": '',
                 "data": "approvestatus_display",
@@ -650,7 +606,7 @@ $(document).ready(function() {
                     return data;
                 }
             }, 
-                        {
+            {
                 "data": "name"
             },
             {
@@ -665,7 +621,7 @@ $(document).ready(function() {
 
                         button += '<div class="btn-group" role="group">';
                         button += '<button class="btn btn-yellow btn-sm btnUpdatevattype mr-1" ' +
-                            'id="' + full['idtbl_print_grn'] + '" ' +
+                            'id="' + full['idtbl_grn'] + '" ' +
                             'data-toggle="tooltip" data-placement="bottom" ' +
                             'title="Update VAT Type">' +
                             '<i class="fas fa-marker"></i>' +
@@ -673,7 +629,7 @@ $(document).ready(function() {
                         button += '<button data-toggle="tooltip" data-placement="bottom" ' +
                             'title="Edit Prices" ' +
                             'class="btn btn-primary btn-sm btnEditGRN mr-1" ' +
-                            'id="' + full['idtbl_print_grn'] + '">' +
+                            'id="' + full['idtbl_grn'] + '">' +
                             '<i class="fas fa-edit"></i>' +
                             '</button>';
 
@@ -681,7 +637,7 @@ $(document).ready(function() {
                     }
 
                             button += '<a href="<?php echo base_url() ?>Goodreceive/pdfgrnget/' +
-                            full['idtbl_print_grn'] +
+                            full['idtbl_grn'] +
                             '" target="_blank" ' +
                             'data-toggle="tooltip" data-placement="bottom" ' +
                             'title="Print GRN" ' +
@@ -692,7 +648,7 @@ $(document).ready(function() {
                     button += '<button data-toggle="tooltip" data-placement="bottom" ' +
                         'title="View GRN" ' +
                         'class="btn btn-dark btn-sm btnview mr-1" ' +
-                        'id="' + full['idtbl_print_grn'] + '" ' +
+                        'id="' + full['idtbl_grn'] + '" ' +
                         'aproval_id="' + full['approvestatus'] + '" ' +
                         'check_status="' + full['check_by'] + '" ' +
                         'grn_no="' + full['grn_no'] + '">' +
@@ -731,7 +687,7 @@ $(document).ready(function() {
             title: '',
             html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
             allowOutsideClick: false,
-            showConfirmButton: false, // Hide the OK button
+            showConfirmButton: false,
             backdrop: `
                 rgba(255, 255, 255, 0.5) 
             `,
@@ -819,11 +775,8 @@ $(document).ready(function() {
                     $.each(result, function (index, item) {
 
                         var listItem = '<li class="list-group-item bg-warning-soft">';
-                        listItem += '<strong>' + item.materialname + '</strong><br>';
-                        listItem += 'Qty: ' + item.qty + ' ' + item.measure_type;
-                        if (item.pieces) {
-                            listItem += ' | Pieces: ' + item.pieces;
-                        }
+                        listItem += '<strong>' + item.product_name + '</strong><br>';
+                        listItem += 'Qty: ' + item.qty + ' ' + item.unit;
                         listItem += '</li>';
 
                         $('#requestitem').append(listItem);
@@ -851,7 +804,7 @@ $(document).ready(function() {
     			recordID: id
     		},
     		url: '<?php echo base_url() ?>Goodreceive/Goodreceiveview',
-    		success: function (result) { //alert(result);
+    		success: function (result) {
     			$('#viewmodal').modal('show');
     			$('#viewhtml').html(result.html);
     			$('#viewcompanyname').text(result.details.companyname);
@@ -921,190 +874,176 @@ $(document).ready(function() {
         });
     });
 
-        $('#dataTable tbody').on('click', '.btnEditGRN', function () {
-            var id = $(this).attr('id');
+    $('#dataTable tbody').on('click', '.btnEditGRN', function () {
+        var id = $(this).attr('id');
 
-            $.ajax({
-                type: "POST",
-                data: { recordID: id },
-                url: '<?php echo base_url() ?>Goodreceive/Geteditgrn',
-                success: function (result) {
-                    var obj = result;        
-                    var header = obj.header;
-                    var details = obj.details;
+        $.ajax({
+            type: "POST",
+            data: { recordID: id },
+            url: '<?php echo base_url() ?>Goodreceive/Geteditgrn',
+            success: function (result) {
+                var obj = result;        
+                var header = obj.header;
+                var details = obj.details;
 
-                    $('#editgrnid').val(header.idtbl_print_grn);
-                    $('#editgrnno').val(header.grn_no);
-                    $('#editgrndate').val(header.grndate);
-                    $('#editsupplier').val(obj.suppliername);
-                    $('#editinvoice').val(header.invoicenum);
-                    $('#editheaderdiscount').val(header.discount);
-                    $('#editheadervat').val(header.vat);
-                    $('#editheadervattype').val(header.vat_type);
-                    $('#editvatpercent').text(header.vat);
+                $('#editgrnid').val(header.idtbl_grn);
+                $('#editgrnno').val(header.grn_no);
+                $('#editgrndate').val(header.grndate);
+                $('#editsupplier').val(obj.suppliername);
+                $('#editinvoice').val(header.invoicenum);
+                $('#editheaderdiscount').val(header.discount);
+                $('#editheadervat').val(header.vat);
+                $('#editheadervattype').val(header.vat_type);
+                $('#editvatpercent').text(header.vat);
 
-                    var tbody = $('#tableeditgrn tbody');
-                    tbody.empty();
+                var tbody = $('#tableeditgrn tbody');
+                tbody.empty();
 
-                    $.each(details, function (i, item) {
-                        var productName;
-                        if (header.tbl_material_group_idtbl_material_group == 4) {
-                            productName = item.comment;
-                        } else {
-                            productName = item.materialname
-                                ? (item.materialname + (item.materialinfocode ? ' / ' + item.materialinfocode : ''))
-                                : item.comment;
-                        }
+                $.each(details, function (i, item) {
+                    var productName = item.product_name;
+                    if (item.product_code) {
+                        productName += ' / ' + item.product_code;
+                    }
 
-                        var hasPieces = (item.pieces !== null && item.pieces !== '' && parseFloat(item.pieces) > 0);
-                        var qtyDisplay = hasPieces ? item.pieces : item.qty;
+                    var qtyDisplay = item.qty;
+                    var uomDisplay = item.unit || '';
+                    var discount = parseFloat(item.unit_discount) || 0;
+                    var rowTotal = (parseFloat(item.unitprice) * parseFloat(qtyDisplay)) - discount;
 
-                        var uomDisplay = hasPieces
-                            ? (item.convert_uom_name ? item.convert_uom_name : (item.main_uom_name ? item.main_uom_name : ''))
-                            : (item.main_uom_name ? item.main_uom_name : '');
+                    var row = '<tr>';
+                    row += '<td>' + productName + '</td>';
+                    row += '<td class="text-center">' + qtyDisplay + '</td>';
+                    row += '<td class="text-center">' + uomDisplay + '</td>';
+                    row += '<td class="text-right"><input type="text" class="form-control form-control-sm text-right edit-unitprice" ' +
+                        'data-detailid="' + item.idtbl_grndetail + '" data-qty="' + item.qty +
+                        '" data-discount="' + discount + '" value="' + parseFloat(item.unitprice) + '"></td>';
+                    row += '<td class="text-right">' + discount.toFixed(2) + '</td>';
+                    row += '<td class="text-right row-total">' + rowTotal.toFixed(2) + '</td>';
+                    row += '</tr>';
 
-                        var discount = parseFloat(item.unit_discount) || 0;
-                        var rowTotal = (parseFloat(item.unitprice) * parseFloat(qtyDisplay)) - discount;
+                    tbody.append(row);
+                });
 
-                        var row = '<tr>';
-                        row += '<td>' + productName + '</td>';
-                        row += '<td class="text-center">' + qtyDisplay + '</td>';
-                        row += '<td class="text-center">' + uomDisplay + '</td>';
-                        row += '<td class="text-right"><input type="text" class="form-control form-control-sm text-right edit-unitprice" ' +
-                            'data-detailid="' + item.idtbl_print_grndetail + '" data-qty="' + item.qty + '" data-pieces="' + item.pieces +
-                            '" data-discount="' + discount + '" value="' + parseFloat(item.unitprice) + '"></td>';
-                        row += '<td class="text-right">' + discount.toFixed(2) + '</td>';
-                        row += '<td class="text-right row-total">' + rowTotal.toFixed(2) + '</td>';
-                        row += '</tr>';
-
-                        tbody.append(row);
-                    });
-
-                    calculateEditGRNTotals();
-                    $('#editgrnmodal').modal('show');
-                }
-            });
-        });
-
-        $(document).on('input', '.edit-unitprice', function () {
-            var row = $(this).closest('tr');
-            var unitprice = parseFloat($(this).val()) || 0;
-            var qty = parseFloat($(this).data('qty')) || 0;
-            var pieces = parseFloat($(this).data('pieces')) || 0;
-            var discount = parseFloat($(this).data('discount')) || 0;
-
-            var finalQty = pieces > 0 ? pieces : qty;
-            var total = (unitprice * finalQty) - discount;
-
-            row.find('.row-total').text(total.toFixed(2));
-            calculateEditGRNTotals();
-        });
-
-        function calculateEditGRNTotals() {
-            var sum = 0;
-
-            $('#tableeditgrn tbody .row-total').each(function () {
-                sum += parseFloat($(this).text()) || 0;
-            });
-
-            var headerDiscount = parseFloat($('#editheaderdiscount').val()) || 0;
-            var vat = parseFloat($('#editheadervat').val()) || 0;
-            var vatType = $('#editheadervattype').val();
-
-            var subTotal = sum - headerDiscount;
-            var vatAmount = 0;
-            var finalTotal = subTotal;
-
-            var companyId = <?php echo (int)$_SESSION['company_id']; ?>;
-
-            if (companyId != 3 && vatType == 1) {
-                vatAmount = (subTotal * vat) / 100;
-                finalTotal = subTotal + vatAmount;
-                $('#editvatrow').show();
-            } else {
-                vatAmount = 0;
-                finalTotal = subTotal;
-                $('#editvatrow').hide();
+                calculateEditGRNTotals();
+                $('#editgrnmodal').modal('show');
             }
+        });
+    });
 
-            $('#editdiscountdisplay').text(addCommas(headerDiscount.toFixed(2)));
-            $('#editsubtotaldisplay').text(addCommas(subTotal.toFixed(2)));
-            $('#editvatamountdisplay').text(addCommas(vatAmount.toFixed(2)));
-            $('#edittotalpaymentdisplay').text(addCommas(finalTotal.toFixed(2)));
+    $(document).on('input', '.edit-unitprice', function () {
+        var row = $(this).closest('tr');
+        var unitprice = parseFloat($(this).val()) || 0;
+        var qty = parseFloat($(this).data('qty')) || 0;
+        var discount = parseFloat($(this).data('discount')) || 0;
+
+        var total = (unitprice * qty) - discount;
+
+        row.find('.row-total').text(total.toFixed(2));
+        calculateEditGRNTotals();
+    });
+
+    function calculateEditGRNTotals() {
+        var sum = 0;
+
+        $('#tableeditgrn tbody .row-total').each(function () {
+            sum += parseFloat($(this).text()) || 0;
+        });
+
+        var headerDiscount = parseFloat($('#editheaderdiscount').val()) || 0;
+        var vat = parseFloat($('#editheadervat').val()) || 0;
+        var vatType = $('#editheadervattype').val();
+
+        var subTotal = sum - headerDiscount;
+        var vatAmount = 0;
+        var finalTotal = subTotal;
+
+        var companyId = <?php echo (int)$_SESSION['company_id']; ?>;
+
+        if (companyId != 3 && vatType == 1) {
+            vatAmount = (subTotal * vat) / 100;
+            finalTotal = subTotal + vatAmount;
+            $('#editvatrow').show();
+        } else {
+            vatAmount = 0;
+            finalTotal = subTotal;
+            $('#editvatrow').hide();
         }
 
-        $('#btnsaveeditgrn').click(function () {
-            var jsonObj = [];
-            var valid = true;
+        $('#editdiscountdisplay').text(addCommas(headerDiscount.toFixed(2)));
+        $('#editsubtotaldisplay').text(addCommas(subTotal.toFixed(2)));
+        $('#editvatamountdisplay').text(addCommas(vatAmount.toFixed(2)));
+        $('#edittotalpaymentdisplay').text(addCommas(finalTotal.toFixed(2)));
+    }
 
-            $('#tableeditgrn tbody tr').each(function () {
-                var input = $(this).find('.edit-unitprice');
-                var unitprice = input.val();
+    $('#btnsaveeditgrn').click(function () {
+        var jsonObj = [];
+        var valid = true;
 
-                if (unitprice === '' || isNaN(unitprice)) {
-                    valid = false;
-                }
+        $('#tableeditgrn tbody tr').each(function () {
+            var input = $(this).find('.edit-unitprice');
+            var unitprice = input.val();
 
-                jsonObj.push({
-                    detailid: input.data('detailid'),
-                    unitprice: unitprice,
-                    qty: input.data('qty'),
-                    pieces: input.data('pieces'),
-                    discount: input.data('discount')
-                });
-            });
-
-            if (!valid) {
-                Swal.fire({ icon: 'warning', title: 'Invalid Input', text: 'Please enter valid unit prices for all items.' });
-                return;
+            if (unitprice === '' || isNaN(unitprice)) {
+                valid = false;
             }
 
-            Swal.fire({
-                title: '',
-                html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                backdrop: "rgba(255, 255, 255, 0.5)",
-                customClass: { popup: "fullscreen-swal" },
-                didOpen: () => {
-                    document.body.style.overflow = "hidden";
-
-                    $.ajax({
-                        type: "POST",
-                        data: {
-                            grnID: $('#editgrnid').val(),
-                            tableData: jsonObj,
-                            discount: $('#editheaderdiscount').val(),
-                            vat: $('#editheadervat').val(),
-                            vat_type: $('#editheadervattype').val()
-                        },
-                        url: '<?php echo base_url() ?>Goodreceive/Goodreceiveeditupdate',
-                        success: function (result) {
-                            Swal.close();
-                            document.body.style.overflow = 'auto';
-                            var obj = JSON.parse(result);
-
-                            if (obj.status == 1) {
-                                $('#editgrnmodal').modal('hide');
-                                actionreload(obj.action);
-                            } else {
-                                action(obj.action);
-                            }
-                        },
-                        error: function () {
-                            Swal.close();
-                            document.body.style.overflow = 'auto';
-                            Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again later.' });
-                        }
-                    });
-                }
+            jsonObj.push({
+                detailid: input.data('detailid'),
+                unitprice: unitprice,
+                qty: input.data('qty'),
+                discount: input.data('discount')
             });
         });
+
+        if (!valid) {
+            Swal.fire({ icon: 'warning', title: 'Invalid Input', text: 'Please enter valid unit prices for all items.' });
+            return;
+        }
+
+        Swal.fire({
+            title: '',
+            html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            backdrop: "rgba(255, 255, 255, 0.5)",
+            customClass: { popup: "fullscreen-swal" },
+            didOpen: () => {
+                document.body.style.overflow = "hidden";
+
+                $.ajax({
+                    type: "POST",
+                    data: {
+                        grnID: $('#editgrnid').val(),
+                        tableData: jsonObj,
+                        discount: $('#editheaderdiscount').val(),
+                        vat: $('#editheadervat').val(),
+                        vat_type: $('#editheadervattype').val()
+                    },
+                    url: '<?php echo base_url() ?>Goodreceive/Goodreceiveeditupdate',
+                    success: function (result) {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+                        var obj = JSON.parse(result);
+
+                        if (obj.status == 1) {
+                            $('#editgrnmodal').modal('hide');
+                            actionreload(obj.action);
+                        } else {
+                            action(obj.action);
+                        }
+                    },
+                    error: function () {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again later.' });
+                    }
+                });
+            }
+        });
+    });
 
     $("#formsubmit").click(function() {
         if (!$("#createorderform")[0].checkValidity()) {
-            // If the form is invalid, submit it. The form won't actually submit;
-            // this will just cause the browser to display the native HTML5 error messages.
             $("#submitBtn").click();
         } else {
             var productID = $('#product').val();
@@ -1112,22 +1051,13 @@ $(document).ready(function() {
             var product = $("#product option:selected").text();
             var unitprice = parseFloat($('#unitprice').val());
             var newqty = parseFloat($('#newqty').val());
-            var pieces = parseFloat($('#piecesper_qty').val());
             var discount = $('#unitdiscount').val();
             var uomID = $('#uom').val();
             var uom = $("#uom option:selected").text();
-            var expdate = $('#expdate').val();
             var porderdetailsid = parseFloat($('#porderdetailsid').val());
 
-            var newtotal;
-            var newprice;
-            if (pieces !== 0) {
-                newtotal = (unitprice * pieces) - discount;
-                newprice = (unitprice * pieces / newqty)  - discount;
-            } else {
-                newtotal = (unitprice * newqty) - discount;
-                newprice = 0;
-            }
+            var newtotal = (unitprice * newqty) - discount;
+            var newprice = 0;
 
             var total = parseFloat(newtotal);
             var showtotal = addCommas(parseFloat(total).toFixed(2));
@@ -1142,8 +1072,7 @@ $(document).ready(function() {
                 '</td><td class="total d-none">' + total + '</td><td class="text-right">' +
                 showtotal +
                 '</td><td name="inquerydetailsid" class="d-none">' + porderdetailsid +
-                    '</td><td name="inquerydetailsid" class="d-none">' + pieces +
-                    '</td><td><button type="button" onclick= "productDelete(this);" id="btnDeleterow" class=" btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td> </tr>'
+                '</td><td><button type="button" onclick= "productDelete(this);" id="btnDeleterow" class=" btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td> </tr>'
             );
 
             $('#product').val('').trigger('change');
@@ -1152,10 +1081,8 @@ $(document).ready(function() {
             $('#comment').val('');
             $('#unitdiscount').val('0');
             $('#newqty').val('');
-            $('#piecesper_qty').val('');
             $('#qtylabel').text('0');
             $('#porder').prop('readonly', true).css('pointer-events', 'none');
-
 
             var sum = 0;
             $(".total").each(function() {
@@ -1178,22 +1105,15 @@ $(document).ready(function() {
         var checkdiscount = parseFloat($("#discount").val());
         if (!checkdiscount == "") {
             finaltotalcalculate();
-        } else {
-
         }
-
     });
 
     $(document).on("keyup", "#vat", function(event) {
         var checkvat = parseFloat($("#vat").val());
         if (!checkvat == "") {
             finaltotalcalculate();
-        } else {
-
         }
-
     });
-
 
     $('#tableorder').on('click', 'tr', function () {
     	var r = confirm("Are you sure you want to remove this product?");
@@ -1215,7 +1135,6 @@ $(document).ready(function() {
     	}
     });
 
-
     $('#tblcost').on('click', 'tr', function() {
         var r = confirm("Are you sure, You want to remove this cost? ");
         if (r == true) {
@@ -1233,7 +1152,7 @@ $(document).ready(function() {
         }
     });
 
-    $('#btncreateorder').click(function() { //alert('IN');
+    $('#btncreateorder').click(function() {
         $('#btncreateorder').prop('disabled', true).html(
             '<i class="fas fa-circle-notch fa-spin mr-2"></i> Create Good Receive Note')
         var tbody = $("#tableorder tbody");
@@ -1247,7 +1166,6 @@ $(document).ready(function() {
                 });
                 jsonObj.push(item);
             });
-            // console.log(jsonObj);
 
             var grndate = $('#grndate').val();
             var remark = $('#remark').val();
@@ -1260,7 +1178,6 @@ $(document).ready(function() {
             var supplier = $('#supplier').val();
             var invoice = $('#invoice').val();
             var vat_type = $('#vat_type').val();
-            var grntype = $('#grntype').val();
             var discount = $('#discount').val();
             var vat = $('#vat').val();
             var subtotal = $('#hiddenfulltotal').val();
@@ -1294,7 +1211,6 @@ $(document).ready(function() {
                         subtotal: subtotal,
                         batchno: batchno,
                         supplier: supplier,
-                        grntype: grntype,
                         discount: discount,
                         vat: vat,
                         company_id: company_id,
@@ -1332,7 +1248,6 @@ $(document).ready(function() {
     });
 
     var tempsupplier;
-    var tempgrntype;
     $('#porder').change(function() {
         var porderID = $(this).val();
 
@@ -1342,7 +1257,7 @@ $(document).ready(function() {
                 recordID: porderID
             },
             url: 'Goodreceive/Getcompanyaccoporder',
-            success: function(result) { //alert(result);
+            success: function(result) {
                 $('#company_id').val(result).css('pointer-events', 'none');
             }
         });
@@ -1353,11 +1268,10 @@ $(document).ready(function() {
                 recordID: porderID
             },
             url: 'Goodreceive/Getbranchaccoporder',
-            success: function(result) { //alert(result);
+            success: function(result) {
                 $('#branch_id').val(result).css('pointer-events', 'none');
             }
         });
-
 
         function getSupplier() {
             return new Promise(function(resolve, reject) {
@@ -1378,33 +1292,10 @@ $(document).ready(function() {
             });
         }
 
-        function getGrntype() {
-            return new Promise(function(resolve, reject) {
-                $.ajax({
-                    type: "POST",
-                    data: {
-                        recordID: porderID
-                    },
-                    url: 'Goodreceive/Getpordertpeaccoporder',
-                    success: function(result) {
-                        $('#grntype').val(result).css('pointer-events', 'none');
-
-                        tempgrntype = result;
-                        getitems(porderID, result);
-                        toggleServiceMaterial();
-                        resolve();
-                    },
-                    error: reject
-                });
-            });
-        }
-
-
         getSupplier()
-            .then(getGrntype)
             .then(function() {
-
-                getbatchno(tempsupplier, tempgrntype);
+                getitems(porderID);
+                getbatchno(tempsupplier);
             })
             .catch(function(error) {
                 console.error("An error occurred:", error);
@@ -1434,85 +1325,7 @@ $(document).ready(function() {
     	});
     });
 
-    $('#product').change(function () {
-        var productID = $(this).val();
-        var porderID = $('#porder').val();
-
-        $.ajax({
-            type: "POST",
-            url: 'Goodreceive/Getservicematerials',
-            data: {
-                recordID: productID,
-                porderID: porderID
-            },
-            success: function (result) {
-                $('#servicematerial').empty();
-                $('#servicematerial').append('<option value="">Select</option>');
-
-                var data = JSON.parse(result);
-
-                if (data.length > 0) {
-                    $.each(data, function (index, item) {
-                        var $opt = $('<option></option>')
-                            .val(item.comment)
-                            .text(item.comment)
-                            .data('recordid', item.idtbl_print_porder_detail);
-
-                        $('#servicematerial').append($opt);
-                    });
-                }
-            }
-        });
-    });
-
-    $('#servicematerial').change(function () {
-        var comment  = $(this).val();
-        var detailid = $('#servicematerial option:selected').data('recordid');
-
-        $('#comment').val(comment);
-        $('#uom').prop('disabled', false).css('pointer-events', 'auto');
-
-        if (!detailid) {
-            $('#newqty').val('');
-            $('#unitprice').val('0');
-            $('#piecesper_qty').val('0');
-            $('#uom').val('');
-            return;
-        }
-
-        $.ajax({
-            type: "POST",
-            url: 'Goodreceive/Getservicematerialsprices',
-            data: {
-                recordID: detailid
-            },
-            success: function (result) {
-                var data = JSON.parse(result);
-
-                if (data.length > 0) {
-                    $('#newqty').val(data[0].qty);
-                    $('#unitprice').val(data[0].unitprice);
-                    $('#piecesper_qty').val(0);
-                    $('#uom').val(data[0].tbl_measurements_idtbl_measurements).trigger('change');
-                } else {
-                    $('#newqty').val('');
-                    $('#unitprice').val('0');
-                    $('#uom').val('');
-                    $('#piecesper_qty').val('0');
-                }
-            },
-            error: function () {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Failed to load quantity and price.'
-                });
-            }
-        });
-    });
-
-
-    function getbatchno(supplierID, typeID) {
+    function getbatchno(supplierID) {
 
         $.ajax({
             type: "POST",
@@ -1521,39 +1334,38 @@ $(document).ready(function() {
             },
             url: 'Goodreceive/Getbatchnoaccosupplier',
             success: function(result) {
-                // alert(result);
                 $('#batchno').val(result);
             }
         });
     }
 
     function getitems(porderID) {
-            $.ajax({
-                type: "POST",
-                data: {
-                    recordID: porderID
-                },
-                url: 'Goodreceive/Getproductaccoporder',
-                success: function(result) { //alert(result);
-                    var obj = JSON.parse(result);
-                    var html1 = '';
-                    html1 += '<option value="">Select</option>';
-                    $.each(obj, function(i, item) {
-                        html1 += '<option value="' + obj[i]
-                            .idtbl_print_material_info +
-                            '">';
-                        html1 += obj[i].materialname + ' / ' + obj[i]
-                            .materialinfocode;
-                        html1 += '</option>';
-                    });
-                    $('#product').empty().append(html1);
-                }
-            });
+        $.ajax({
+            type: "POST",
+            data: {
+                recordID: porderID
+            },
+            url: 'Goodreceive/Getproductaccoporder',
+            success: function(result) {
+                var obj = JSON.parse(result);
+                var html1 = '';
+                html1 += '<option value="">Select</option>';
+                $.each(obj, function(i, item) {
+                    html1 += '<option value="' + obj[i]
+                        .idtbl_product +
+                        '">';
+                    html1 += obj[i].product_name + ' / ' + obj[i]
+                        .product_code;
+                    html1 += '</option>';
+                });
+                $('#product').empty().append(html1);
+            }
+        });
     };
+
     $('#product').change(function () {
         var productID = $(this).val();
         var grn_id = $('#porder').val();
-        var grntype = $('#grntype').val(); // GRN type
 
         $.ajax({
             type: "POST",
@@ -1565,47 +1377,19 @@ $(document).ready(function() {
             success: function (result) {
                 try {
                     var obj = JSON.parse(result);
-                    if (grntype != 4) {
-                    var actualQty = parseFloat(obj.actual_qty) || 0;
-                    var pieces = parseFloat(obj.pieces) || 0;
                     var qty = parseFloat(obj.qty) || 0;
-                    var conversion_qty = parseFloat(obj.conversion_rate) || 1;
                     var newqty = 0,
                         qtyLabel = 0;
 
-                    if (pieces > 0) {
-                        var remainingPieces = pieces - actualQty;
-                        newqty = remainingPieces / conversion_qty;
-                        qtyLabel = newqty;
+                    newqty = qty;          
+                    qtyLabel = newqty;
+                    $('#newqty').val(newqty);
 
-                        if (actualQty <= 0) {
-                            $('#newqty').val(newqty);
-                        } else {
-                            $('#newqty').val('');
-                        }
-                    } else {
-                        newqty = qty - actualQty;
-                        qtyLabel = newqty;
-                        $('#newqty').val(newqty);
-                    }
-
-                        $('#newqty').data('original-qty', qty);
-                        $('#newqty').data('original-pieces', pieces);
-                        $('#qtylabel').html(qtyLabel);
-                        $('#uom').val(obj.uom || '');
-                        $('#unitprice').val(obj.unitprice || '');
-                        $('#piecesper_qty').val(pieces);
-                        /* comment intentionally left alone for normal materials */
-                        $('#porderdetailsid').val(obj.detailsid || '');
-
-                    } else {
-                        $('#uom, #unitprice, #piecesper_qty, #porderdetailsid').val('');
-                        $('#qtylabel').html('');
-                    }
-
-                    $('#piecesper_qty')
-                        .closest('.form-group')
-                        .toggle(pieces > 0);
+                    $('#newqty').data('original-qty', qty);
+                    $('#qtylabel').html(qtyLabel);
+                    $('#uom').val(obj.uom || '');
+                    $('#unitprice').val(obj.unitprice || '');
+                    $('#porderdetailsid').val(obj.detailsid || '');
 
                 } catch (e) {
                     console.error("Error parsing response:", e);
@@ -1619,15 +1403,6 @@ $(document).ready(function() {
         });
     });
 
-    $('#newqty').on('input', function () {
-        var newQty = parseFloat($(this).val()) || 0;
-        var originalQty = parseFloat($(this).data('original-qty')) || 1;
-        var originalPieces = parseFloat($(this).data('original-pieces')) || 0;
-
-        var newPieces = Math.round((newQty / originalQty) * originalPieces);
-        $('#piecesper_qty').val(newPieces);
-    });
-
     $('#dataTable tbody').on('click', '.btnLabel', function() {
         var id = $(this).attr('id');
         $('#lablemodal').modal('show');
@@ -1638,16 +1413,16 @@ $(document).ready(function() {
                 recordID: id
             },
             url: '<?php echo base_url() ?>Goodreceive/Getmateriallistaccogrn',
-            success: function(result) { //alert(result);
+            success: function(result) {
                 var obj = JSON.parse(result);
                 var html1 = '';
                 html1 += '<option value="">Select</option>';
                 $.each(obj, function(i, item) {
                     html1 += '<option value="' + obj[i]
-                        .idtbl_print_material_info +
+                        .idtbl_product +
                         '">';
-                    html1 += obj[i].materialname + ' / ' + obj[i]
-                        .materialinfocode;
+                    html1 += obj[i].product_name + ' / ' + obj[i]
+                        .product_code;
                     html1 += '</option>';
                 });
                 $('#materiallist').empty().append(html1);
@@ -1657,8 +1432,6 @@ $(document).ready(function() {
 
     $('#btncreatelable').click(function() {
         if (!$("#formlable")[0].checkValidity()) {
-            // If the form is invalid, submit it. The form won't actually submit;
-            // this will just cause the browser to display the native HTML5 error messages.
             $("#hidesubmitbtn").click();
         } else {
             let mname = $('#mname').val();
@@ -1725,8 +1498,6 @@ function finaltotalcalculate() {
     $('#modeltotalpayment').val(finalTotal.toFixed(2));
 }
 
-
-
 function addCommas(nStr) {
     nStr += '';
     x = nStr.split('.');
@@ -1739,17 +1510,15 @@ function addCommas(nStr) {
     return x1 + x2;
 }
 
-function action(data) { //alert(data);
+function action(data) {
     var obj = JSON.parse(data);
     $.notify({
-        // options
         icon: obj.icon,
         title: obj.title,
         message: obj.message,
         url: obj.url,
         target: obj.target
     }, {
-        // settings
         element: 'body',
         position: null,
         type: obj.type,
@@ -1799,9 +1568,8 @@ function getVat() {
             currentDate: currentDate,
         },
         url: 'Goodreceive/Getvatpresentage',
-        success: function(result) { //alert(result);
+        success: function(result) {
             var obj = JSON.parse(result);
-
             $('#vat').val(obj);
         }
     });
@@ -1811,7 +1579,7 @@ function approvejob(confirmnot){
         title: '',
         html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
         allowOutsideClick: false,
-        showConfirmButton: false, // Hide the OK button
+        showConfirmButton: false,
         backdrop: `
             rgba(255, 255, 255, 0.5) 
         `,
@@ -1840,11 +1608,9 @@ function approvejob(confirmnot){
                     }
                 },
                 error: function(error) {
-                    // Close the SweetAlert on error
                     Swal.close();
                     document.body.style.overflow = 'auto';
                     
-                    // Show an error alert
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
@@ -1861,7 +1627,7 @@ function checkjob(confirmnot){
         title: '',
         html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
         allowOutsideClick: false,
-        showConfirmButton: false, // Hide the OK button
+        showConfirmButton: false,
         backdrop: `
             rgba(255, 255, 255, 0.5) 
         `,
@@ -1890,11 +1656,9 @@ function checkjob(confirmnot){
                     }
                 },
                 error: function(error) {
-                    // Close the SweetAlert on error
                     Swal.close();
                     document.body.style.overflow = 'auto';
                     
-                    // Show an error alert
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
