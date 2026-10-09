@@ -19731,10 +19731,12 @@ body {
   margin-right: 0.5rem;
   display: -webkit-inline-box;
   display: inline-flex;
+  display: none;
 }
 .page-header .page-header-content .page-header-title .page-header-icon .feather {
   height: 1.75rem;
   width: 1.75rem;
+  display: none;
 }
 .page-header .page-header-content .page-header-subtitle {
   line-height: normal;
