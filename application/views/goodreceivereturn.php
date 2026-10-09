@@ -25,7 +25,7 @@ include "include/topnavbar.php";
                         <div class="row">
                             <div class="col-12 text-right">
                                 <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
-                                    data-target="#staticBackdrop"
+                                    data-target="#staticBackdrop" onclick="getVat();"
                                     <?php if($addcheck==0){echo 'disabled';} ?>><i class="fas fa-plus mr-2"></i>Create
                                     Good Receive Return Note</button>
                                 <hr>
@@ -127,6 +127,12 @@ include "include/topnavbar.php";
                             </div>
                             <div class="form-row mb-1">
                                 <div class="col">
+                                    <label class="small font-weight-bold text-dark">Serial Numbers</label>
+                                    <select class="form-control form-control-sm px-0" name="serials" id="serials" multiple></select>
+                                </div>
+                            </div>
+                            <div class="form-row mb-1">
+                                <div class="col">
                                     <label class="small font-weight-bold text-dark">Return Qty*</label>
                                     <label class="small font-weight-bold text-danger" id="qtylabel"></label>
                                     <input type="text" id="returnqty" name="returnqty"
@@ -186,6 +192,8 @@ include "include/topnavbar.php";
                                     <tr>
                                         <th>Product</th>
                                         <th class="d-none">ProductID</th>
+                                        <th class="d-none">Serial IDs</th>
+                                        <th>Serials</th>
                                         <th class="text-right">Orderd QTY</th>
                                         <th class="text-right">Avalible Stock QTY</th>
                                         <th class="text-right">Return QTY</th>
@@ -221,10 +229,14 @@ include "include/topnavbar.php";
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-6">
+                            <div class="col-3">
                                 <label class="small font-weight-bold text-dark">Vat (%)*</label>
                                 <input type="number" id="vat" name="vat" class="form-control form-control-sm" value="0"
                                     onkeyup="finaltotalcalculate();" required>
+                            </div>
+                            <div class="col-3">
+                                <label class="small font-weight-bold text-dark">Vat Amount</label>
+                                <input type="number" id="vatamount" class="form-control form-control-sm" value="0" readonly>
                             </div>
                             <div class="col-6">
                                 <label class="small font-weight-bold text-dark"><b>Total Payment</b></label>
@@ -256,34 +268,19 @@ include "include/topnavbar.php";
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">View Good Recieve Return Note</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">View Good Receive Return Note</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body" id="GRNView">
-                <div class="row">
-                    <div class="col-6 text-left">
-                        <img src="./images/book.jpg" alt="" width="40%" style="margin-top: -20px;">
-                    </div>
-                    <div class="col-6">
-                        <h2 style="margin-bottom: 2px; color: black;font-family: cursive;font-size:20px;font-weight: bold; padding:0;"
-                            class="text-right">Good Recieve Return Note<span id="pr"></span>
-                        </h2>
-                        <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding-top: 8px;padding:0;"
-                            class="text-right">Spencersz (Pvt) LTD <span id="proname"></span>
-                        </p>
-                        <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding-top: 8px;padding:0;"
-                            class="text-right">GRN-<span id="grncode"></span>
-                        </P>
-                    </div>
-                </div>
                 <div id="viewhtml"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" id="printgrn" class="btn btn-outline-primary btn-sm fa-pull-right"
-                    <?php if($addcheck==0){echo 'disabled';} ?>><i class="far fa-save"></i>&nbsp;Print GRN
-                    Return</button>
+                <button type="button" id="printgrn" class="btn btn-outline-primary btn-sm"
+                    <?php if($addcheck==0){echo 'disabled';} ?>>
+                    <i class="fas fa-print"></i>&nbsp;Print GRN Return
+                </button>
             </div>
         </div>
     </div>
@@ -298,11 +295,39 @@ $(document).ready(function() {
 </script>
 <script>
 $(document).ready(function() {
-    $('#printgrn').click(function() {
+    $('#printgrn').click(function () {
+        var $content = $('#GRNView').clone();
+        $content.find('.no-print').remove();
+        $content.find('.print-only').removeClass('print-only');
+
+        var printStyle = `
+            @page { size: A4; margin: 15mm; }
+            body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #000; }
+            .doc-header { display:flex; justify-content:space-between; align-items:flex-start;
+                          border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
+            .doc-header .company { font-size: 20px; font-weight: bold; }
+            .doc-header .sub { font-size: 11px; color:#444; }
+            .doc-title { text-align:right; font-size: 18px; font-weight:bold; text-transform: uppercase; }
+            .info-grid { width:100%; margin-bottom: 12px; }
+            .info-grid td { padding: 3px 0; vertical-align: top; width:50%; }
+            .info-grid b { display:inline-block; min-width: 90px; }
+            table.items { width:100%; border-collapse: collapse; margin-top: 8px; }
+            table.items th { background:#eee; border:1px solid #000; padding:6px; text-align:left; }
+            table.items td { border:1px solid #666; padding:6px; }
+            .text-right { text-align:right; } .text-center { text-align:center; }
+            table.totals { width:45%; margin-left:55%; margin-top:12px; border-collapse: collapse; }
+            table.totals td { padding:4px 6px; text-align:right; }
+            table.totals tr.final td { border-top:2px solid #000; font-size:14px; font-weight:bold; }
+            .signatures { display:flex; justify-content:space-between; margin-top:70px; }
+            .signatures div { width:30%; text-align:center; border-top:1px solid #000; padding-top:5px; }
+            .footer-note { margin-top:30px; text-align:center; font-size:10px; color:#666; }
+        `;
+
         printJS({
-            printable: 'GRNView',
-            type: 'html',
-            css: 'assets/css/styles.css'
+            printable: $content.html(),
+            type: 'raw-html',
+            style: printStyle,
+            documentTitle: 'GRN Return Note'
         });
     });
 });
@@ -316,6 +341,20 @@ $(document).ready(function() {
     $('#product').select2({
         dropdownParent: $('#staticBackdrop'),
         width: '100%',
+    });
+
+    var hasSerials = false;
+
+    $('#serials').select2({
+        dropdownParent: $('#staticBackdrop'),
+        width: '100%',
+        placeholder: 'Serial numbers'
+    });
+
+    $('#serials').on('change', function() {
+        if (hasSerials) {
+            $('#returnqty').val(($(this).val() || []).length);
+        }
     });
 
     var addcheck = '<?php echo $addcheck; ?>';
@@ -501,8 +540,11 @@ $(document).ready(function() {
             },
             url: 'Goodreceivereturn/Getordertypesetgrn',
             success: function(result) {
-                var obj = JSON.parse(result);
-                $('#batchno').val(obj.batchNo);
+            var obj = JSON.parse(result);
+            $('#batchno').val(obj.batchNo);
+
+            $('#vat').val(obj.vatType == 1 ? obj.vat : 0);
+            finaltotalcalculate();
 
                 $.ajax({
                     type: "POST",
@@ -551,6 +593,30 @@ $(document).ready(function() {
                 $('#unitprice').val(obj.unitPrice);
             }
         });
+
+        hasSerials = false;
+        $('#serials').empty().trigger('change');
+        $('#returnqty').prop('readonly', editcheck == 0);
+
+        if (productID) {
+            $.ajax({
+                type: "POST",
+                data: { productID: productID, grnNo: grnNo },
+                url: 'Goodreceivereturn/Getserialsaccoproduct',
+                success: function(result) {
+                    var list = JSON.parse(result);
+                    if (list.length > 0) {
+                        hasSerials = true;
+                        var html = '';
+                        $.each(list, function(i, item) {
+                            html += '<option value="' + item.idtbl_product_serial + '">' + item.serialno + '</option>';
+                        });
+                        $('#serials').html(html).val(null).trigger('change');
+                        $('#returnqty').val('').prop('readonly', true);
+                    }
+                }
+            });
+        }
     });
 
     $("#formsubmit").click(function() {
@@ -586,16 +652,24 @@ $(document).ready(function() {
                 return;
             }
 
+            var serialIDs = $('#serials').val() || [];
+            var serialTexts = $('#serials option:selected').map(function() { return $(this).text(); }).get().join(', ');
+
+            if (hasSerials && serialIDs.length == 0) {
+                alert("Please select the serial numbers to return.");
+                return;
+            }
+
             $('#tableorder > tbody:last').append('<tr class="pointer"><td>' + product +
-                '</td><td class="d-none">' + productID + '</td><td class="text-right">' +
-                orderedQty +
-                '</td><td class="text-right">' + stockQty + '</td><td class="text-right">' +
-                returnQty +
+                '</td><td class="d-none">' + productID + '</td><td class="text-right">' + orderedQty +
+                '</td><td class="text-right">' + stockQty + '</td><td class="text-right">' + returnQty +
                 '</td><td class="text-right">' + unitPrice + '</td><td class="text-center">' + uom +
                 '</td><td class="d-none">' + uomID + '</td><td class="text-right">' + discount +
-                '</td><td>' + comment + '<td class="text-right"> ' + showtotal +
+                '</td><td>' + comment + '</td><td class="text-right"> ' + showtotal +
                 '</td><td class="d-none total"> ' + total +
-                '</td><td><button type="button" onclick= "productDelete(this);" id="btnDeleterow" class=" btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td> </tr>'
+                '</td><td class="d-none">' + serialIDs.join(',') +
+                '</td><td>' + serialTexts +
+                '</td><td><button type="button" onclick="productDelete(this);" id="btnDeleterow" class="btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td></tr>'
             );
 
             $('#grn_no').prop('disabled', true);
@@ -753,7 +827,7 @@ function productDelete(elem) {
 function finaltotalcalculate() {
     var vat = parseFloat($("#vat").val());
     var discount = parseFloat($("#discount").val());
-    var total = parseFloat($("#hidetotalorder").val());
+    var total = parseFloat($("#hidetotalorder").val()) || 0;
 
     if (isNaN(discount)) {
         discount = 0;
@@ -765,13 +839,25 @@ function finaltotalcalculate() {
         $("#vat").val(0);
     }
 
-    var finalsubtot = total - discount
-    $('#hiddenfulltotal').val(finalsubtot.toFixed(2))
+    var finalsubtot = total - discount;
+    $('#hiddenfulltotal').val(finalsubtot.toFixed(2));
 
-    var vatamount = parseFloat((finalsubtot / 100) * vat);
-    var finaltotal = finalsubtot + vatamount
+    var vatamount = (finalsubtot * vat) / 100;
+    $('#vatamount').val(vatamount.toFixed(2));
 
-    $('#modeltotalpayment').val(finaltotal.toFixed(2));
+    $('#modeltotalpayment').val((finalsubtot + vatamount).toFixed(2));
+}
+
+function getVat() {
+    $.ajax({
+        type: "POST",
+        data: { currentDate: '<?php echo date('Y-m-d'); ?>' },
+        url: 'Goodreceivereturn/Getvatpresentage',
+        success: function(result) {
+            $('#vat').val(JSON.parse(result));
+            finaltotalcalculate();
+        }
+    });
 }
 
 function addCommas(nStr) {

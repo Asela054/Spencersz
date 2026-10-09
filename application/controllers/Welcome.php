@@ -3,29 +3,14 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Welcome extends CI_Controller {
 
-	/**
-	 * Index Page for this controller.
-	 *
-	 * Maps to the following URL
-	 * 		http://example.com/index.php/welcome
-	 *	- or -
-	 * 		http://example.com/index.php/welcome/index
-	 *	- or -
-	 * Since this controller is set as the default controller in
-	 * config/routes.php, it's displayed at http://example.com/
-	 *
-	 * So any other public methods not prefixed with an underscore will
-	 * map to /index.php/welcome/<method_name>
-	 * @see https://codeigniter.com/userguide3/general/urls.html
-	 */
 	public function index()
 	{
 		$this->load->view('login');
 	}
+
 	public function LoginUser(){
 		$this->load->model('Userinfo');
         $result=$this->Userinfo->LoginUser();
-		//  print_r($result['user_data']);
 		$AccountAPIURL='http://localhost/accountscode/';
 
         if($result['user_data']!=false){
@@ -38,20 +23,20 @@ class Welcome extends CI_Controller {
 				'companyname'=>$result['company_name'],
 				'branch_id'=>$result['branch_id'],
 				'branchname'=>$result['branch_name'],
-				'branchname'=>$result['branch_name'],
 				'accountapiurl'=>$AccountAPIURL,
                 'loggedin'=>true
             );
 
 			$this->session->set_userdata($user_data);
-			
-			redirect('Welcome/Dashboard');            
+
+			redirect('Welcome/Dashboard');
         }
         else{
             $this->session->set_flashdata('msg', 'Invalid Username or password');
             redirect();
         }
 	}
+
 	public function Logout(){
         $this->session->unset_userdata('userid');
         $this->session->unset_userdata('name');
@@ -65,58 +50,57 @@ class Welcome extends CI_Controller {
         $this->session->unset_userdata('loggedin');
         $this->cart->destroy();
 
-		
         redirect(base_url());
     }
+
 	public function Dashboard(){
 		$this->load->model('Commeninfo');
 		$this->load->model('DashboardInfo');
-		$result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
-		// $result['materialinfo']=$this->DashboardInfo->DashMaterialInfo();
-		// $result['zerostockinfo']=$this->DashboardInfo->DashZeroStockInfo();
-		// $result['lowstockinfo']=$this->DashboardInfo->DashLowStockInfo();
-		// $result['todaysales']=$this->DashboardInfo->DashTodaySalesTotal();
-		// $result['monthsales']=$this->DashboardInfo->DashMonthSalesTotal();
-		// $result['resultdate']=$this->DashboardInfo->DashLastFiveInfo();
-		// $result['resultqty']=$this->DashboardInfo->DashTopFiveInfo();
-		// $result['resultnonmove']=$this->DashboardInfo->DashNonMoveInfo();
 
-		// Chart data: daily/monthly sales (json-encoded for Chart.js)
-		// $result['dailysales']   = json_encode($this->DashboardInfo->DashDailySales(7));
-		// $result['monthlysales'] = json_encode($this->DashboardInfo->DashMonthlySales(12));
+		$result['menuaccess'] = $this->Commeninfo->Getmenuprivilege();
+
+		// stat cards
+		$result['cards'] = $this->DashboardInfo->Cards();
+
+		// tables
+		$result['lowstock']   = $this->DashboardInfo->LowStockTable(8);
+		$result['recentgrn']  = $this->DashboardInfo->RecentGrn(6);
+		$result['recentinv']  = $this->DashboardInfo->RecentInvoices(6);
+		$result['recentret']  = $this->DashboardInfo->RecentGrnReturns(6);
+
+		// chart data (json for Chart.js)
+		$result['daily']      = json_encode($this->DashboardInfo->DailySeries(7));
+		$result['monthly']    = json_encode($this->DashboardInfo->MonthlySeries(12));
+		$result['bycategory'] = json_encode($this->DashboardInfo->StockByCategory());
+		$result['bybrand']    = json_encode($this->DashboardInfo->StockByBrand());
+		$result['topproducts']= json_encode($this->DashboardInfo->TopProducts(5));
+		$result['serials']    = json_encode($this->DashboardInfo->SerialStatus());
 
 		$this->load->view('dashboard', $result);
 	}
+
 	public function Getbranchaccocompany(){
 		$recordID=$this->input->post('company_id');
         $result=CompanyBranchList($recordID);
 	}
 
-	// AJAX: returns 7-day sales total ending on the posted date
-	// POST: enddate = 'YYYY-MM-DD'
-	// public function DailyChartData(){
-	// 	$this->load->model('DashboardInfo');
-	// 	$endDate = $this->input->post('enddate');
+	public function DailyChartData(){
+		$this->load->model('DashboardInfo');
+		$endDate = $this->input->post('enddate');
+		$days    = (int) $this->input->post('days');
+		if (!in_array($days, array(7, 14, 30))) { $days = 7; }
 
-	// 	$data = array(
-	// 		'sales' => $this->DashboardInfo->DashDailySales(7, $endDate),
-	// 	);
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($this->DashboardInfo->DailySeries($days, $endDate)));
+	}
 
-	// 	header('Content-Type: application/json');
-	// 	echo json_encode($data);
-	// }
+	public function MonthlyChartData(){
+		$this->load->model('DashboardInfo');
+		$endMonth = $this->input->post('endmonth');
 
-	// AJAX: returns 12-month sales total ending on the posted month
-	// POST: endmonth = 'YYYY-MM'
-	// public function MonthlyChartData(){
-	// 	$this->load->model('DashboardInfo');
-	// 	$endMonth = $this->input->post('endmonth');
-
-	// 	$data = array(
-	// 		'sales' => $this->DashboardInfo->DashMonthlySales(12, $endMonth),
-	// 	);
-
-	// 	header('Content-Type: application/json');
-	// 	echo json_encode($data);
-	// }
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($this->DashboardInfo->MonthlySeries(12, $endMonth)));
+	}
 }

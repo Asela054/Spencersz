@@ -118,7 +118,7 @@ include "include/topnavbar.php";
                                         <label class="small font-weight-bold">Serial Number Tracking*</label>
                                         <select class="form-control form-control-sm" name="has_serial" id="has_serial" required>
                                             <option value="0">No</option>
-                                            <option value="1">Yes</option>
+                                            <option value="1" selected>Yes</option>
                                         </select>
                                     </div>
                                     <div class="form-group mb-1">

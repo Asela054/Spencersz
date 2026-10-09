@@ -10,7 +10,6 @@ class Goodreceive extends CI_Controller {
 		$result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
 		$result['companylist']=$this->Goodreceiveinfo->Getcompany();
 		$result['locationlist']=$this->Goodreceiveinfo->Getlocation();
-		$result['warehouselist']=$this->Goodreceiveinfo->Getwarehouse();
 		$result['branchlist']=$this->Goodreceiveinfo->Getcompanybranch();
 		$result['measurelist']=$this->Goodreceiveinfo->Getmeasuretype();
 		$this->load->view('goodreceive', $result);
@@ -125,4 +124,12 @@ class Goodreceive extends CI_Controller {
         $this->load->model('PdfGRNinfo');
         $this->PdfGRNinfo->pdfgrnget($x);
     }
+	public function Getgrnserials(){
+		$this->load->model('Goodreceiveinfo');
+		$result=$this->Goodreceiveinfo->Getgrnserials();
+	}
+	public function Goodreceiveserialinsert(){
+		$this->load->model('Goodreceiveinfo');
+		$result=$this->Goodreceiveinfo->Goodreceiveserialinsert();
+	}
 }
