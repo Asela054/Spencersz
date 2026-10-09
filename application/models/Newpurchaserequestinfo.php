@@ -195,31 +195,40 @@ class Newpurchaserequestinfo extends CI_Model {
 		$this->db->where('d.status', 1);
 		$responddetail = $this->db->get();
 
-		$html = '<div class="row"><div class="col-12"><hr>
-		<table class="table table-striped table-bordered table-sm">
+		$html = '<table class="table table-striped table-bordered table-sm">
 		<thead>
-			<th class="bg-primary text-light">Code</th>
-			<th class="bg-primary text-light">Product</th>
-			<th class="bg-primary text-light">Model</th>
-			<th class="bg-primary text-light text-center">Qty</th>
-			<th class="bg-primary text-light text-center">Unit</th>
-			<th class="bg-primary text-light">Comment</th>
+			<tr>
+				<th>Product Info</th>
+				<th>Model</th>
+				<th>Comment</th>
+				<th class="text-right">Qty</th>
+				<th class="text-center">Unit</th>
+			</tr>
 		</thead>
 		<tbody>';
 
+		if ($responddetail->num_rows() == 0) {
+			$html .= '<tr><td colspan="5" class="text-center text-muted">No items found</td></tr>';
+		}
+
 		foreach ($responddetail->result() as $row) {
 			$unit = $row->unit_short ? $row->unit_short : $row->unit;
+
+			$productInfo = html_escape($row->product_name);
+			if (!empty($row->product_code)) {
+				$productInfo .= ' / ' . html_escape($row->product_code);
+			}
+
 			$html .= '<tr>
-				<td>' . html_escape($row->product_code) . '</td>
-				<td>' . html_escape($row->product_name) . '</td>
+				<td>' . $productInfo . '</td>
 				<td>' . html_escape($row->model_no) . '</td>
-				<td class="text-center">' . (float)$row->qty . '</td>
-				<td class="text-center">' . html_escape($unit) . '</td>
 				<td>' . html_escape($row->comment) . '</td>
+				<td class="text-right">' . (float)$row->qty . '</td>
+				<td class="text-center">' . html_escape($unit) . '</td>
 			</tr>';
 		}
 
-		$html .= '</tbody></table></div></div>';
+		$html .= '</tbody></table>';
 		echo $html;
 	}
 

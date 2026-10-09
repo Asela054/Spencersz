@@ -1,6 +1,19 @@
 <?php
 class PorderPrintinfo extends CI_Model{
 
+    private $logoPath    = 'images/logo.jpeg';
+    private $faviconPath = 'images/favicon.jpeg';
+
+    private function imgData($relativePath){
+        $full = FCPATH . ltrim($relativePath, '/');
+        if (!is_file($full)) {
+            return '';
+        }
+        $ext  = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+        $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($full));
+    }
+
     public function Printinvoice($x){
         $recordID = (int)$x;
 
@@ -18,7 +31,8 @@ class PorderPrintinfo extends CI_Model{
             return;
         }
 
-        $company_id = $respond->row(0)->tbl_company_idtbl_company;
+        $po = $respond->row(0);
+        $company_id = $po->tbl_company_idtbl_company;
 
         $this->db->select('tbl_company.company AS companyname, tbl_company.address1 AS companyaddress, tbl_company.mobile AS companymobile,
                            tbl_company.phone AS companyphone, tbl_company.email AS companyemail,
@@ -32,14 +46,14 @@ class PorderPrintinfo extends CI_Model{
         $this->db->join('tbl_user AS approver', 'approver.idtbl_user = tbl_porder.approve_by', 'left');
         $this->db->where('tbl_porder.idtbl_porder', $recordID);
         $companydetails = $this->db->get();
+        $co = $companydetails->row();
 
         $dots = '...................................';
-        $preparedByName   = !empty($companydetails->row()->preparedByName)   ? htmlspecialchars($companydetails->row()->preparedByName)   : $dots;
-        $authorizedByName = !empty($companydetails->row()->authorizedByName) ? htmlspecialchars($companydetails->row()->authorizedByName) : $dots;
-        // No contact-person table in the current DB, so there is no contact number to print
+        $preparedByName   = !empty($co->preparedByName)   ? htmlspecialchars($co->preparedByName)   : $dots;
+        $authorizedByName = !empty($co->authorizedByName) ? htmlspecialchars($co->authorizedByName) : $dots;
         $contactNo = $dots;
 
-        $net = sprintf('%0.2f', $respond->row(0)->nettotal);
+        $net = (float)$po->nettotal;
 
         $respond2 = $this->db->query(
             "SELECT `tbl_porder_detail`.`qty`, `tbl_porder_detail`.`unitprice`, `tbl_porder_detail`.`netprice`,
@@ -55,226 +69,193 @@ class PorderPrintinfo extends CI_Model{
             array($recordID)
         );
 
-        $dataArray = [];
-        $count = 0;
-        $section = 1;
+        $remarkFeild = trim((string)$po->remark);
+        $supplierId  = (int)$po->tbl_supplier_idtbl_supplier;
 
-        $remarkFeild = trim((string)$respond->row(0)->remark);
-        $supplierId  = (int)$respond->row(0)->tbl_supplier_idtbl_supplier;
+        // Supplier address lines
+        $addr = array();
+        foreach (array($po->address_line1, $po->address_line2, $po->city) as $part) {
+            $part = trim((string)$part);
+            if ($part !== '') { $addr[] = htmlspecialchars($part); }
+        }
+        $tp = (strlen((string)$po->telephone_no) >= 9) ? htmlspecialchars($po->telephone_no) : '';
 
+        $logo    = $this->imgData($this->logoPath);
+        $favicon = $this->imgData($this->faviconPath);
+
+        $red     = '#c8102e';
+        $darkred = '#8a0c20';
+
+        $html = '<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Purchase Order - ' . htmlspecialchars((string)$po->porder_no) . '</title>
+<style>
+    @page { size: A4 portrait; margin: 130px 32px 120px 32px; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; margin: 0; }
+
+    header { position: fixed; top: -130px; left: -32px; right: -32px; height: 100px; }
+    footer { position: fixed; bottom: -120px; left: 0; right: 0; height: 110px; }
+
+    .watermark-wrap { position: fixed; top: 290px; left: 0; right: 0; text-align: center; }
+    .watermark { width: 250px; opacity: 0.06; }
+
+    .box-title { background: ' . $red . '; color: #fff; font-weight: bold; font-size: 10px;
+                 letter-spacing: 1px; padding: 5px 10px; text-transform: uppercase; }
+    .box-body  { border: 1px solid #e3c4ca; border-top: none; padding: 8px 10px; line-height: 1.55; }
+
+    table.items { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 16px; }
+    table.items th { background: ' . $darkred . '; color: #fff; font-size: 10px; text-transform: uppercase;
+                     letter-spacing: .5px; padding: 8px 6px; border: 1px solid ' . $darkred . '; }
+    table.items td { padding: 7px 6px; border-bottom: 1px solid #ead5d9; font-size: 11px; vertical-align: top; }
+    table.items tr.alt td { background: #fbf1f3; }
+    table.items thead { display: table-header-group; }
+    table.items tr { page-break-inside: avoid; }
+
+    table.totals { border-collapse: collapse; width: 100%; }
+    table.totals td { padding: 7px 10px; font-size: 11px; }
+    .grand td { background: ' . $red . '; color: #fff; font-weight: bold; font-size: 13px; }
+
+    .pagenum:before { content: counter(page); }
+    .sig-line { border-top: 1px solid #555; padding-top: 4px; font-size: 10px; text-align: center; color: #444; }
+</style>
+</head>
+<body>';
+
+        if ($favicon !== '') {
+            $html .= '<div class="watermark-wrap"><img class="watermark" src="' . $favicon . '"></div>';
+        }
+
+        // ---------- HEADER (repeats on every page) ----------
+        $html .= '
+<header>
+    <table style="width:100%;border-collapse:collapse;background:' . $red . ';">
+        <tr>
+            <td style="width:55%;padding:0;">'
+            . ($logo !== '' ? '<img src="' . $logo . '" style="height:100px;">' : '<span style="color:#fff;font-size:20px;font-weight:bold;padding:20px;">' . htmlspecialchars((string)$co->companyname) . '</span>') .
+            '</td>
+            <td style="width:45%;text-align:right;padding:0 38px 0 0;color:#fff;vertical-align:middle;">
+                <div style="font-size:24px;font-weight:bold;letter-spacing:2px;">PURCHASE ORDER</div>
+                <div style="font-size:12px;margin-top:4px;">No: ' . htmlspecialchars((string)$po->porder_no) . '</div>
+            </td>
+        </tr>
+    </table>
+    <div style="height:5px;background:' . $darkred . ';"></div>
+</header>';
+
+        // ---------- FOOTER (repeats on every page) ----------
+        $html .= '<footer>';
+        if ($supplierId != 65 && $remarkFeild !== '') {
+            $html .= '<div style="font-size:10px;font-weight:bold;margin-bottom:6px;color:' . $darkred . ';">Remark: ' . htmlspecialchars($remarkFeild) . '</div>';
+        }
+        $html .= '
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tr>
+            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $preparedByName . '</div><div class="sig-line">Prepared by</div></td>
+            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $authorizedByName . '</div><div class="sig-line">Authorized by</div></td>
+            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $contactNo . '</div><div class="sig-line">Contact No</div></td>
+        </tr>
+    </table>
+    <div style="margin-top:8px;border-top:2px solid ' . $red . ';padding-top:5px;font-size:9px;color:#666;text-align:center;">
+        This is a computer-generated document. No signature is required. &nbsp;|&nbsp; Page <span class="pagenum"></span>
+    </div>
+</footer>';
+
+        // ---------- INFO BOXES ----------
+        $html .= '
+<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+<tr>
+    <td style="width:49%;vertical-align:top;padding:0;">
+        <div class="box-title">Supplier</div>
+        <div class="box-body">
+            <div style="font-size:13px;font-weight:bold;">' . htmlspecialchars((string)$po->suppliername) . '</div>';
+        if ($supplierId == 65 && $remarkFeild !== '') {
+            $html .= '<div style="font-weight:bold;">' . htmlspecialchars($remarkFeild) . '</div>';
+        }
+        foreach ($addr as $line) {
+            $html .= '<div>' . $line . '</div>';
+        }
+        if ($tp !== '') {
+            $html .= '<div>Tel: ' . $tp . '</div>';
+        }
+        $html .= '<div style="margin-top:6px;">Attn: ..............................................</div>
+        </div>
+    </td>
+    <td style="width:2%;"></td>
+    <td style="width:49%;vertical-align:top;padding:0;">
+        <div class="box-title">Order Details</div>
+        <div class="box-body">
+            <div style="font-size:12px;font-weight:bold;text-transform:uppercase;">' . htmlspecialchars((string)$co->companyname) . '</div>
+            <div style="text-transform:uppercase;">' . htmlspecialchars((string)$co->companyaddress) . '</div>
+            <div>Phone: ' . htmlspecialchars((string)$co->companymobile) . ' / ' . htmlspecialchars((string)$co->companyphone) . '</div>
+            <div>E-Mail: ' . htmlspecialchars((string)$co->companyemail) . '</div>
+            <div style="margin-top:4px;"><b>PO No:</b> ' . htmlspecialchars((string)$po->porder_no) . '</div>
+            <div><b>Date:</b> ' . htmlspecialchars((string)$po->orderdate) . '</div>'
+            . ($company_id == 1 ? '<div><b>Our VAT No:</b> 103305667-7000</div>' : '') . '
+        </div>
+    </td>
+</tr>
+</table>';
+
+        // ---------- ITEMS TABLE ----------
+        $html .= '
+<table class="items">
+    <thead>
+        <tr>
+            <th style="width:6%;">#</th>
+            <th style="width:13%;">Code</th>
+            <th style="width:33%;text-align:left;">Item Description</th>
+            <th style="width:9%;">Qty</th>
+            <th style="width:9%;">UOM</th>
+            <th style="width:15%;text-align:right;">Unit Price</th>
+            <th style="width:15%;text-align:right;">Total</th>
+        </tr>
+    </thead>
+    <tbody>';
+
+        $i = 0;
         foreach ($respond2->result() as $rowlist) {
-            $itemDescription = (string)$rowlist->product_name;
+            $i++;
+            $desc = (string)$rowlist->product_name;
             if (trim((string)$rowlist->comment) !== '') {
-                $itemDescription .= ' - ' . $rowlist->comment;
+                $desc .= ' - ' . $rowlist->comment;
             }
-
-            if ($count % 5 == 0) {
-                $dataArray[$section] = [];
-            }
-
-            $dataArray[$section][] = [
-                'materialInfoCode' => $rowlist->product_code,
-                'itemDescription'  => $itemDescription,
-                'qty'              => $rowlist->qty,
-                'measureType'      => $rowlist->measure_type,
-                'unitPrice'        => $rowlist->unitprice,
-                'netprice'         => $rowlist->netprice
-            ];
-
-            $count++;
-
-            if ($count % 5 == 0) {
-                $section++;
-            }
+            $html .= '<tr class="' . ($i % 2 == 0 ? 'alt' : '') . '">
+                <td style="text-align:center;color:#888;">' . $i . '</td>
+                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->product_code) . '</td>
+                <td>' . htmlspecialchars($desc) . '</td>
+                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->qty) . '</td>
+                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->measure_type) . '</td>
+                <td style="text-align:right;">' . number_format((float)$rowlist->unitprice, 2) . '</td>
+                <td style="text-align:right;font-weight:bold;">' . number_format((float)$rowlist->netprice, 2) . '</td>
+            </tr>';
         }
 
-        if (empty($dataArray)) {
-            $dataArray[1] = [];
-        }
+        $html .= '</tbody></table>';
 
-        $tpnumber = '&nbsp;';
-        if (strlen((string)$respond->row(0)->telephone_no) >= 9) {
-            $tpnumber = htmlspecialchars($respond->row(0)->telephone_no);
-        }
+        // ---------- TOTALS (once, after last item) ----------
+        $html .= '
+<table style="width:100%;border-collapse:collapse;margin-top:14px;page-break-inside:avoid;">
+<tr>
+    <td style="width:58%;"></td>
+    <td style="width:42%;">
+        <table class="totals">
+            <tr><td style="border-bottom:1px solid #ead5d9;">Total (Excl)</td><td style="text-align:right;border-bottom:1px solid #ead5d9;">' . number_format($net, 2) . '</td></tr>
+            <tr><td style="border-bottom:1px solid #ead5d9;">Tax</td><td style="text-align:right;border-bottom:1px solid #ead5d9;">&nbsp;</td></tr>
+            <tr class="grand"><td>Total (Incl)</td><td style="text-align:right;">' . number_format($net, 2) . '</td></tr>
+        </table>
+    </td>
+</tr>
+</table>';
 
-        $html = '
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Multi Offset Printers</title>
-            <style>
-                @page {
-                    size: 220mm 140mm;
-                    margin: 5mm 5mm 5mm 5mm; /* top right bottom left */
-                    font-family: Arial, sans-serif;
-                }
-                body {
-                    font-family: Arial, sans-serif;
-                    line-height: 1.5;
-                    text-align:left;
-                    margin-top: 160px;
-                }
-
-                /** Define the header rules **/
-                header {
-                    position: fixed;
-                    top: 0px;
-                    left: 0px;
-                    right: 0px;
-                    height: 250px;
-                }
-
-                /** Define the footer rules **/
-                footer {
-                    position: fixed;
-                    bottom: 1rem;
-                    left: 0px;
-                    right: 0px;
-                    height: 55px;
-                    font-family: Arial, sans-serif;
-                }
-            </style>
-        </head>
-        <body>
-            <header>
-                <table style="width:100%;border-collapse: collapse;">
-                <tr>
-                    <td width="55%" style="vertical-align: top;padding:0px;">
-                        <p style="margin:0px;font-size:16px;font-weight: bold;">PURCHASE ORDER</p>
-                        <p style="margin:0px;font-size:13px;font-weight: bold;">To: '.htmlspecialchars((string)$respond->row(0)->suppliername).'</p>';
-
-                        if ($supplierId == 65 && !empty($remarkFeild)) {
-                            $html .= '<p style="margin:0px;font-size:13px;font-weight:bold;">'
-                                . htmlspecialchars($remarkFeild)
-                                . '</p>';
-                        }
-
-                        $address_line1 = trim((string)$respond->row(0)->address_line1);
-                        $address_line2 = trim((string)$respond->row(0)->address_line2);
-                        $city = trim((string)$respond->row(0)->city);
-
-                        if ($address_line1 !== '') {
-                            $html .= '<p style="margin:0px;font-size:13px;padding-left: 24px;">' . htmlspecialchars($address_line1) . ',' . '</p>';
-                        }
-                        if ($address_line2 !== '') {
-                            $html .= '<p style="margin:0px;font-size:13px;padding-left: 24px;">' . htmlspecialchars($address_line2) . ',' . '</p>';
-                        }
-                        if ($city !== '') {
-                            $html .= '<p style="margin:0px;font-size:13px;padding-left: 24px;">' . htmlspecialchars($city) . '.' . '</p>';
-                        }
-
-                        $tpnumber_clean = trim(str_replace('&nbsp;', '', $tpnumber));
-                        if ($tpnumber_clean !== '') {
-                            $html .= '<p style="margin:0px;font-size:13px;padding-left: 24px;">' . $tpnumber . '</p>';
-                        }
-
-                        $html .= '</td>
-                        <td style="vertical-align: top;padding:0px;">
-                            <p style="margin:0px;font-size:18px;font-weight:bold;text-transform: uppercase;">'.htmlspecialchars((string)$companydetails->row()->companyname).'</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;text-transform: uppercase;">'.htmlspecialchars((string)$companydetails->row()->companyaddress).'</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;">Phone : '.htmlspecialchars((string)$companydetails->row()->companymobile).'/'.htmlspecialchars((string)$companydetails->row()->companyphone).'</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;"><u>E-Mail : '.htmlspecialchars((string)$companydetails->row()->companyemail).'</u></p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;">PO No : ' . htmlspecialchars((string)$respond->row(0)->porder_no) . '</p>
-                            <p style="margin:0px;font-size:13px;font-weight:normal;">Date : '.$respond->row(0)->orderdate.'</p>
-                            '.($company_id == 1 ? '<p style="margin:0px;font-size:13px;font-weight:normal;">Our Vat No : &nbsp; 103305667-7000</p>' : '').'
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="padding-top: -5px;">
-                            <p style="margin:0px;font-size:13px;">Atten ....................................................</p>
-                        </td>
-                    </tr>
-                </table>
-            </header>
-
-            <footer>';
-
-            if ($supplierId != 65 && !empty($remarkFeild)) {
-                $html .= '<p style="margin:0px 0px 3px 0px;font-size:12px;font-weight:bold;">
-                            '.htmlspecialchars($remarkFeild).'
-                        </p>';
-            }
-
-            $html .= '
-                <table style="table-layout: fixed;padding:3px;width:100%;border-collapse: collapse;font-size:12px;">
-                    <tr>
-                        <td style="width:35%;">Prepared by &nbsp;: &nbsp;'.$preparedByName.'</td>
-                        <td style="width:35%;">Authorized by &nbsp;: &nbsp;'.$authorizedByName.'</td>
-                        <td style="width:30%;">Contact No &nbsp;: &nbsp;'.$contactNo.'</td>
-                    </tr>
-                </table>
-                <p style="font-size:12px;text-align:center;padding:0 3px;">
-                    This is a computer-generated document. No signature is required.
-                </p>
-            </footer>';
-
-            // PHP 7.2/older-safe replacement for array_key_last()/array_key_first()
-            $sectionKeys     = array_keys($dataArray);
-            $firstSectionKey = reset($sectionKeys);
-            $lastSectionKey  = end($sectionKeys);
-
-            foreach ($dataArray as $index => $section) {
-
-                // page break BEFORE every section except the first one
-                if ($index !== $firstSectionKey) {
-                    $html .= '<div style="page-break-before: always;"></div>';
-                }
-
-                $html .= '<main>
-                    <table style="table-layout: fixed;padding:3px;width:100%;border-collapse: collapse;font-size: 13px;">
-                        <thead>
-                            <tr>
-                                <th style="width: 12%;text-align:center; border: 1px solid #000;">Code</th>
-                                <th style="width: 46%;text-align:center; border: 1px solid #000;">Item Description </th>
-                                <th style="width: 10%;text-align:center; border: 1px solid #000;">Qty</th>
-                                <th style="width: 10%;text-align:center; border: 1px solid #000;">UOM</th>
-                                <th style="width: 11%;text-align:right; border: 1px solid #000;padding-right: 10px;">Unit Price</th>
-                                <th style="width: 11%;text-align:right; border: 1px solid #000;padding-right: 10px;">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>';
-                            foreach ($section as $row) {
-                                $html .= '<tr style="page-break-inside: avoid;">
-                                    <td style="text-align:center; border-right: 1px solid black; border-left: 1px solid #000;">' . htmlspecialchars((string)$row['materialInfoCode']) . '</td>
-                                    <td style="border-right: 1px solid black; padding-left: 10px;">' . htmlspecialchars((string)$row['itemDescription']) . '</td>
-                                    <td style="text-align:center; border-right: 1px solid black;">' . htmlspecialchars((string)$row['qty']) . '</td>
-                                    <td style="text-align:center; border-right: 1px solid black;">' . htmlspecialchars((string)$row['measureType']) . '</td>
-                                    <td style="text-align:right; border-right: 1px solid black;padding-right: 10px;">' . htmlspecialchars(number_format($row['unitPrice'],2)) . '</td>
-                                    <td style="text-align:right; border-right: 1px solid black;padding-right: 10px;">' . htmlspecialchars(number_format($row['netprice'],2)) . '</td>
-                                </tr>';
-                            }
-                        $html.='</tbody>';
-
-                            // only the TRUE last section shows the actual totals
-                            $totalShow = ($index === $lastSectionKey) ? number_format($net,2) : '';
-
-                            $html .= '<tfoot>
-                                <tr>
-                                    <td colspan="3" style="border-top: 1px solid #000;font-size:12px;"></td>
-                                    <td colspan="2" style="border-top: 1px solid #000;border-left: 1px solid #000;border-right: 1px solid #000;text-align:left;padding-left:35px;">Total (Excl)</td>
-                                    <td style="border-top: 1px solid #000;border-left: 1px solid #000;border-right: 1px solid #000;text-align:right;padding-right:10px;"><label id="lbltotal">'.$totalShow.'</label></td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" style="font-size:11px;"></td>
-                                    <td colspan="2" style="border-left: 1px solid #000;border-right: 1px solid #000;text-align:left;padding-left:35px;">Tax</td>
-                                    <td style="border-left: 1px solid #000;border-right: 1px solid #000;text-align:right;"><label class="padding-right:10px;" id="lbldiscount"></label></td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3"></td>
-                                    <td colspan="2" style="border-bottom: 1px solid #000;border-left: 1px solid #000;border-right: 1px solid #000;text-align:left; font-weight:bold;padding-left:35px;">Total (Incl)</td>
-                                    <th style="border-bottom: 1px solid #000;border-left: 1px solid #000;border-right: 1px solid #000;text-align:right;padding-right:10px;"><label class="font-weight-bold text-dark" id="lblbalance">'.$totalShow.'</label></th>
-                                </tr>
-                            </tfoot>';
-                    $html.='</table>
-                </main>';
-            }
-        $html .= '</body>
-        </html>';
+        $html .= '</body></html>';
 
         $this->load->library('pdf');
+        $this->pdf->setPaper('A4', 'portrait');
         $this->pdf->loadHtml($html);
         $this->pdf->render();
-        $this->pdf->stream( "MULTI OFFSET PRINTERS-PURCHASE ORDER- ".$recordID.".pdf", array("Attachment"=>0));
+        $this->pdf->stream("MULTI OFFSET PRINTERS-PURCHASE ORDER- " . $recordID . ".pdf", array("Attachment" => 0));
     }
 
 }

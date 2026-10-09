@@ -68,14 +68,14 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			</a>
 
 			<!-- Product Menu New Added -->
-			<?php if(in_array("Product", $permissionallowed) || in_array("Category", $permissionallowed) || in_array("Brand", $permissionallowed) || in_array("Unit", $permissionallowed)){ ?>
+			<?php if(in_array("Product", $permissionallowed) || in_array("Category", $permissionallowed) || in_array("Brand", $permissionallowed) || in_array("Unit", $permissionallowed) || in_array("Productserial", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
 				data-target="#collapseproduct" aria-expanded="false" aria-controls="collapseproduct">
 				<div class="nav-link-icon"><i class="fas fa-boxes"></i></div>
 				<span>Product</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Product" || $functionmenu=="Category" || $functionmenu=="Brand" || $functionmenu=="Unit"){echo 'show';} ?>"
+			<div class="collapse <?php if($functionmenu=="Product" || $functionmenu=="Category" || $functionmenu=="Brand" || $functionmenu=="Unit" || $functionmenu=="Productserial"){echo 'show';} ?>"
 				id="collapseproduct" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion">
 					<?php if(in_array("Category", $permissionallowed)){ ?>
@@ -86,6 +86,8 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<a class="nav-link" href="<?php echo base_url().'Unit'; ?>">Unit</a>
 					<?php } if(in_array("Product", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Product'; ?>">Product</a>
+					<?php } if(in_array("Productserial", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Productserial'; ?>">Product Serial</a>
 					<?php } ?>
 				</nav>
 			</div>
@@ -174,8 +176,8 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				id="collapsStock" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
 					<?php if(in_array("Report", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Report'; ?>">Material Stock
-						Category Wise Report</a>
+					<a class="nav-link" href="<?php echo base_url().'Report'; ?>">Stock
+						Category Wise</a>
 					<?php } if(in_array("Allstockview", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Allstockview'; ?>">All
 						Stock View</a>
@@ -194,27 +196,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				<span>Stock Transfer</span>
 			</a>
 			<?php } ?>
-
-			<!-- Internal Item (Issue)Request Menu New Added -->
-			<!-- <?php if(in_array("Goodreceiverequest", $permissionallowed) || in_array("Approvedgoodreceiverequest", $permissionallowed) || in_array("Issuegoodreceive", $permissionallowed)){ ?>
-			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
-				data-target="#collapsGrnrequest" aria-expanded="false" aria-controls="collapsGrnrequest">
-				<div class="nav-link-icon"><i class="fa fa-folder-open"></i></div> <span>Internal Item Request</span>
-				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-			</a>
-			<div class="collapse <?php if($functionmenu=="Goodreceiverequest" || $functionmenu=="Approvedgoodreceiverequest" || $functionmenu=="Issuegoodreceive"){echo 'show';} ?>"
-				id="collapsGrnrequest" data-parent="#accordionSidenav">
-				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
-					<?php if(in_array("Goodreceiverequest", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Goodreceiverequest'; ?>">Item Request</a>
-					<?php } if(in_array("Issuegoodreceive", $permissionallowed)){ ?>
-					<a class="nav-link"
-						href="<?php echo base_url().'Issuegoodreceive'; ?>">Issue Item Request </a>
-					<?php } ?>
-				</nav>
-			</div>
-			<?php } ?> -->
 
 			<!-- Invoice Menu New Added -->
 			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed)){ ?>
@@ -321,6 +302,23 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				</nav>
 			</div>
 			<?php } ?> -->
+
+			<!-- Tax Control Menu New Added -->
+			<?php if(in_array("Taxcontrol", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Taxcontrol'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-euro-sign"></i></div>
+				<span>Tax Control</span>
+			</a>
+			<?php } ?>
+
+			<!-- Serial Number Movement Menu New Added -->
+			<?php if(in_array("Serialmovement", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Serialmovement'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-barcode"></i></div>
+				<span>Serial Number Movement</span>
+			</a>
+			<?php } ?>
+
 
 			<!-- User Account Menu New Added -->
 			<?php if(in_array("Useraccount", $permissionallowed) || in_array("Usertype", $permissionallowed) || in_array("Userprivilege", $permissionallowed) || in_array("Userpermissions", $permissionallowed) || in_array("Userroles", $permissionallowed)){ ?>

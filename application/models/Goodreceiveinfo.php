@@ -8,14 +8,6 @@
 		return $respond=$this->db->get();
 	}
 
-	public function Getwarehouse() {
-		$this->db->select('`idtbl_warehouse`, `wh_name`');
-		$this->db->from('tbl_warehouse');
-		$this->db->where('status', 1);
-
-		return $respond=$this->db->get();
-	}
-
 	public function Getcompany() {
 		$this->db->select('`idtbl_company`, `company`');
 		$this->db->from('tbl_company');
@@ -129,8 +121,7 @@
 			'tbl_user_idtbl_user'=> $userID,
 			'tbl_supplier_idtbl_supplier'=> $supplier,
 			'tbl_location_idtbl_location'=> $location,
-			'tbl_porder_idtbl_porder'=> $porder,
-			'warehouse_id'=> $warehouse);
+			'tbl_porder_idtbl_porder'=> $porder);
 
 		$this->db->insert('tbl_grn', $data);
 
@@ -322,7 +313,7 @@
 				<td width="20%" style="text-align: right; font-weight: bold;">Rs. ' . number_format(($respond->row(0)->subtotalcost), 2) . '</td>
 			</tr>
 			<tr>
-				<td width="80%" style="text-align: right; font-weight: bold;">Vat</td>
+				<td width="80%" style="text-align: right; font-weight: bold;">Vat (' . floatval($respond->row(0)->vat) . '%)</td>
 				<td width="20%" style="text-align: right; font-weight: bold;">Rs. ' . number_format(($respond->row(0)->vatamount), 2) . '</td>
 			</tr>
 			<tr>
@@ -409,7 +400,7 @@
 				$this->db->update('tbl_porder', $dataporder);
 			}
 
-			$this->db->select('tbl_grn.batchno, tbl_grn.tbl_company_idtbl_company, tbl_grn.tbl_company_branch_idtbl_company_branch, tbl_grn.tbl_location_idtbl_location, tbl_grn.warehouse_id, tbl_grn.tbl_supplier_idtbl_supplier, tbl_grn.grndate, tbl_grndetail.qty, tbl_grndetail.total, tbl_grndetail.unitprice, tbl_grndetail.tbl_product_idtbl_product, tbl_grn.tbl_porder_idtbl_porder');
+			$this->db->select('tbl_grn.batchno, tbl_grn.tbl_company_idtbl_company, tbl_grn.tbl_company_branch_idtbl_company_branch, tbl_grn.tbl_location_idtbl_location, tbl_grn.tbl_supplier_idtbl_supplier, tbl_grn.grndate, tbl_grndetail.qty, tbl_grndetail.total, tbl_grndetail.unitprice, tbl_grndetail.tbl_product_idtbl_product, tbl_grn.tbl_porder_idtbl_porder');
 			$this->db->from('tbl_grn');
 			$this->db->join('tbl_grndetail', 'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn', 'left');
 			$this->db->where('tbl_grn.status', 1);
@@ -420,7 +411,6 @@
 				foreach ($respond->result() as $row) {
 					$batchno = $row->batchno;
 					$location = $row->tbl_location_idtbl_location;
-					$warehouse = $row->warehouse_id;
 					$qty = $row->qty;
 					$unitprice = $row->unitprice;
 					$materialID = $row->tbl_product_idtbl_product;
@@ -442,8 +432,7 @@
 							'tbl_grndetail_idtbl_grndetail' => 0,
 							'tbl_location_idtbl_location' => $location,
 							'tbl_company_idtbl_company' => $companyid,
-							'tbl_company_branch_idtbl_company_branch' => $branchid,
-							'warehouse_id' => $warehouse
+							'tbl_company_branch_idtbl_company_branch' => $branchid
 						);
 
 						$this->db->insert('tbl_stock', $stockData);
@@ -719,11 +708,31 @@
 	}
 
 	public function Getvatpresentage() {
-		$recordCurrentDate=$this->input->post('currentDate');
-		$currentDate = date('Y-m-d');
+		$date = $this->input->post('currentDate');
+		if (empty($date) || !strtotime($date)) {
+			$date = date('Y-m-d');
+		}
+		$date = date('Y-m-d', strtotime($date));
 
-		// Since tbl_tax_control doesn't exist in your DB, return 0
-		echo 0;
+		echo json_encode($this->Fetchvatpercentage($date));
+	}
+
+	public function Fetchvatpercentage($date) {
+		$this->db->select('percentage');
+		$this->db->from('tbl_tax_control');
+		$this->db->where('status', 1);
+		$this->db->where('effective_from <=', $date);
+		$this->db->group_start();
+			$this->db->where('effective_to IS NULL', null, false);
+			$this->db->or_where('effective_to', '0000-00-00');
+			$this->db->or_where('effective_to >=', $date);
+		$this->db->group_end();
+		$this->db->order_by('effective_from', 'DESC');
+		$this->db->limit(1);
+
+		$query = $this->db->get();
+
+		return $query->num_rows() > 0 ? floatval($query->row()->percentage) : 0;
 	}
 
 	public function Goodreceivecheckstatus() {
@@ -907,6 +916,176 @@
 			$actionObj->icon = 'fas fa-warning';
 			$actionObj->title = '';
 			$actionObj->message = 'Record Error';
+			$actionObj->url = '';
+			$actionObj->target = '_blank';
+			$actionObj->type = 'danger';
+
+			echo json_encode(array('status' => 2, 'action' => json_encode($actionObj)));
+		}
+	}
+
+	public function Getgrnserials() {
+		$recordID = $this->input->post('recordID');
+
+		$this->db->select('d.idtbl_grndetail, d.qty, d.costunitprice, d.tbl_product_idtbl_product, p.product_name, p.product_code');
+		$this->db->from('tbl_grndetail d');
+		$this->db->join('tbl_product p', 'p.idtbl_product = d.tbl_product_idtbl_product', 'left');
+		$this->db->where('d.tbl_grn_idtbl_grn', $recordID);
+		$this->db->where('d.status', 1);
+		$details = $this->db->get()->result();
+
+		$this->db->select('serialno, tbl_grndetail_idtbl_grndetail');
+		$this->db->from('tbl_product_serial');
+		$this->db->where('tbl_grn_idtbl_grn', $recordID);
+		$this->db->where('status', 1);
+		$this->db->order_by('idtbl_product_serial', 'ASC');
+		$serialrows = $this->db->get()->result();
+
+		$map = array();
+		foreach ($serialrows as $s) {
+			$map[$s->tbl_grndetail_idtbl_grndetail][] = $s->serialno;
+		}
+
+		foreach ($details as $d) {
+			$d->serials = isset($map[$d->idtbl_grndetail]) ? $map[$d->idtbl_grndetail] : array();
+		}
+
+		$this->output->set_content_type('application/json')->set_output(json_encode(array('details' => $details)));
+	}
+
+	public function Goodreceiveserialinsert() {
+		$this->db->trans_begin();
+
+		$userID = $_SESSION['userid'];
+		$updatedatetime = date('Y-m-d H:i:s');
+
+		$grnID = $this->input->post('grnID');
+		$tableData = $this->input->post('tableData');
+
+		$error = '';
+		$inserts = array();
+		$seen = array();
+
+		$this->db->select('idtbl_grn, grn_no, approvestatus');
+		$this->db->from('tbl_grn');
+		$this->db->where('idtbl_grn', $grnID);
+		$this->db->where('status', 1);
+		$grn = $this->db->get()->row();
+
+		if (!$grn) {
+			$error = 'GRN not found';
+		} elseif ($grn->approvestatus == 2) {
+			$error = 'Cannot add serial numbers to a rejected GRN';
+		} elseif (empty($tableData)) {
+			$error = 'No serial numbers to save';
+		}
+
+		if ($error == '') {
+			foreach ($tableData as $row) {
+				$detailID = $row['detailid'];
+				$serials = isset($row['serials']) ? $row['serials'] : array();
+
+				// detail must belong to this GRN
+				$this->db->select('idtbl_grndetail, qty, costunitprice, tbl_product_idtbl_product');
+				$this->db->from('tbl_grndetail');
+				$this->db->where('idtbl_grndetail', $detailID);
+				$this->db->where('tbl_grn_idtbl_grn', $grnID);
+				$this->db->where('status', 1);
+				$detail = $this->db->get()->row();
+
+				if (!$detail) {
+					$error = 'Invalid GRN detail';
+					break;
+				}
+
+				// do not exceed the GRN qty
+				$this->db->where('tbl_grndetail_idtbl_grndetail', $detailID);
+				$this->db->where('status', 1);
+				$existing = $this->db->count_all_results('tbl_product_serial');
+
+				$remaining = floor($detail->qty) - $existing;
+				if (count($serials) > $remaining) {
+					$error = 'Serial numbers exceed the GRN qty';
+					break;
+				}
+
+				foreach ($serials as $serial) {
+					$serial = trim($serial);
+					if ($serial === '') { continue; }
+
+					$key = strtolower($serial);
+					if (isset($seen[$key])) {
+						$error = 'Duplicate serial number: ' . htmlspecialchars($serial);
+						break 2;
+					}
+					$seen[$key] = true;
+
+					// serial must be unique across all stock
+					$this->db->where('serialno', $serial);
+					$this->db->where('status', 1);
+					if ($this->db->count_all_results('tbl_product_serial') > 0) {
+						$error = 'Serial number already exists: ' . htmlspecialchars($serial);
+						break 2;
+					}
+
+					$inserts[] = array(
+						'serialno' => $serial,
+						'tbl_grn_idtbl_grn' => $grnID,
+						'tbl_grndetail_idtbl_grndetail' => $detailID,
+						'costunitprice' => $detail->costunitprice,
+						'tbl_product_idtbl_product' => $detail->tbl_product_idtbl_product,
+						'stock_status' => 1,
+						'status' => 1,
+						'insertdatetime' => $updatedatetime,
+						'tbl_user_idtbl_user' => $userID
+					);
+				}
+			}
+		}
+
+		if ($error == '' && !empty($inserts)) {
+			foreach ($inserts as $serialRow) {
+
+				$this->db->insert('tbl_product_serial', $serialRow);
+				$serialID = $this->db->insert_id();
+				$branchID=$_SESSION['branch_id'];
+
+				$movement = array(
+					'movement_type' => 1,                    
+					'from_status' => NULL,                     
+					'to_status' => 1,                           
+					'doc_type' => 'GRN',
+					'doc_id' => $grnID,
+					'doc_detail_id' => $serialRow['tbl_grndetail_idtbl_grndetail'],
+					'branch_id' => $branchID,
+					'remark' => 'Serial added from ' . $grn->grn_no,
+					'insertdatetime' => $updatedatetime,
+					'tbl_user_idtbl_user' => $userID,
+					'tbl_product_serial_idtbl_product_serial' => $serialID
+				);
+				$this->db->insert('tbl_serial_movement', $movement);
+			}
+		}
+
+		if ($error == '' && $this->db->trans_status() === TRUE) {
+			$this->db->trans_commit();
+
+			$actionObj = new stdClass();
+			$actionObj->icon = 'fas fa-save';
+			$actionObj->title = '';
+			$actionObj->message = count($inserts) . ' Serial Number(s) Added Successfully';
+			$actionObj->url = '';
+			$actionObj->target = '_blank';
+			$actionObj->type = 'success';
+
+			echo json_encode(array('status' => 1, 'action' => json_encode($actionObj)));
+		} else {
+			$this->db->trans_rollback();
+
+			$actionObj = new stdClass();
+			$actionObj->icon = 'fas fa-exclamation-triangle';
+			$actionObj->title = '';
+			$actionObj->message = ($error != '') ? $error : 'Record Error';
 			$actionObj->url = '';
 			$actionObj->target = '_blank';
 			$actionObj->type = 'danger';

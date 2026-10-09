@@ -123,17 +123,6 @@ include "include/topnavbar.php";
                             </div>
 
                             <div class="form-group mb-1">
-                                <label class="small font-weight-bold text-dark">Warehouse*</label>
-                                <select class="form-control form-control-sm" name="warehouse" id="warehouse" required>
-                                    <option value="">Select</option>
-                                    <?php foreach($warehouselist->result() as $rowwarehouselist){ ?>
-                                    <option value="<?php echo $rowwarehouselist->idtbl_warehouse ?>">
-                                        <?php echo $rowwarehouselist->wh_name ?></option>
-                                    <?php } ?>
-                                </select>
-                            </div>
-
-                            <div class="form-group mb-1">
                                 <label class="small font-weight-bold text-dark">Products*</label>
                                 <select class="form-control form-control-sm selecter2 px-0" name="product"
                                     id="product" required>
@@ -202,8 +191,8 @@ include "include/topnavbar.php";
                                 <label class="small font-weight-bold text-dark">Vat Type*</label>
                                 <select class="form-control form-control-sm" name="vat_type" id="vat_type" required>
                                     <option value="">Select Vat Type</option>
-                                    <option value="1">VAT Seperated</option>
-                                    <option value="2" selected>Non VAT</option>
+                                    <option value="1" selected>VAT Seperated</option>
+                                    <option value="2" >Non VAT</option>
                                 </select>
                                 </div>
                                 <div class="col">
@@ -469,6 +458,42 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
+<div class="modal fade" id="serialmodal" data-backdrop="static" data-keyboard="false" tabindex="-1"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-barcode mr-2"></i>Add Serial Numbers -
+                    <span id="serialgrnno"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="serialgrnid">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm" id="tableserial">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-center">GRN Qty</th>
+                                <th class="text-center">Added</th>
+                                <th class="text-center">Remaining</th>
+                                <th width="38%">Scan / Enter Serial Number</th>
+                                <th>Already Added</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnsaveserial" class="btn btn-primary btn-sm">
+                    <i class="fas fa-save"></i>&nbsp;Save Serial Numbers</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 
 <script>
@@ -617,6 +642,16 @@ $(document).ready(function() {
 
                     var button = '';
 
+                    if (full['approvestatus'] != 2) {
+                        button += '<button data-toggle="tooltip" data-placement="bottom" ' +
+                            'title="Add Serial Numbers" ' +
+                            'class="btn btn-secondary btn-sm btnSerial mr-1" ' +
+                            'id="' + full['idtbl_grn'] + '" ' +
+                            'grn_no="' + full['grn_no'] + '">' +
+                            '<i class="fas fa-barcode"></i>' +
+                            '</button>';
+                    }
+
                     if (editcheck == 1) {
 
                         button += '<div class="btn-group" role="group">';
@@ -641,7 +676,7 @@ $(document).ready(function() {
                             '" target="_blank" ' +
                             'data-toggle="tooltip" data-placement="bottom" ' +
                             'title="Print GRN" ' +
-                            'class="btn btn-secondary btn-sm mr-1">' +
+                            'class="btn btn-danger btn-sm mr-1">' +
                             '<i class="fas fa-file-pdf mr-2"></i>' +
                             '</a>';
 
@@ -930,6 +965,257 @@ $(document).ready(function() {
         });
     });
 
+    var serialPending = {};  
+    var serialExisting = {};
+
+    function escapeHtml(s) {
+        return $('<div>').text(s).html();
+    }
+
+    function renderSerialList(detailid) {
+        var $row = $('#serialrow_' + detailid);
+        var list = serialPending[detailid] || [];
+        var total = parseInt($row.data('remaining')) || 0;
+
+        var html = '';
+        $.each(list, function (i, s) {
+            html += '<span class="badge badge-primary mr-1 mb-1 p-2">' + escapeHtml(s) +
+                ' <a href="#" class="text-white ml-1 serial-remove" data-detailid="' + detailid +
+                '" data-index="' + i + '">&times;</a></span>';
+        });
+
+        $row.find('.serial-list').html(html);
+        $row.find('.serial-remaining').text(total - list.length);
+
+        if (total === 0) {
+            $row.find('.serial-count').text('All serials added');
+        } else {
+            $row.find('.serial-count').text(list.length + ' of ' + total + ' ready to save');
+        }
+
+        $row.find('.serial-text, .btnaddserial').prop('disabled', list.length >= total);
+    }
+
+    function addSerial(detailid) {
+        var $row = $('#serialrow_' + detailid);
+        var $input = $row.find('.serial-text');
+        var $msg = $row.find('.serial-msg');
+        var serial = $.trim($input.val());
+        var total = parseInt($row.data('remaining')) || 0;
+
+        $msg.text('');
+        if (serial === '') { return; }
+
+        serialPending[detailid] = serialPending[detailid] || [];
+        var key = serial.toLowerCase();
+
+        if (serialPending[detailid].length >= total) {
+            $msg.text('Qty limit reached');
+            return;
+        }
+
+        if (serialExisting[key]) {
+            $msg.text('"' + serial + '" is already added to this GRN');
+            $input.select();
+            return;
+        }
+
+        var dup = false;
+        $.each(serialPending, function (id, list) {
+            $.each(list, function (i, s) {
+                if (s.toLowerCase() === key) { dup = true; return false; }
+            });
+            if (dup) { return false; }
+        });
+
+        if (dup) {
+            $msg.text('"' + serial + '" is already in the list');
+            $input.select();
+            return;
+        }
+
+        serialPending[detailid].push(serial);
+        $input.val('');
+        renderSerialList(detailid);
+
+        if (serialPending[detailid].length >= total) {
+            $('#tableserial .serial-text:enabled').first().focus();
+        } else {
+            $input.focus();
+        }
+    }
+
+    $('#dataTable tbody').on('click', '.btnSerial', function () {
+        var id = $(this).attr('id');
+        $('#serialgrnid').val(id);
+        $('#serialgrnno').text($(this).attr('grn_no'));
+
+        serialPending = {};
+        serialExisting = {};
+
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            data: { recordID: id },
+            url: '<?php echo base_url() ?>Goodreceive/Getgrnserials',
+            success: function (obj) {
+                var tbody = $('#tableserial tbody').empty();
+
+                $.each(obj.details, function (i, item) {
+                    var detailid = item.idtbl_grndetail;
+                    var qty = Math.floor(parseFloat(item.qty)) || 0;
+                    var added = item.serials.length;
+                    var remaining = Math.max(qty - added, 0);
+
+                    var productName = item.product_name;
+                    if (item.product_code) { productName += ' / ' + item.product_code; }
+
+                    var existing = '';
+                    $.each(item.serials, function (j, s) {
+                        serialExisting[s.toLowerCase()] = true;
+                        existing += '<span class="badge badge-secondary mr-1 mb-1">' + escapeHtml(s) + '</span>';
+                    });
+
+                    var dis = (remaining == 0) ? 'disabled' : '';
+
+                    var row = '<tr id="serialrow_' + detailid + '" data-remaining="' + remaining + '">';
+                    row += '<td>' + escapeHtml(productName) + '</td>';
+                    row += '<td class="text-center">' + qty + '</td>';
+                    row += '<td class="text-center">' + added + '</td>';
+                    row += '<td class="text-center font-weight-bold serial-remaining">' + remaining + '</td>';
+                    row += '<td>' +
+                        '<div class="input-group input-group-sm">' +
+                        '<input type="text" class="form-control serial-text" data-detailid="' + detailid + '" ' +
+                        'placeholder="Scan or type serial, then Enter" autocomplete="off" ' + dis + '>' +
+                        '<div class="input-group-append">' +
+                        '<button type="button" class="btn btn-warning btnaddserial" data-detailid="' + detailid + '" ' + dis + '>' +
+                        '<i class="fas fa-plus"></i> Add</button></div></div>' +
+                        '<small class="text-danger serial-msg"></small>' +
+                        '<div class="serial-list mt-2"></div>' +
+                        '<small class="text-muted serial-count"></small>' +
+                        '</td>';
+                    row += '<td>' + existing + '</td>';
+                    row += '</tr>';
+
+                    tbody.append(row);
+                    renderSerialList(detailid);
+                });
+
+                $('#serialmodal').off('shown.bs.modal').on('shown.bs.modal', function () {
+                    $('#tableserial .serial-text:enabled').first().focus();
+                });
+                $('#serialmodal').modal('show');
+            }
+        });
+    });
+
+    // Enter key (scanner) adds the serial
+    $(document).on('keydown', '.serial-text', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            addSerial($(this).data('detailid'));
+        }
+    });
+
+    // Add button
+    $(document).on('click', '.btnaddserial', function () {
+        var detailid = $(this).data('detailid');
+        addSerial(detailid);
+        $('#serialrow_' + detailid).find('.serial-text:enabled').focus();
+    });
+
+    // Remove a serial from the pending list
+    $(document).on('click', '.serial-remove', function (e) {
+        e.preventDefault();
+        var detailid = $(this).data('detailid');
+        var index = parseInt($(this).data('index'));
+
+        serialPending[detailid].splice(index, 1);
+        renderSerialList(detailid);
+        $('#serialrow_' + detailid).find('.serial-text').focus();
+    });
+
+    $('#btnsaveserial').click(function () {
+        // anything typed but not added yet: try to add it first
+        $('#tableserial .serial-text').each(function () {
+            if ($.trim($(this).val()) !== '') {
+                addSerial($(this).data('detailid'));
+            }
+        });
+
+        var leftover = false;
+        $('#tableserial .serial-text').each(function () {
+            if ($.trim($(this).val()) !== '') { leftover = true; }
+        });
+
+        if (leftover) {
+            Swal.fire({ icon: 'warning', title: 'Check the serial numbers', text: 'One or more serial numbers could not be added. Fix the red message first.' });
+            return;
+        }
+
+        var jsonObj = [];
+        $.each(serialPending, function (detailid, list) {
+            if (list.length > 0) {
+                jsonObj.push({ detailid: detailid, serials: list });
+            }
+        });
+
+        if (jsonObj.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'Nothing to save', text: 'Please add at least one serial number.' });
+            return;
+        }
+
+        Swal.fire({
+            title: '',
+            html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            backdrop: "rgba(255, 255, 255, 0.5)",
+            customClass: { popup: "fullscreen-swal" },
+            didOpen: () => {
+                document.body.style.overflow = "hidden";
+
+                $.ajax({
+                    type: "POST",
+                    data: {
+                        grnID: $('#serialgrnid').val(),
+                        tableData: jsonObj
+                    },
+                    url: '<?php echo base_url() ?>Goodreceive/Goodreceiveserialinsert',
+                    success: function (result) {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+
+                        var obj = JSON.parse(result);
+                        var act = JSON.parse(obj.action);
+
+                        if (obj.status == 1) {
+                            $('#serialmodal').modal('hide');
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: act.message,
+                                showConfirmButton: false,
+                                timer: 2500
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Could not save',
+                                html: act.message
+                            });
+                        }
+                    },
+                    error: function () {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again later.' });
+                    }
+                });
+            }
+        });
+    });
+
     $(document).on('input', '.edit-unitprice', function () {
         var row = $(this).closest('tr');
         var unitprice = parseFloat($(this).val()) || 0;
@@ -1172,7 +1458,6 @@ $(document).ready(function() {
             var total = $('#modeltotalpayment').val();
             var vatamount = $('#vatamount').val();
             var location = $('#location').val();
-            var warehouse = $('#warehouse').val();
             var porder = $('#porder').val();
             var batchno = $('#batchno').val();
             var supplier = $('#supplier').val();
@@ -1205,7 +1490,6 @@ $(document).ready(function() {
                         remark: remark,
                         vatamount: vatamount,
                         location: location,
-                        warehouse: warehouse,
                         porder: porder,
                         invoice: invoice,
                         subtotal: subtotal,
@@ -1564,13 +1848,12 @@ function getVat() {
 
     $.ajax({
         type: "POST",
-        data: {
-            currentDate: currentDate,
-        },
+        data: { currentDate: currentDate },
         url: 'Goodreceive/Getvatpresentage',
         success: function(result) {
             var obj = JSON.parse(result);
             $('#vat').val(obj);
+            finaltotalcalculate();
         }
     });
 }

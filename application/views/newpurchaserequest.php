@@ -143,23 +143,24 @@ include "include/topnavbar.php";
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
+                    <h5 class="modal-title" id="staticBackdropLabel">View Purchase Order Request<span id="pr" class="d-none"></span></h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
                     <div class="row">
-                        <div class="col-12">
-                            <h2 style="margin-bottom: 2px; color: black;font-family: cursive;font-size:20px;font-weight: bold; padding:0;"
-                                class="text-left">Purchase Order Request<span id="pr"></span></h2>
-                            <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding:0;"
-                                class="text-left"><span id="viewcompanyname"></span></p>
-                            <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; font-weight: bold; padding:0;"
-                                class="text-left"><span id="viewbranchname"></span></p>
-                            <p style="margin-bottom: 2px; font-family: cursive;font-size:15px; padding:0;"
-                                class="text-left"><span id="porder_number"></span></p>
+                        <div class="col-6 small">
+                            <label class="small font-weight-bold text-dark mb-1">Date:</label> <span id="viewdate"></span><br>
+                            <label class="small font-weight-bold text-dark mb-1">Request No:</label> <span id="porder_number"></span>
+                        </div>
+                        <div class="col-6 small">
+                            <label class="small font-weight-bold text-dark mb-1">Company:</label> <span id="viewcompanyname"></span><br>
+                            <label class="small font-weight-bold text-dark mb-1">Branch:</label> <span id="viewbranchname"></span><br>
+                            <label class="small font-weight-bold text-dark mb-1">Check By:</label> <span id="viewcheckby"></span>
                         </div>
                     </div>
+                    <hr class="border-dark">
                     <div id="viewhtml"></div>
                     <div class="col-12 text-right">
                         <hr>
@@ -171,7 +172,7 @@ include "include/topnavbar.php";
                         <button id="btncheck" class="btn btn-success btn-sm px-3 mb-2"><i class="fas fa-user-check mr-2"></i>Check By</button>
                         <?php } ?>
                     </div>
-                    <div class="col-12 text-center"><div id="alertdiv"></div></div> 
+                    <div class="col-12 text-center"><div id="alertdiv"></div></div>
                     <div class="col-12 text-center"><div id="checkalertdiv"></div></div>
                 </div>
             </div>
@@ -393,7 +394,7 @@ $(document).ready(function() {
                     var button = '';
 
                     button += '<a href="<?php echo base_url() ?>Newpurchaserequest/Printinvoice/' + full['idtbl_porder_req'] +
-                        '" target="_blank" data-toggle="tooltip" data-placement="bottom" title="Print Request" class="btn btn-secondary btn-sm mr-1 ';
+                        '" target="_blank" data-toggle="tooltip" data-placement="bottom" title="Print Request" class="btn btn-danger btn-sm mr-1 ';
                     if (editcheck != 1) { button += 'd-none'; }
                     button += '"><i class="fas fa-file-pdf mr-2"></i></a>';
 
