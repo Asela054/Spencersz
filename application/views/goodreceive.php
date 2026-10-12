@@ -476,10 +476,11 @@ include "include/topnavbar.php";
                         <thead>
                             <tr>
                                 <th>Product</th>
+                                <th>Batch Number</th>
                                 <th class="text-center">GRN Qty</th>
                                 <th class="text-center">Added</th>
                                 <th class="text-center">Remaining</th>
-                                <th width="38%">Scan / Enter Serial Number</th>
+                                <th width="42%">Scan / Enter Serial Number &amp; Sale Price</th>
                                 <th>Already Added</th>
                             </tr>
                         </thead>
@@ -965,11 +966,17 @@ $(document).ready(function() {
         });
     });
 
-    var serialPending = {};  
+    // ===================== SERIAL NUMBERS + SALE PRICE =====================
+    // serialPending[detailid] = [ {serial: 'ABC', saleprice: 1500}, ... ]
+    var serialPending = {};
     var serialExisting = {};
 
     function escapeHtml(s) {
         return $('<div>').text(s).html();
+    }
+
+    function formatPrice(v) {
+        return addCommas((parseFloat(v) || 0).toFixed(2));
     }
 
     function renderSerialList(detailid) {
@@ -979,7 +986,8 @@ $(document).ready(function() {
 
         var html = '';
         $.each(list, function (i, s) {
-            html += '<span class="badge badge-primary mr-1 mb-1 p-2">' + escapeHtml(s) +
+            html += '<span class="badge badge-primary mr-1 mb-1 p-2">' + escapeHtml(s.serial) +
+                ' - Rs. ' + formatPrice(s.saleprice) +
                 ' <a href="#" class="text-white ml-1 serial-remove" data-detailid="' + detailid +
                 '" data-index="' + i + '">&times;</a></span>';
         });
@@ -993,14 +1001,16 @@ $(document).ready(function() {
             $row.find('.serial-count').text(list.length + ' of ' + total + ' ready to save');
         }
 
-        $row.find('.serial-text, .btnaddserial').prop('disabled', list.length >= total);
+        $row.find('.serial-text, .serial-price, .btnaddserial').prop('disabled', list.length >= total);
     }
 
     function addSerial(detailid) {
         var $row = $('#serialrow_' + detailid);
         var $input = $row.find('.serial-text');
+        var $price = $row.find('.serial-price');
         var $msg = $row.find('.serial-msg');
         var serial = $.trim($input.val());
+        var priceStr = $.trim($price.val());
         var total = parseInt($row.data('remaining')) || 0;
 
         $msg.text('');
@@ -1014,6 +1024,12 @@ $(document).ready(function() {
             return;
         }
 
+        if (priceStr === '' || isNaN(priceStr) || parseFloat(priceStr) < 0) {
+            $msg.text('Enter a valid sale price');
+            $price.focus().select();
+            return;
+        }
+
         if (serialExisting[key]) {
             $msg.text('"' + serial + '" is already added to this GRN');
             $input.select();
@@ -1023,7 +1039,7 @@ $(document).ready(function() {
         var dup = false;
         $.each(serialPending, function (id, list) {
             $.each(list, function (i, s) {
-                if (s.toLowerCase() === key) { dup = true; return false; }
+                if (s.serial.toLowerCase() === key) { dup = true; return false; }
             });
             if (dup) { return false; }
         });
@@ -1034,8 +1050,8 @@ $(document).ready(function() {
             return;
         }
 
-        serialPending[detailid].push(serial);
-        $input.val('');
+        serialPending[detailid].push({ serial: serial, saleprice: parseFloat(priceStr) });
+        $input.val('');   // sale price stays filled for the next serial of the same product
         renderSerialList(detailid);
 
         if (serialPending[detailid].length >= total) {
@@ -1063,6 +1079,7 @@ $(document).ready(function() {
 
                 $.each(obj.details, function (i, item) {
                     var detailid = item.idtbl_grndetail;
+                    var batchno = item.batchno;
                     var qty = Math.floor(parseFloat(item.qty)) || 0;
                     var added = item.serials.length;
                     var remaining = Math.max(qty - added, 0);
@@ -1072,14 +1089,18 @@ $(document).ready(function() {
 
                     var existing = '';
                     $.each(item.serials, function (j, s) {
-                        serialExisting[s.toLowerCase()] = true;
-                        existing += '<span class="badge badge-secondary mr-1 mb-1">' + escapeHtml(s) + '</span>';
+                        serialExisting[s.serialno.toLowerCase()] = true;
+                        existing += '<span class="badge badge-secondary mr-1 mb-1">' + escapeHtml(s.serialno) +
+                            ' - Rs. ' + formatPrice(s.saleprice) + '</span>';
                     });
 
                     var dis = (remaining == 0) ? 'disabled' : '';
 
-                    var row = '<tr id="serialrow_' + detailid + '" data-remaining="' + remaining + '">';
+                    var row = '<tr id="serialrow_' + detailid + '" ' +
+                        'data-remaining="' + remaining + '" ' +
+                        'data-batchno="' + escapeHtml(batchno || '') + '">';
                     row += '<td>' + escapeHtml(productName) + '</td>';
+                    row += '<td>' + escapeHtml(batchno) + '</td>';
                     row += '<td class="text-center">' + qty + '</td>';
                     row += '<td class="text-center">' + added + '</td>';
                     row += '<td class="text-center font-weight-bold serial-remaining">' + remaining + '</td>';
@@ -1087,6 +1108,9 @@ $(document).ready(function() {
                         '<div class="input-group input-group-sm">' +
                         '<input type="text" class="form-control serial-text" data-detailid="' + detailid + '" ' +
                         'placeholder="Scan or type serial, then Enter" autocomplete="off" ' + dis + '>' +
+                        '<input type="number" min="0" step="any" class="form-control serial-price text-right" ' +
+                        'data-detailid="' + detailid + '" style="max-width: 150px;" ' +
+                        'placeholder="Sale price" autocomplete="off" ' + dis + '>' +
                         '<div class="input-group-append">' +
                         '<button type="button" class="btn btn-warning btnaddserial" data-detailid="' + detailid + '" ' + dis + '>' +
                         '<i class="fas fa-plus"></i> Add</button></div></div>' +
@@ -1109,11 +1133,33 @@ $(document).ready(function() {
         });
     });
 
-    // Enter key (scanner) adds the serial
+    // Enter in serial box (scanner): add if price is filled, otherwise jump to price
     $(document).on('keydown', '.serial-text', function (e) {
         if (e.which === 13) {
             e.preventDefault();
-            addSerial($(this).data('detailid'));
+            var detailid = $(this).data('detailid');
+            var $row = $('#serialrow_' + detailid);
+
+            if ($.trim($(this).val()) === '') { return; }
+
+            if ($.trim($row.find('.serial-price').val()) === '') {
+                $row.find('.serial-price').focus();
+            } else {
+                addSerial(detailid);
+            }
+        }
+    });
+
+    // Enter in price box adds the serial
+    $(document).on('keydown', '.serial-price', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            var detailid = $(this).data('detailid');
+            if ($.trim($('#serialrow_' + detailid).find('.serial-text').val()) === '') {
+                $('#serialrow_' + detailid).find('.serial-text').focus();
+                return;
+            }
+            addSerial(detailid);
         }
     });
 
@@ -1154,9 +1200,16 @@ $(document).ready(function() {
         }
 
         var jsonObj = [];
+
         $.each(serialPending, function (detailid, list) {
             if (list.length > 0) {
-                jsonObj.push({ detailid: detailid, serials: list });
+                var batchno = $('#serialrow_' + detailid).attr('data-batchno') || '';
+
+                jsonObj.push({
+                    detailid: detailid,
+                    batchno: batchno,
+                    serials: list
+                });
             }
         });
 
@@ -1179,7 +1232,7 @@ $(document).ready(function() {
                     type: "POST",
                     data: {
                         grnID: $('#serialgrnid').val(),
-                        tableData: jsonObj
+                        tableData: JSON.stringify(jsonObj)
                     },
                     url: '<?php echo base_url() ?>Goodreceive/Goodreceiveserialinsert',
                     success: function (result) {
@@ -1215,6 +1268,7 @@ $(document).ready(function() {
             }
         });
     });
+    // =======================================================================
 
     $(document).on('input', '.edit-unitprice', function () {
         var row = $(this).closest('tr');
