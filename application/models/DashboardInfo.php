@@ -28,7 +28,7 @@ class DashboardInfo extends CI_Model{
         $r = array();
 
         // ---- Sales (excl. VAT) ----
-        $salesSql = "SELECT COALESCE(SUM(`total` - `vatamount`),0) AS v FROM `tbl_invoice`
+        $salesSql = "SELECT COALESCE(SUM(`net_total` - `vatamount`),0) AS v FROM `tbl_invoice`
                      WHERE `status` = 1 AND `tbl_company_idtbl_company` = ? ";
         $r['sales_today']      = $this->_val($salesSql . "AND `invoice_date` = CURDATE()", array($c));
         $r['sales_month']      = $this->_val($salesSql . "AND DATE_FORMAT(`invoice_date`,'%Y-%m') = DATE_FORMAT(CURDATE(),'%Y-%m')", array($c));
@@ -116,7 +116,7 @@ class DashboardInfo extends CI_Model{
 
     public function RecentInvoices($limit = 6){
         $c = $this->_co();
-        $sql = "SELECT i.`invoice_no`, i.`invoice_date`, i.`total`, cu.`customer`
+        $sql = "SELECT i.`invoice_no`, i.`invoice_date`, i.`net_total`, cu.`customer`
                 FROM `tbl_invoice` i
                 LEFT JOIN `tbl_customer` cu ON cu.`idtbl_customer` = i.`tbl_customer_idtbl_customer`
                 WHERE i.`status` = 1 AND i.`tbl_company_idtbl_company` = ?
@@ -145,7 +145,7 @@ class DashboardInfo extends CI_Model{
     // Top selling products by revenue, last 30 days
     public function TopProducts($limit = 5){
         $c = $this->_co();
-        $sql = "SELECT p.`product_name` AS label, SUM(d.`qty`) AS units, SUM(d.`total`) AS revenue
+        $sql = "SELECT p.`product_name` AS label, SUM(d.`qty`) AS units, SUM(d.`line_total`) AS revenue
                 FROM `tbl_invoice_detail` d
                 INNER JOIN `tbl_invoice` i ON i.`idtbl_invoice` = d.`tbl_invoice_idtbl_invoice`
                 INNER JOIN `tbl_product` p ON p.`idtbl_product` = d.`tbl_product_idtbl_product`
@@ -206,7 +206,7 @@ class DashboardInfo extends CI_Model{
         $days    = max(1, min(60, (int) $days));
         $endDate = $this->_normalizeDate($endDate);
 
-        $sales = $this->db->query("SELECT `invoice_date` AS d, SUM(`total` - `vatamount`) AS v FROM `tbl_invoice`
+        $sales = $this->db->query("SELECT `invoice_date` AS d, SUM(`net_total` - `vatamount`) AS v FROM `tbl_invoice`
                 WHERE `status` = 1 AND `tbl_company_idtbl_company` = ?
                 AND `invoice_date` BETWEEN DATE_SUB(?, INTERVAL ? DAY) AND ?
                 GROUP BY `invoice_date`", array($c, $endDate, $days - 1, $endDate))->result();
@@ -234,7 +234,7 @@ class DashboardInfo extends CI_Model{
         $endMonth = $this->_normalizeMonth($endMonth);
         $endOfEnd = date('Y-m-t', strtotime($endMonth . '-01'));
 
-        $sales = $this->db->query("SELECT DATE_FORMAT(`invoice_date`,'%Y-%m') AS d, SUM(`total` - `vatamount`) AS v FROM `tbl_invoice`
+        $sales = $this->db->query("SELECT DATE_FORMAT(`invoice_date`,'%Y-%m') AS d, SUM(`net_total` - `vatamount`) AS v FROM `tbl_invoice`
                 WHERE `status` = 1 AND `tbl_company_idtbl_company` = ?
                 AND `invoice_date` > DATE_SUB(?, INTERVAL ? MONTH) AND `invoice_date` <= ?
                 GROUP BY DATE_FORMAT(`invoice_date`,'%Y-%m')", array($c, $endOfEnd, $months, $endOfEnd))->result();
