@@ -924,43 +924,86 @@
 		}
 	}
 
-	public function Getgrnserials() {
+
+	public function Getgrnserials()
+	{
 		$recordID = $this->input->post('recordID');
 
-		$this->db->select('d.idtbl_grndetail, d.qty, d.costunitprice, d.tbl_product_idtbl_product, p.product_name, p.product_code');
+		$this->db->select('
+			d.idtbl_grndetail,
+			d.qty,
+			d.costunitprice,
+			d.tbl_product_idtbl_product,
+			p.product_name,
+			p.product_code,
+			g.batchno
+		');
 		$this->db->from('tbl_grndetail d');
-		$this->db->join('tbl_product p', 'p.idtbl_product = d.tbl_product_idtbl_product', 'left');
+		$this->db->join(
+			'tbl_product p',
+			'p.idtbl_product = d.tbl_product_idtbl_product',
+			'left'
+		);
+		$this->db->join(
+			'tbl_grn g',
+			'g.idtbl_grn = d.tbl_grn_idtbl_grn',
+			'left'
+		);
 		$this->db->where('d.tbl_grn_idtbl_grn', $recordID);
 		$this->db->where('d.status', 1);
+
 		$details = $this->db->get()->result();
 
-		$this->db->select('serialno, tbl_grndetail_idtbl_grndetail');
+		$this->db->select('
+			serialno,
+			saleprice,
+			batchno,
+			tbl_grndetail_idtbl_grndetail
+		');
 		$this->db->from('tbl_product_serial');
 		$this->db->where('tbl_grn_idtbl_grn', $recordID);
 		$this->db->where('status', 1);
 		$this->db->order_by('idtbl_product_serial', 'ASC');
+
 		$serialrows = $this->db->get()->result();
 
 		$map = array();
+
 		foreach ($serialrows as $s) {
-			$map[$s->tbl_grndetail_idtbl_grndetail][] = $s->serialno;
+			$map[$s->tbl_grndetail_idtbl_grndetail][] = array(
+				'serialno'  => $s->serialno,
+				'saleprice' => $s->saleprice,
+				'batchno'   => $s->batchno
+			);
 		}
 
 		foreach ($details as $d) {
-			$d->serials = isset($map[$d->idtbl_grndetail]) ? $map[$d->idtbl_grndetail] : array();
+			$d->serials = isset($map[$d->idtbl_grndetail])
+				? $map[$d->idtbl_grndetail]
+				: array();
 		}
 
-		$this->output->set_content_type('application/json')->set_output(json_encode(array('details' => $details)));
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'details' => $details
+			)));
 	}
 
 	public function Goodreceiveserialinsert() {
 		$this->db->trans_begin();
 
 		$userID = $_SESSION['userid'];
+		$companyID = $_SESSION['company_id'];
+		$branchID = $_SESSION['branch_id'];
 		$updatedatetime = date('Y-m-d H:i:s');
 
 		$grnID = $this->input->post('grnID');
 		$tableData = $this->input->post('tableData');
+
+		if (is_string($tableData)) {
+			$tableData = json_decode($tableData, true);
+		}
 
 		$error = '';
 		$inserts = array();
@@ -976,13 +1019,14 @@
 			$error = 'GRN not found';
 		} elseif ($grn->approvestatus == 2) {
 			$error = 'Cannot add serial numbers to a rejected GRN';
-		} elseif (empty($tableData)) {
+		} elseif (empty($tableData) || !is_array($tableData)) {
 			$error = 'No serial numbers to save';
 		}
 
 		if ($error == '') {
 			foreach ($tableData as $row) {
 				$detailID = $row['detailid'];
+				$batchno = isset($row['batchno']) ? trim($row['batchno']) : '';
 				$serials = isset($row['serials']) ? $row['serials'] : array();
 
 				// detail must belong to this GRN
@@ -1009,9 +1053,17 @@
 					break;
 				}
 
-				foreach ($serials as $serial) {
-					$serial = trim($serial);
+				foreach ($serials as $item) {
+					$serial = isset($item['serial']) ? trim($item['serial']) : '';
 					if ($serial === '') { continue; }
+
+					// sale price must be a number >= 0
+					$saleprice = isset($item['saleprice']) ? $item['saleprice'] : '';
+					if ($saleprice === '' || !is_numeric($saleprice) || floatval($saleprice) < 0) {
+						$error = 'Invalid sale price for serial number: ' . htmlspecialchars($serial);
+						break 2;
+					}
+					$saleprice = floatval($saleprice);
 
 					$key = strtolower($serial);
 					if (isset($seen[$key])) {
@@ -1030,14 +1082,18 @@
 
 					$inserts[] = array(
 						'serialno' => $serial,
+						'batchno' => $batchno,
 						'tbl_grn_idtbl_grn' => $grnID,
 						'tbl_grndetail_idtbl_grndetail' => $detailID,
 						'costunitprice' => $detail->costunitprice,
+						'saleprice' => $saleprice,
 						'tbl_product_idtbl_product' => $detail->tbl_product_idtbl_product,
 						'stock_status' => 1,
 						'status' => 1,
 						'insertdatetime' => $updatedatetime,
-						'tbl_user_idtbl_user' => $userID
+						'tbl_user_idtbl_user' => $userID,
+						'tbl_company_idtbl_company' => $companyID,
+						'tbl_company_branch_idtbl_company_branch' => $branchID
 					);
 				}
 			}

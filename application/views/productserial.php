@@ -108,12 +108,28 @@ include "include/topnavbar.php";
         function stat(label,value,color){ return '<div class="col-6 col-md mb-2"><div class="card ps-stat" style="--c:'+color+'"><div class="card-body py-2"><span>'+label+'</span><b>'+value+'</b></div></div></div>'; }
         function issold(full){ return (full['sold_invoice_id'] && full['sold_invoice_id']!='0') ? true : false; }
 
-        function stockbadge(full){
-            if(issold(full)){ return badge('primary','Sold'); }
-            var t=(full['stock_status']||'').toString().toLowerCase();
-            if(t.indexOf('return')>-1){ return badge('warning','Returned'); }
-            if(t.indexOf('damage')>-1 || t.indexOf('defect')>-1){ return badge('danger',full['stock_status']); }
-            return badge('success', full['stock_status'] ? full['stock_status'] : 'In stock');
+        function stockbadge(full) {
+            var status = (full['stock_status'] || '').toString().trim();
+
+            switch (status) {
+                case '1':
+                    return badge('success', 'In Stock');
+
+                case '2':
+                    return badge('primary', 'Sold');
+
+                case '3':
+                    return badge('warning', 'Returned to Supplier');
+
+                case '4':
+                    return badge('danger', 'Damaged');
+
+                case '5':
+                    return badge('info', 'Returned by Customer');
+
+                default:
+                    return badge('secondary', 'Unknown Status');
+            }
         }
         function warrantybadge(full){
             var w=full['warranty_end'];

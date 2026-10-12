@@ -619,82 +619,98 @@ $(document).ready(function() {
         }
     });
 
+    
     $("#formsubmit").click(function() {
         if (!$("#createorderform")[0].checkValidity()) {
             $("#submitBtn").click();
-        } else {
-            var product = $("#product option:selected").text();
-            var productID = $('#product').val();
-            var orderedQty = $('#orderedqty').val();
-            var stockQty = $('#qtylabel').text();
-            var returnQty = parseFloat($('#returnqty').val());
-            var unitPrice = parseFloat($('#unitprice').val());
-            var uom = $("#uom option:selected").text();
-            var uomID = $('#uom').val();
-            var discount = parseFloat($('#unitdiscount').val());
-            var comment = $('#comment').val();
-
-            var newtotal = parseFloat((unitPrice * returnQty) - discount);
-            var total = parseFloat(newtotal);
-            var showtotal = addCommas(parseFloat(total).toFixed(2));
-
-            var productExists = false;
-            $('#tableorder tbody tr').each(function() {
-                var existingProductID = $(this).find('td.d-none').first().text();
-                if (existingProductID === productID) {
-                    productExists = true;
-                    return false;
-                }
-            });
-
-            if (productExists) {
-                alert("This Product has already been added.");
-                return;
-            }
-
-            var serialIDs = $('#serials').val() || [];
-            var serialTexts = $('#serials option:selected').map(function() { return $(this).text(); }).get().join(', ');
-
-            if (hasSerials && serialIDs.length == 0) {
-                alert("Please select the serial numbers to return.");
-                return;
-            }
-
-            $('#tableorder > tbody:last').append('<tr class="pointer"><td>' + product +
-                '</td><td class="d-none">' + productID + '</td><td class="text-right">' + orderedQty +
-                '</td><td class="text-right">' + stockQty + '</td><td class="text-right">' + returnQty +
-                '</td><td class="text-right">' + unitPrice + '</td><td class="text-center">' + uom +
-                '</td><td class="d-none">' + uomID + '</td><td class="text-right">' + discount +
-                '</td><td>' + comment + '</td><td class="text-right"> ' + showtotal +
-                '</td><td class="d-none total"> ' + total +
-                '</td><td class="d-none">' + serialIDs.join(',') +
-                '</td><td>' + serialTexts +
-                '</td><td><button type="button" onclick="productDelete(this);" id="btnDeleterow" class="btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td></tr>'
-            );
-
-            $('#grn_no').prop('disabled', true);
-
-            $('#product').val('').trigger('change');
-            $('#orderedqty').val('');
-            $('#returnqty').val('');
-            $('#qtylabel').empty();
-            $('#uom').val('').trigger('change');
-            $('#unitprice').val('0');
-            $('#unitdiscount').val('0');
-            $('#comment').val('');
-
-            var sum = 0;
-            $(".total").each(function() {
-                sum += parseFloat($(this).text());
-            });
-
-            var showsum = addCommas(parseFloat(sum).toFixed(2));
-
-            $('#divtotal').html('Rs. ' + showsum);
-            $('#hidetotalorder').val(sum);
-
-            $('#product').focus();
+            return;
         }
+
+        var product = $("#product option:selected").text();
+        var productID = $("#product").val();
+        var orderedQty = $("#orderedqty").val();
+        var stockQty = $("#qtylabel").text();
+        var returnQty = parseFloat($("#returnqty").val()) || 0;
+        var unitPrice = parseFloat($("#unitprice").val()) || 0;
+        var uom = $("#uom option:selected").text();
+        var uomID = $("#uom").val();
+        var discount = parseFloat($("#unitdiscount").val()) || 0;
+        var comment = $("#comment").val();
+
+        var total = (unitPrice * returnQty) - discount;
+        var showtotal = addCommas(total.toFixed(2));
+
+        var productExists = false;
+
+        $("#tableorder tbody tr").each(function() {
+            var existingProductID = $(this).find("td").eq(1).text();
+
+            if (existingProductID === productID) {
+                productExists = true;
+                return false;
+            }
+        });
+
+        if (productExists) {
+            alert("This Product has already been added.");
+            return;
+        }
+
+        var serialIDs = $("#serials").val() || [];
+        var serialTexts = $("#serials option:selected")
+            .map(function() {
+                return $(this).text();
+            }).get().join(", ");
+
+        if (hasSerials && serialIDs.length === 0) {
+            alert("Please select the serial numbers to return.");
+            return;
+        }
+
+        var row = '<tr class="pointer">' +
+            '<td>' + product + '</td>' +                         // col_1
+            '<td class="d-none">' + productID + '</td>' +        // col_2
+            '<td class="d-none">' + serialIDs.join(',') + '</td>' + // col_3
+            '<td>' + serialTexts + '</td>' +                     // col_4
+            '<td class="text-right">' + orderedQty + '</td>' +  // col_5
+            '<td class="text-right">' + stockQty + '</td>' +    // col_6
+            '<td class="text-right">' + returnQty + '</td>' +   // col_7
+            '<td class="text-right">' + unitPrice + '</td>' +   // col_8
+            '<td class="text-center">' + uom + '</td>' +        // col_9
+            '<td class="d-none">' + uomID + '</td>' +           // col_10
+            '<td class="text-right">' + discount + '</td>' +    // col_11
+            '<td>' + $('<div>').text(comment).html() + '</td>' + // col_12
+            '<td class="text-right">' + showtotal + '</td>' +   // col_13
+            '<td class="d-none total">' + total.toFixed(2) + '</td>' + // col_14
+            '<td><button type="button" onclick="productDelete(this);" ' +
+            'class="btn btn-danger btn-sm float-right">' +
+            '<i class="fas fa-trash-alt"></i></button></td>' +  // col_15
+            '</tr>';
+
+        $("#tableorder tbody").append(row);
+
+        $("#grn_no").prop("disabled", true);
+
+        $("#product").val("").trigger("change");
+        $("#orderedqty").val("");
+        $("#returnqty").val("");
+        $("#qtylabel").empty();
+        $("#uom").val("").trigger("change");
+        $("#unitprice").val("0");
+        $("#unitdiscount").val("0");
+        $("#comment").val("");
+
+        var sum = 0;
+
+        $(".total").each(function() {
+            sum += parseFloat($(this).text()) || 0;
+        });
+
+        $("#divtotal").html("Rs. " + addCommas(sum.toFixed(2)));
+        $("#hidetotalorder").val(sum);
+
+        $("#product").focus();
+
         finaltotalcalculate();
     });
 

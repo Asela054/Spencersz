@@ -150,15 +150,20 @@
 
 		foreach ($tableData as $rowtabledata) {
 			$product           = $rowtabledata['col_2'];
-			$orderedQty        = $rowtabledata['col_3'];
-			$availableStockQty = $rowtabledata['col_4'];
-			$returnQty         = $rowtabledata['col_5'];
-			$unitPrice         = $rowtabledata['col_6'];
-			$uom               = $rowtabledata['col_8'];
-			$unitDiscount      = $rowtabledata['col_9'];
-			$comment           = $rowtabledata['col_10'];
-			$total             = $rowtabledata['col_12'];
-			$serialIDs         = array_filter(array_map('trim', explode(',', $rowtabledata['col_13'])));
+			$serialIDs         = array_filter(array_map(
+				'trim',
+				explode(',', $rowtabledata['col_3'])
+			));
+			$orderedQty        = $rowtabledata['col_5'];
+			$availableStockQty = $rowtabledata['col_6'];
+			$returnQty         = $rowtabledata['col_7'];
+			$unitPrice         = $rowtabledata['col_8'];
+			$uom               = $rowtabledata['col_10'];
+			$unitDiscount      = $rowtabledata['col_11'];
+			$comment           = $rowtabledata['col_12'];
+			$total             = $rowtabledata['col_14'];
+
+
 
 			$datadetail = array(
 				'ordered_qty'        => $orderedQty,
@@ -327,8 +332,8 @@
 				<td class="text-right">'.$d->return_qty.'</td>
 				<td class="text-center">'.$d->unit.'</td>
 				<td class="text-right">'.number_format($d->unit_discount, 2).'</td>
-				<td>'.$d->comment.'</td>
-				<td class="text-right">'.number_format($d->total, 2).'</td>
+				<td>'.htmlspecialchars($d->comment ?? '', ENT_QUOTES, 'UTF-8').'</td>
+				<td class="text-right">'.number_format((float)$d->total, 2).'</td>
 			</tr>';
 		}
 
@@ -428,7 +433,7 @@
 					$this->db->where('stock_status', 1);
 					$this->db->where('status', 1);
 					$this->db->update('tbl_product_serial', array(
-						'stock_status'   => 4,
+						'stock_status'   => 3,
 						'updatedatetime' => $updatedatetime,
 						'updateuser'     => $userID
 					));
