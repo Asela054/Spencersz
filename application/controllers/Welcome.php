@@ -60,21 +60,21 @@ class Welcome extends CI_Controller {
 		$result['menuaccess'] = $this->Commeninfo->Getmenuprivilege();
 
 		// stat cards
-		$result['cards'] = $this->DashboardInfo->Cards();
+		// $result['cards'] = $this->DashboardInfo->Cards();
 
 		// tables
-		$result['lowstock']   = $this->DashboardInfo->LowStockTable(8);
-		$result['recentgrn']  = $this->DashboardInfo->RecentGrn(6);
-		$result['recentinv']  = $this->DashboardInfo->RecentInvoices(6);
-		$result['recentret']  = $this->DashboardInfo->RecentGrnReturns(6);
+		// $result['lowstock']   = $this->DashboardInfo->LowStockTable(8);
+		// $result['recentgrn']  = $this->DashboardInfo->RecentGrn(6);
+		// $result['recentinv']  = $this->DashboardInfo->RecentInvoices(6);
+		// $result['recentret']  = $this->DashboardInfo->RecentGrnReturns(6);
 
 		// chart data (json for Chart.js)
-		$result['daily']      = json_encode($this->DashboardInfo->DailySeries(7));
-		$result['monthly']    = json_encode($this->DashboardInfo->MonthlySeries(12));
-		$result['bycategory'] = json_encode($this->DashboardInfo->StockByCategory());
-		$result['bybrand']    = json_encode($this->DashboardInfo->StockByBrand());
-		$result['topproducts']= json_encode($this->DashboardInfo->TopProducts(5));
-		$result['serials']    = json_encode($this->DashboardInfo->SerialStatus());
+		// $result['daily']      = json_encode($this->DashboardInfo->DailySeries(7));
+		// $result['monthly']    = json_encode($this->DashboardInfo->MonthlySeries(12));
+		// $result['bycategory'] = json_encode($this->DashboardInfo->StockByCategory());
+		// $result['bybrand']    = json_encode($this->DashboardInfo->StockByBrand());
+		// $result['topproducts']= json_encode($this->DashboardInfo->TopProducts(5));
+		// $result['serials']    = json_encode($this->DashboardInfo->SerialStatus());
 
 		$this->load->view('dashboard', $result);
 	}
@@ -84,23 +84,23 @@ class Welcome extends CI_Controller {
         $result=CompanyBranchList($recordID);
 	}
 
-	public function DailyChartData(){
-		$this->load->model('DashboardInfo');
-		$endDate = $this->input->post('enddate');
-		$days    = (int) $this->input->post('days');
-		if (!in_array($days, array(7, 14, 30))) { $days = 7; }
+	// public function DailyChartData(){
+	// 	$this->load->model('DashboardInfo');
+	// 	$endDate = $this->input->post('enddate');
+	// 	$days    = (int) $this->input->post('days');
+	// 	if (!in_array($days, array(7, 14, 30))) { $days = 7; }
 
-		$this->output
-			->set_content_type('application/json')
-			->set_output(json_encode($this->DashboardInfo->DailySeries($days, $endDate)));
-	}
+	// 	$this->output
+	// 		->set_content_type('application/json')
+	// 		->set_output(json_encode($this->DashboardInfo->DailySeries($days, $endDate)));
+	// }
 
-	public function MonthlyChartData(){
-		$this->load->model('DashboardInfo');
-		$endMonth = $this->input->post('endmonth');
+	// public function MonthlyChartData(){
+	// 	$this->load->model('DashboardInfo');
+	// 	$endMonth = $this->input->post('endmonth');
 
-		$this->output
-			->set_content_type('application/json')
-			->set_output(json_encode($this->DashboardInfo->MonthlySeries(12, $endMonth)));
-	}
+	// 	$this->output
+	// 		->set_content_type('application/json')
+	// 		->set_output(json_encode($this->DashboardInfo->MonthlySeries(12, $endMonth)));
+	// }
 }
