@@ -31,4 +31,11 @@ class Invoice extends CI_Controller {
     public function Insertinvoice(){
        $result=$this->Invoiceinfo->Insertinvoice();
     }
+    public function Printinvoice($x){
+       $result=$this->Invoiceinfo->Printinvoice($x);
+    }
+    public function ajax_credit_notes() {
+        $cid = $this->input->post('customer_id');
+        echo json_encode($this->Invoiceinfo->get_open_credit_notes($cid));
+    }
 }

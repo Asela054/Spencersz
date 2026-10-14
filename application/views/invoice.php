@@ -448,7 +448,8 @@ include "include/topnavbar.php";
 									<div class="col-md-4">
 										<label class="form-label mb-1 text-muted fw-semibold">Invoice Type</label>
 										<select class="form-control form-control-sm fw-bold" id="invoiceTypeSelect">
-											<option value="Retail Tax Invoice (VAT)" selected>Retail Tax Invoice (VAT)
+											<option value="Retail Invoice" selected>Retail Invoice
+											<option value="Retail Tax Invoice (VAT)">Retail Tax Invoice (VAT)
 											</option>
 											<option value="Hire Purchase (HP)">Hire Purchase (HP Scheme)</option>
 											<option value="Corporate Quotation">Corporate Quotation</option>
@@ -563,10 +564,10 @@ include "include/topnavbar.php";
 							<div class="totals-row">
 								<span>Showroom Promo Discount:</span>
 								<div class="d-flex align-items-center gap-1">
-									<span class="text-danger">- LKR</span>
+									<span class="text-danger mr-2">- LKR </span>
 									<input type="number" id="discountInput"
-										class="form-control form-control-sm text-end p-0 px-1 border-0 bg-dark text-white font-monospace"
-										style="width: 80px;" value="10000" oninput="recalculateInvoice()">
+										class="form-control form-control-sm text-right p-0 px-1 border-0 bg-dark text-white font-monospace"
+										style="width: 80px;" value="0" oninput="recalculateInvoice()">
 								</div>
 							</div>
 							<div class="totals-row">
@@ -590,10 +591,25 @@ include "include/topnavbar.php";
 								</button>
 							</div>
 							<div class="card-body-compact">
+                                <!-- Credit note -->
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                    <label class="mb-0 fw-semibold text-muted mr-2" style="font-size:0.75rem; white-space:nowrap;">
+                                        <i class="fas fa-receipt text-danger mr-1"></i> Credit Note
+                                    </label>
+                                    <select id="creditnoteid" name="creditnoteid" class="form-control form-control-sm">
+                                        <option value="">-- None --</option>
+                                    </select>
+                                </div>
+                                <input type="hidden" id="creditused" name="creditused" value="0">
+
                                 <div id="paymentLinesContainer"></div>
 
                                 <!-- Payment Balance Summary -->
                                 <div class="p-2 rounded bg-light border fw-bold mt-2" style="font-size: 0.75rem;">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-dark">Payable: LKR <span id="payabletext">0.00</span></span>
+                                        <span class="text-muted">Credit used: LKR <span id="creditusedtext">0.00</span></span>
+                                    </div>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span class="text-success">Total Entered: <span id="totalEnteredDisplay">LKR 0.00</span></span>
                                         <span class="text-muted" id="balanceRemainingDisplay">Balance: LKR 0.00</span>
@@ -601,7 +617,7 @@ include "include/topnavbar.php";
                                     <div id="changeDueDisplay" class="text-primary mt-1 text-end" style="display:none;"></div>
                                 </div>
                             </div>
-						</div>
+						</div>   
 
 						<!-- Quick Action Hotkeys & Submit -->
 						<div class="d-flex flex-column gap-2 mt-2">
@@ -841,6 +857,26 @@ include "include/topnavbar.php";
 		</div>
 	</div>
 </div>
+
+<!-- MODAL 3: INVOICE RECEIPT PDF -->
+<div class="modal fade" id="invoicePdfModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark py-2">
+                <h6 class="modal-title fw-bold text-white"><i class="fas fa-file-pdf mr-2"></i>Invoice</h6>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true" class="text-light">&times;</span></button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe id="invoicePdfFrame" style="width:100%; height:78vh; border:0;"></iframe>
+            </div>
+            <div class="modal-footer py-2">
+                <a id="invoicePdfOpen" href="#" target="_blank" class="btn btn-outline-secondary btn-sm">Open / Download</a>
+                <button type="button" class="btn btn-spencersz btn-sm" onclick="printInvoicePdf()"><i class="fas fa-print"></i> Print</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 <script>
 	$(document).ready(function () {
@@ -855,7 +891,7 @@ include "include/topnavbar.php";
                 let custName = $('#regCustName').val();
                 let regCustNIC = $('#regCustNIC').val();
 
-                console.log($('#newCustForm').serialize());
+                // console.log($('#newCustForm').serialize());
 
                 $.ajax({
                     url: '<?php echo base_url(); ?>Invoice/SubmitNewCustomer',
@@ -870,6 +906,7 @@ include "include/topnavbar.php";
                             action(obj.action);
                             $('#newCustomerModal').modal('hide');
                             $('#hidecustomerResetBtn').click();
+                            $('#searchCustomer').click();
                         }
                         else{
                             action(obj.action);
@@ -912,6 +949,8 @@ include "include/topnavbar.php";
                         $('#custNameInput').val(obj.customer_name);
                         $('#custSearchInput').val(obj.customer_nic);
                         $('#custIDInput').val(obj.customer_id);
+
+                        loadCreditNotes(obj.customer_id); 
                     } else {
                         Swal.fire({
                             icon: 'error',
@@ -919,6 +958,8 @@ include "include/topnavbar.php";
                             text: 'No customer found with the provided NIC or mobile number.'
                         });
                         $('#custNameInput').val('');
+                        $('#creditnoteid').html('<option value="">-- None --</option>');
+                        recalcPayable();
                     }
                 },
                 error: function (xhr, status, error) {
@@ -932,6 +973,8 @@ include "include/topnavbar.php";
         });
         
         loadProductlist();
+
+        $('#creditnoteid').on('change', recalcPayable);
 	});
 </script>
 <script>
@@ -1247,6 +1290,7 @@ include "include/topnavbar.php";
 		});
 
 		calculateSplitPayments();
+        recalcPayable();
 	}
 
 	// function addPaymentRow() {
@@ -1314,12 +1358,25 @@ include "include/topnavbar.php";
 
 	function completeTransaction() {
 		if (cart.length === 0) {
-			alert("Cannot print invoice for an empty cart.");
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Cannot print invoice for an empty cart.'
+            });
 			return;
 		}
 
         const payErr = validatePayments();
-        if (payErr) { alert(payErr); return; }
+        if (payErr) {
+            Swal.fire({
+                title: 'Payment Error',
+                text: payErr,
+                icon: 'error',
+                confirmButtonColor: '#D0111B',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
 
 		document.getElementById("previewCustName").innerText = document.getElementById("custNameInput").value;
 		document.getElementById("previewCustNIC").innerText = "NIC: " + document.getElementById("custSearchInput").value;
@@ -1403,8 +1460,16 @@ include "include/topnavbar.php";
                 pb.appendChild(tr);
             });
 
-            const change = Math.max(0, r2(paid - net));
-            const balance = Math.max(0, r2(net - paid));
+            const creditUsed = getCreditUsed();
+            if (creditUsed > 0) {
+                const tr = document.createElement("tr");
+                tr.innerHTML = '<td>Credit Note</td><td class="text-end">' +
+                    creditUsed.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</td>';
+                pb.appendChild(tr);
+            }
+            const payable = r2(net - creditUsed);
+            const change = Math.max(0, r2(paid - payable));
+            const balance = Math.max(0, r2(payable - paid));
             document.getElementById("previewChange").innerText = change.toLocaleString('en-US', { minimumFractionDigits: 2 });
             document.getElementById("previewBalance").innerText = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
             document.getElementById("previewChangeRow").style.display = change > 0 ? "inline" : "none";
@@ -1419,6 +1484,8 @@ include "include/topnavbar.php";
             invoiceType: document.getElementById("invoiceTypeSelect").value,
             customerNic: document.getElementById("custSearchInput").value,
             customerName: document.getElementById("custNameInput").value,
+            customerId: document.getElementById("custIDInput").value,       
+            creditNoteId: document.getElementById("creditnoteid").value || null,
             fulfillment: document.querySelector('input[name="fulfillmentRadio"]:checked').value,
             discount: parseFloat(document.getElementById("discountInput").value) || 0,
             items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty })),
@@ -1435,44 +1502,69 @@ include "include/topnavbar.php";
             dataType: 'json',
             success: function (res) {
                 if (res.status == 1) {
-                    document.getElementById("previewInvoiceNo").innerText = res.invoice_no;
-                    document.getElementById("previewDate").innerText = "Date: " +
-                        new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-                    window.print();   // blocks until the print dialog closes
-
-                    const m = bootstrap.Modal.getInstance(document.getElementById("receiptPreviewModal"));
-                    if (m) m.hide();
+                    const savedId = res.invoice_id;
 
                     cart = [];
                     renderCartTable();
                     resetPayments();
+                    const cid = document.getElementById("custIDInput").value;
+                    if (cid) loadCreditNotes(cid); else recalcPayable();
                     document.getElementById("invoiceTypeSelect").value = "Retail Tax Invoice (VAT)";
-                    loadProductlist();   // sold serials disappear from the list
+                    loadProductlist();
+
+                    $('#receiptPreviewModal').modal('hide');
+                    showInvoicePdf(savedId);
                 } else {
-                    alert(res.message || "Could not save the invoice.");
+                    action(res.action);
                 }
                 btn.disabled = false;
             },
             error: function () {
-                alert("Server error while saving the invoice.");
+                Swal.fire({
+                    title: 'Server Error',
+                    text: "Server error while saving the invoice.",
+                    icon: 'error',
+                    confirmButtonColor: '#D0111B',
+                    confirmButtonText: 'OK'
+                });
                 btn.disabled = false;
             }
         });
     }
 
 	function clearInvoiceCart() {
-		if (confirm("Clear current invoice transaction?")) {
-			cart = [];
-			renderCartTable();
-		}
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "Clear current invoice transaction?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#D0111B', // Matches your invoice red theme
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, clear it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                cart = [];
+                renderCartTable();
+                window.location.reload();
+            }
+        });
 	}
 
 	function holdInvoiceDraft() {
 		if (cart.length === 0) return;
-		alert("Invoice held in Terminal Draft Queue #01.");
-		cart = [];
-		renderCartTable();
+
+        Swal.fire({
+            title: 'Invoice Held',
+            text: "Invoice held in Terminal Draft Queue #01.",
+            icon: 'success',
+            confirmButtonColor: '#D0111B', // Matches your red theme
+            confirmButtonText: 'OK'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                cart = [];
+                renderCartTable();
+            }
+        });
 	}
 
 	function printQuotation() {
@@ -1566,8 +1658,15 @@ include "include/topnavbar.php";
         if (!val) return;
 
         if (!pendingProduct) {
-            alert("Please select a product first.");
-            document.getElementById("barcodeInput").focus();
+            Swal.fire({
+                title: 'Product Required',
+                text: "Please select a product first.",
+                icon: 'warning',
+                confirmButtonColor: '#D0111B',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                document.getElementById("barcodeInput").focus();
+            });
             return;
         }
 
@@ -1579,15 +1678,33 @@ include "include/topnavbar.php";
         }
 
         if (!serial) {
-            alert("Serial / IMEI not found for this product.");
+            Swal.fire({
+                title: 'Not Found',
+                text: "Serial / IMEI not found for this product.",
+                icon: 'error',
+                confirmButtonColor: '#D0111B',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                e.target.value = ""; // Clear input on error
+            });
             return;
         }
+
         if (cart.some(c => c.serialId == serial.idtbl_product_serial)) {
-            alert("This serial is already in the cart.");
-            e.target.value = "";
+            Swal.fire({
+                title: 'Duplicate Serial',
+                text: "This serial is already in the cart.",
+                icon: 'info',
+                confirmButtonColor: '#D0111B',
+                confirmButtonText: 'OK'
+            }).then(() => {
+                e.target.value = "";
+            });
             return;
         }
+
         addSerialToCart(pendingProduct, serial);
+        e.target.value = ""; // Clear input after successful addition
     }
 
     function addSerialToCart(prod, s) {
@@ -1961,5 +2078,50 @@ include "include/topnavbar.php";
         if (total > r2(net) && r2(total - net) > r2(cash)) return "Over-payment can only be returned as cash change.";
         return "";
     }
+
+    function loadCreditNotes(customerId) {
+        $.post('<?= base_url("Invoice/ajax_credit_notes") ?>', {customer_id: customerId}, function (res) {
+            var opts = '<option value="">-- None --</option>';
+            $.each(JSON.parse(res), function (i, r) {
+                opts += '<option value="' + r.id + '" data-balance="' + r.balance + '">'
+                    + r.date + ' - ' + r.balance + '</option>';
+            });
+            $('#creditnoteid').html(opts);
+            recalcPayable();
+        });
+    }
+
+    function getCreditUsed() {
+        const cn = parseFloat($('#creditnoteid option:selected').data('balance')) || 0;
+        return r2(Math.min(cn, getNetTotal()));
+    }
+
+    function getPayableTotal() {
+        return r2(getNetTotal() - getCreditUsed());
+    }
+
+    function recalcPayable() {
+        $('#creditused').val(getCreditUsed().toFixed(2));
+        $('#payabletext').text(getPayableTotal().toLocaleString('en-US', {minimumFractionDigits: 2}));
+        calculateSplitPayments();
+    }
+
+    function showInvoicePdf(invoiceId) {
+        const url = '<?php echo base_url(); ?>Invoice/Printinvoice/' + invoiceId;
+        $('#invoicePdfFrame').attr('src', url);
+        $('#invoicePdfOpen').attr('href', url);
+        $('#invoicePdfModal').modal('show');
+    }
+
+    function printInvoicePdf() {
+        const f = document.getElementById('invoicePdfFrame');
+        f.contentWindow.focus();
+        f.contentWindow.print();
+    }
+
+    $('#invoicePdfModal').on('hidden.bs.modal', function () {
+        $('#invoicePdfFrame').attr('src', 'about:blank');   // free the PDF
+        window.location.reload();
+    });
 </script>
 <?php include "include/footer.php"; ?>
