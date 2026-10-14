@@ -45,6 +45,14 @@
     var actionText=$('#actiontext').val();
     action(actionText);
 
+    $(document).ready(function() {
+        $('.container-fluid').removeClass('p-2');
+        <?php if($controllermenu != 'Invoice') {?>
+        $('.page-header-content').append('<span class="text-muted small"><?php echo $_SESSION['companyname']; ?></span>');
+        <?php } ?>
+        $('.page-header-title').addClass('mb-0');
+    });
+
     function action(data) {
         if(data!=''){
             var obj=JSON.parse(data);
