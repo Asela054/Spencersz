@@ -197,14 +197,30 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			</a>
 			<?php } ?>
 
+			<!-- Customer Menu New Added -->
+			<?php if(in_array("Customer", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Customer'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-user"></i></div>
+				<span>Customer</span>
+			</a>
+			<?php } ?>
+
+			<!-- Item Reservation Menu New Added -->
+			<?php if(in_array("Reservation", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Reservation'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-calendar-check"></i></div>
+				<span>Item Reservation</span>
+			</a>
+			<?php } ?>
+
 			<!-- Invoice Menu New Added -->
-			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed)){ ?>
+			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed) || in_array("Giftvoucher", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
 				data-target="#collapsInvoice" aria-expanded="false" aria-controls="collapsInvoice">
 				<div class="nav-link-icon"><i class="fa fa-file-invoice"></i></div><span>Invoice</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote"){echo 'show';} ?>"
+			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote" || $functionmenu=="Giftvoucher"){echo 'show';} ?>"
 				id="collapsInvoice" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
 					<?php if(in_array("Dispatchnote", $permissionallowed)){ ?>
@@ -215,6 +231,9 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Creditnote", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Creditnote'; ?>">Credit
 						Note</a>
+					<?php } if(in_array("Giftvoucher", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Giftvoucher'; ?>">Gift
+						Voucher</a>
 					<?php } ?>
 				</nav>
 			</div>
@@ -317,6 +336,27 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				<div class="nav-link-icon"><i class="fas fa-barcode"></i></div>
 				<span>Serial Number Movement</span>
 			</a>
+			<?php } ?>
+
+			<!-- Company Menu New Added -->
+			<?php if(in_array("Company", $permissionallowed) || in_array("Companybranch", $permissionallowed)){ ?>
+			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
+				data-target="#collapseCompany" aria-expanded="false" aria-controls="collapseCompany">
+				<div class="nav-link-icon"><i class="fas fa-building"></i></div>
+				<span>Company</span>
+				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+			</a>
+			<div class="collapse <?php if($functionmenu=="Company" || $functionmenu=="Companybranch"){echo 'show';} ?>"
+				id="collapseCompany" data-parent="#accordionSidenav">
+				<nav class="sidenav-menu-nested nav accordion">
+					<?php if(in_array("Company", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Company'; ?>">Company</a>
+					<?php } if(in_array("Companybranch", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Companybranch'; ?>">New
+						Company Branch</a>
+					<?php } ?>
+				</nav>
+			</div>
 			<?php } ?>
 
 
