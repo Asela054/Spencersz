@@ -352,20 +352,41 @@ class Invoiceinfo extends CI_Model{
             $balance   = $isQuote ? $net : max(0, round($net - $paidTotal, 2));
             $payStatus = $isQuote ? 0 : ($balance <= 0 ? 1 : ($paidTotal > 0 ? 2 : 0));       // CHANGE: 0 unpaid, 1 paid, 2 partial
 
+            $quotation_id = !empty($inv['quotationId']) ? (int)$inv['quotationId'] : 0;
+            $reference = '';
+            if ($quotation_id && !$isQuote) {
+                $q = $this->db->where('idtbl_invoice', $quotation_id)->where('invoice_type', 'Corporate Quotation')
+                            ->where('converted_invoice_id IS NULL', null, false)->get('tbl_invoice')->row();
+                if (!$q) throw new RuntimeException('Quotation not found or already converted');
+                $reference = 'Quotation ' . $q->invoice_no;
+            }
+
             // =============== 4. SAVE (all or nothing) ===============
             $this->db->trans_begin();
             $inTrans = true;
 
-            $companybranch = $this->db->select('code')
-                                ->where('idtbl_company_branch', $branch_id)
-                                ->get('tbl_company_branch')->row();
+            $branch = $this->db->select('code')->where('idtbl_company_branch', $branch_id)
+                   ->get('tbl_company_branch')->row();
+            if (!$branch) throw new RuntimeException('Branch not found');
 
-            $branch_code = $companybranch->code;
-            $prefix = date('y') . strtoupper(date('M')) . '_' . $branch_code . '_';
-            $seq = $this->db
-                ->like('invoice_no', $prefix, 'after')
-                ->count_all_results('tbl_invoice') + 1;
-            $invoice_no = $prefix . str_pad($seq, 5, '0', STR_PAD_LEFT);
+            // QQQQ: exactly 4 letters/digits, upper case, no symbols (example: BR03)
+            $qqqq = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)$branch->code));
+            if (strlen($qqqq) !== 4) throw new RuntimeException('Branch code must be exactly 4 letters/digits (example: BR03)');
+
+            // quotation = its own series (QT + last 2 characters of the branch code), so tax invoice numbers stay continuous
+            if ($isQuote) $qqqq = 'QT' . substr($qqqq, -2);
+
+            $prefix     = date('y') . strtoupper(date('M')) . '_' . $qqqq . '_';   // 26OCT_BR03_   or   26OCT_QT03_
+            $likePrefix = str_replace('_', '\_', $prefix) . '%';                   // "_" is a LIKE wildcard, so escape it
+
+            // FOR UPDATE: a second cashier waits here until this invoice is saved, so numbers can never repeat
+            $last = $this->db->query(
+                "SELECT MAX(CAST(SUBSTRING(invoice_no, ?) AS UNSIGNED)) AS m
+                FROM tbl_invoice WHERE invoice_no LIKE ? FOR UPDATE",
+                [strlen($prefix) + 1, $likePrefix]
+            )->row();
+
+            $invoice_no = $prefix . str_pad(((int)$last->m) + 1, 5, '0', STR_PAD_LEFT);   // 26OCT_BR03_00001
 
             $this->db->insert('tbl_invoice', [
                 'invoice_no' => $invoice_no, 'invoice_date' => $today, 'invoice_type' => $invoiceType,
@@ -373,7 +394,7 @@ class Invoiceinfo extends CI_Model{
                 'fulfillment' => $inv['fulfillment'],
                 'gross_total' => $gross, 'discount' => $discount, 'vat_rate' => $vat_rate, 'vatamount' => $vat,
                 'net_total' => $net, 'paid_total' => $paidTotal, 'balance_due' => $balance,
-                'change_given' => $change, 'remark' => $cn_id ? 'Credit note #' . $cn_id . ' applied' : '',
+                'change_given' => $change, 'remark' => trim($reference . ($cn_id ? ' | Credit note #' . $cn_id . ' applied' : ''), ' |'),
                 'payment_status' => $payStatus, 'status' => 1,
                 'insertdatetime' => $now, 'updateuser' => $userid, 'updatedatetime' => $now,
                 'tbl_user_idtbl_user' => $userid, 'tbl_customer_idtbl_customer' => $customer_id,
@@ -381,6 +402,18 @@ class Invoiceinfo extends CI_Model{
             ]);
             $invoice_id = $this->db->insert_id();
             if (!$invoice_id) throw new Exception('Invoice insert failed');
+
+            // ----- hold invoice -----
+            $hold_id = !empty($inv['holdId']) ? (int)$inv['holdId'] : 0;
+            if ($hold_id) {
+                $this->db->where('idtbl_invoice_hold', $hold_id)->where('status', 1)
+                        ->update('tbl_invoice_hold', ['status' => 2, 'updatedatetime' => $now, 'updateuser' => $userid]);
+            }
+
+            if ($quotation_id && $reference !== '') {
+                $this->db->where('idtbl_invoice', $quotation_id)
+                        ->update('tbl_invoice', ['converted_invoice_id' => $invoice_id, 'updatedatetime' => $now, 'updateuser' => $userid]);
+            }
 
             // ----- invoice lines + serial / stock -----
             foreach ($lines as $l) {
@@ -547,65 +580,6 @@ class Invoiceinfo extends CI_Model{
             ->where('cn.settle_status', 0)                           
             ->get()->result();
     }
-    // public function Printinvoice($invoice_id = 0){
-    //     $branch_id=$_SESSION['branch_id'];
-    //     $inv = $this->db->where('idtbl_invoice', (int)$invoice_id)
-    //                     ->where('tbl_company_branch_idtbl_company_branch', $branch_id)   // only this branch's invoices
-    //                     ->get('tbl_invoice')->row();
-    //     if (!$inv) show_404();
-
-    //     $items = $this->db->where('tbl_invoice_idtbl_invoice', $inv->idtbl_invoice)->where('status', 1)
-    //                     ->order_by('idtbl_invoice_detail', 'ASC')->get('tbl_invoice_detail')->result();
-    //     $pays  = $this->db->where('tbl_invoice_idtbl_invoice', $inv->idtbl_invoice)->where('status', 1)
-    //                     ->get('tbl_invoice_payment')->result();
-    //     $customer = $inv->tbl_customer_idtbl_customer
-    //         ? $this->db->where('idtbl_customer', $inv->tbl_customer_idtbl_customer)->get('tbl_customer')->row()   // CHANGE columns in the view
-    //         : null;
-
-    //     // mode of payment text
-    //     $modes = [];
-    //     foreach ($pays as $p) {
-    //         if ((float)$p->amount > 0) $modes[] = $p->paytype . ' (' . number_format($p->amount, 2) . ')';
-    //     }
-
-    //     $logoFile = FCPATH . 'images/header.png'; 
-    //     $logo = is_file($logoFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoFile)) : '';
-
-    //     $data = [
-    //         'inv'      => $inv,
-    //         'items'    => $items,
-    //         'customer' => $customer,
-    //         'logo'     => $logo,
-    //         'title'    => ($inv->invoice_type === 'Corporate Quotation') ? 'QUOTATION' : 'TAX INVOICE',
-    //         'rate'     => 1 + ((float)$inv->vat_rate / 100),
-    //         'supply'   => round($inv->net_total - $inv->vatamount, 2),   // total value of supply (excl. VAT, after discount)
-    //         'words'    => $this->_amount_in_words($inv->net_total),
-    //         'modes'    => $modes ? implode('  |  ', $modes) : '-',
-    //         // supplier details: CHANGE (or read them from your company table)
-    //         'company'  => [
-    //             'tin'     => '000000000-7000',
-    //             'name'    => 'Spencersz Lanka (Pvt) Ltd',
-    //             'address' => '295, Negombo Road, Wattala',
-    //             'tel'     => '+94 11 000 0000',
-    //             'place'   => 'Wattala',
-    //         ],
-    //     ];
-
-    //     $html = $this->load->view('invoice_pdf', $data, TRUE);
-
-    //     $this->load->library('pdf');
-
-    //     // only if your library does not already set these
-    //     $this->pdf->getOptions()->set('defaultFont', 'DejaVu Sans');
-    //     $this->pdf->getOptions()->set('isRemoteEnabled', false);
-
-    //     $this->pdf->loadHtml($html);
-    //     $this->pdf->setPaper('A4', 'portrait');
-    //     $this->pdf->render();
-
-    //     if (ob_get_length()) ob_end_clean();   // nothing may be printed before the PDF
-    //     $this->pdf->stream('SPENCERSZ-INVOICE-' . $inv->invoice_no . '.pdf', ['Attachment' => 0]);
-    // }
     public function Printinvoice($invoice_id = 0){
         $branch_id = $_SESSION['branch_id'];
         $inv = $this->db->where('idtbl_invoice', (int)$invoice_id)
@@ -665,6 +639,99 @@ class Invoiceinfo extends CI_Model{
 
         if (ob_get_length()) ob_end_clean();
         $this->pdf->stream('SPENCERSZ-INVOICE-' . $inv->invoice_no . '.pdf', ['Attachment' => 0]);
+    }
+    public function Holdinvoice(){
+        try {
+            $inv = json_decode($this->input->post('invoice'), true);
+            if (!is_array($inv) || empty($inv['items'])) throw new RuntimeException('Cart is empty');
+
+            $userid=$_SESSION['userid'];
+            $company_id=$_SESSION['company_id'];
+            $branch_id=$_SESSION['branch_id'];
+            $now        = date('Y-m-d H:i:s');
+
+            $items = [];
+            foreach ($inv['items'] as $it) {
+                $items[] = [
+                    'id'       => (int)$it['id'],
+                    'serialId' => !empty($it['serialId']) ? (int)$it['serialId'] : null,
+                    'qty'      => max(1, (int)$it['qty']),
+                ];
+            }
+
+            $row = [
+                'label'         => mb_substr(trim((string)$inv['label']), 0, 100),
+                'customer_nic'  => $inv['customerNic'],
+                'customer_name' => $inv['customerName'],
+                'tbl_customer_idtbl_customer' => !empty($inv['customerId']) ? (int)$inv['customerId'] : null,
+                'invoice_type'  => $inv['invoiceType'],
+                'fulfillment'   => $inv['fulfillment'],
+                'discount'      => max(0, round((float)$inv['discount'], 2)),
+                'items_json'    => json_encode($items),
+                'item_count'    => array_sum(array_column($items, 'qty')),
+                'updatedatetime' => $now, 'updateuser' => $userid,
+            ];
+
+            $hold_id = !empty($inv['holdId']) ? (int)$inv['holdId'] : 0;
+            $old = $hold_id ? $this->db->where('idtbl_invoice_hold', $hold_id)->where('status', 1)
+                        ->where('tbl_company_branch_idtbl_company_branch', $branch_id)
+                        ->get('tbl_invoice_hold')->row() : null;
+
+            if ($old) {                                   // resumed bill held again: update the same draft
+                $this->db->where('idtbl_invoice_hold', $hold_id)->update('tbl_invoice_hold', $row);
+                $hold_no = $old->hold_no;
+            } else {
+                $prefix  = 'HLD' . date('ymd');
+                $seq     = $this->db->like('hold_no', $prefix, 'after')->count_all_results('tbl_invoice_hold') + 1;
+                $hold_no = $prefix . str_pad($seq, 3, '0', STR_PAD_LEFT);
+                $row += ['hold_no' => $hold_no, 'status' => 1, 'insertdatetime' => $now,
+                        'tbl_user_idtbl_user' => $userid, 'tbl_company_idtbl_company' => $company_id,
+                        'tbl_company_branch_idtbl_company_branch' => $branch_id];
+                $this->db->insert('tbl_invoice_hold', $row);
+                if (!$this->db->insert_id()) throw new Exception('Hold insert failed');
+            }
+
+            return $this->_jsonResponse(1, 'fas fa-pause-circle', 'Bill held: ' . $hold_no, 'success', ['hold_no' => $hold_no]);
+
+        } catch (RuntimeException $e) {
+            return $this->_jsonResponse(0, 'fas fa-exclamation-triangle', $e->getMessage(), 'danger');
+        } catch (Throwable $e) {
+            log_message('error', 'Holdinvoice failed: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            return $this->_jsonResponse(0, 'fas fa-exclamation-triangle', 'Could not hold the bill.', 'danger');
+        }
+    }
+    public function Getholdlist(){
+        $branch_id=$_SESSION['branch_id'];
+        $rows = $this->db->select('idtbl_invoice_hold AS id, hold_no, label, customer_name, item_count, discount, insertdatetime')
+            ->where('status', 1)->where('tbl_company_branch_idtbl_company_branch', $branch_id)
+            ->order_by('idtbl_invoice_hold', 'DESC')->limit(50)->get('tbl_invoice_hold')->result();
+        echo json_encode(['status' => 1, 'rows' => $rows]);
+    }
+    public function Resumehold(){
+        $branch_id=$_SESSION['branch_id'];
+        $h = $this->db->where('idtbl_invoice_hold', (int)$this->input->post('id'))->where('status', 1)
+                    ->where('tbl_company_branch_idtbl_company_branch', $branch_id)
+                    ->get('tbl_invoice_hold')->row();
+        if (!$h) return $this->_jsonResponse(0, 'fas fa-exclamation-triangle', 'Held bill not found', 'danger');
+
+        echo json_encode(['status' => 1, 'bill' => [
+            'id'           => (int)$h->idtbl_invoice_hold,
+            'customerId'   => $h->tbl_customer_idtbl_customer,
+            'customerNic'  => $h->customer_nic,
+            'customerName' => $h->customer_name,
+            'invoiceType'  => $h->invoice_type,
+            'fulfillment'  => $h->fulfillment,
+            'discount'     => (float)$h->discount,
+            'items'        => json_decode($h->items_json, true),
+        ]]);
+    }
+    public function Deletehold(){
+        $branch_id=$_SESSION['branch_id'];
+        $this->db->where('idtbl_invoice_hold', (int)$this->input->post('id'))->where('status', 1)
+                ->where('tbl_company_branch_idtbl_company_branch', $branch_id)
+                ->update('tbl_invoice_hold', ['status' => 3, 'updatedatetime' => date('Y-m-d H:i:s'),
+                                            'updateuser' => $this->session->userdata('userid')]);   // CHANGE
+        return $this->_jsonResponse(1, 'fas fa-trash', 'Held bill deleted', 'success');
     }
 
     // ── Private helper ────────────────────────────────────────────────────────────
