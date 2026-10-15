@@ -37,6 +37,7 @@ $sql_details = array(
 );
 
 require('ssp.customized.class.php' );
+$branchID = isset($_POST['branch_id']) ? (int)$_POST['branch_id'] : 0;
 
 $joinQuery = "FROM `tbl_serial_movement` AS `u`
 	LEFT JOIN `tbl_product_serial` AS `ps` ON (`ps`.`idtbl_product_serial` = `u`.`tbl_product_serial_idtbl_product_serial`)
@@ -45,6 +46,10 @@ $joinQuery = "FROM `tbl_serial_movement` AS `u`
 	LEFT JOIN `tbl_grn` AS `g` ON (`g`.`idtbl_grn` = `u`.`doc_id` AND `u`.`doc_type` = 'GRN')";
 
 $where = array('1 = 1');
+
+if ($branchID > 0) {
+	$where[] = "`u`.`branch_id` = ".$branchID;
+}
 
 if (!empty($_POST['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['from'])) {
 	$where[] = "DATE(`u`.`insertdatetime`) >= '".$_POST['from']."'";

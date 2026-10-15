@@ -345,6 +345,11 @@ include "include/topnavbar.php";
             ajax: {
                 url: "<?php echo base_url() ?>scripts/reservationlist.php",
                 type: "POST",
+                "data": function (d) {
+                    return $.extend({}, d, {
+                        "branch_id": '<?php echo ($_SESSION['branch_id']); ?>',
+                    });
+                }
             },
             "order": [[ 0, "desc" ]],
             "columns": [
@@ -380,13 +385,16 @@ include "include/topnavbar.php";
                         var button='';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="View Items" class="btn btn-dark btn-sm btnView mr-1" data-no="'+full['reservation_no']+'" id="'+full['idtbl_reservation']+'"><i class="fas fa-eye"></i></button>';
                         button+='<a href="<?php echo base_url() ?>Reservation/Reservationnote/'+full['idtbl_reservation']+'" target="_blank" data-toggle="tooltip" data-placement="bottom" title="Reservation Note (PDF)" class="btn btn-danger btn-sm mr-1"><i class="fas fa-file-pdf"></i></a>';
+
                         if(full['reserve_status']==1){
                             button+='<button data-toggle="tooltip" data-placement="bottom" title="Edit" class="btn btn-primary btn-sm btnEdit mr-1 ';if(editcheck!=1){button+='d-none';}button+='" id="'+full['idtbl_reservation']+'"><i class="fas fa-pen"></i></button>';
+                            button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Converted" class="btn btn-success btn-sm btnConvert mr-1 ';if(editcheck!=1){button+='d-none';}button+='" data-no="'+full['reservation_no']+'" id="'+full['idtbl_reservation']+'"><i class="fas fa-file-invoice"></i></button>';
                             button+='<a href="<?php echo base_url() ?>Reservation/Reservationstatus/'+full['idtbl_reservation']+'/2" data-toggle="tooltip" data-placement="bottom" title="Cancel Reservation" onclick="return cancel_confirm()" target="_self" class="btn btn-warning btn-sm mr-1 ';if(statuscheck!=1){button+='d-none';}button+='"><i class="fas fa-times"></i></a>';
                         }
                         else if(full['reserve_status']==3){
                             button+='<a href="<?php echo base_url() ?>Reservation/Reservationstatus/'+full['idtbl_reservation']+'/1" data-toggle="tooltip" data-placement="bottom" title="Reopen" onclick="return reopen_confirm()" target="_self" class="btn btn-success btn-sm mr-1 ';if(statuscheck!=1){button+='d-none';}button+='"><i class="fas fa-undo"></i></a>';
                         }
+
                         if(full['reserve_status']!=2){
                             button+='<a href="<?php echo base_url() ?>Reservation/Reservationstatus/'+full['idtbl_reservation']+'/3" data-toggle="tooltip" data-placement="bottom" title="Delete" onclick="return delete_confirm()" target="_self" class="btn btn-danger btn-sm ';if(deletecheck!=1){button+='d-none';}button+='"><i class="fas fa-trash-alt"></i></a>';
                         }
@@ -463,6 +471,65 @@ include "include/topnavbar.php";
                     }
                 });
             }
+        });
+
+        $('#tblreservation tbody').on('click', '.btnConvert', function() {
+            var id = $(this).attr('id');
+            var no = $(this).data('no');
+
+            Swal.fire({
+                title: 'Convert Reservation?',
+                html: 'Are you sure you want to mark <b>'+no+'</b> as converted?<br><br>' +
+                    '<div style="text-align:left"><label class="small font-weight-bold">Invoice*</label>' +
+                    '<select id="swalInvoice" style="width:100%"></select></div>',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Convert',
+                cancelButtonText: 'Cancel',
+                focusConfirm: false,
+                didOpen: function() {
+                    $('#swalInvoice').select2({
+                        dropdownParent: $('.swal2-container'),
+                        placeholder: 'Search invoice no',
+                        allowClear: true,
+                        width: '100%',
+                        ajax: {
+                            url: '<?php echo base_url() ?>Reservation/Getinvoicelist',
+                            type: 'POST',
+                            dataType: 'json',
+                            delay: 250,
+                            data: function(params) { return { q: params.term }; }
+                        }
+                    });
+                },
+                preConfirm: function() {
+                    var invoiceID = $('#swalInvoice').val();
+                    if (!invoiceID) {
+                        Swal.showValidationMessage('Please select an invoice');
+                        return false;
+                    }
+                    return $.ajax({
+                        type: 'POST',
+                        url: '<?php echo base_url() ?>Reservation/Reservationconvert',
+                        data: { recordID: id, invoiceID: invoiceID },
+                        dataType: 'json'
+                    }).then(function(res) {
+                        if (!res.success) {
+                            Swal.showValidationMessage(res.message);
+                            return false;
+                        }
+                        return res;
+                    }).catch(function() {
+                        Swal.showValidationMessage('Request failed');
+                        return false;
+                    });
+                }
+            }).then(function(result) {
+                if (result.isConfirmed && result.value) {
+                    Swal.fire({ icon: 'success', title: 'Converted', text: result.value.message, timer: 1500, showConfirmButton: false });
+                    $('#tblreservation').DataTable().ajax.reload(null, false);
+                }
+            });
         });
     });
 

@@ -28,11 +28,12 @@ $sql_details = array(
 );
 
 require('ssp.customized.class.php');
+$branchID = $_POST['branch_id'];
 
 $joinQuery = "FROM `tbl_grn_return` AS `u` 
     LEFT JOIN `tbl_supplier` AS `ua` ON (`ua`.`idtbl_supplier` = `u`.`tbl_supplier_idtbl_supplier`)";
 
-$extraWhere = "`u`.`status` IN (1,2)";
+$extraWhere = "`u`.`status` IN (1,2) AND `u`.`tbl_company_branch_idtbl_company_branch`='$branchID'";
 
 echo json_encode(
 	SSP::simple( $_POST, $sql_details, $table, $primaryKey, $columns, $joinQuery, $extraWhere)

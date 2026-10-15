@@ -247,6 +247,7 @@ include "include/topnavbar.php";
                     d.type = $('#f_type').val();
                     d.product = $('#f_product').val();
                     d.serial = $('#f_serial').val();
+                    d.branch_id = '<?php echo $_SESSION['branch_id']; ?>';
                 }
             },
             "order": [[ 0, "desc" ]],

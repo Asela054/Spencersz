@@ -59,10 +59,10 @@ $sql_details = array(
 
 // require( 'ssp.class.php' );
 require('ssp.customized.class.php' );
-$companyID = $_POST['company_id'];
+$branchID = $_POST['branch_id'];
 
 $joinQuery = "FROM `tbl_supplier` AS `u` JOIN `tbl_supplier_type` AS `ua` ON (`ua`.`idtbl_supplier_type` = `u`.`tbl_supplier_type_idtbl_supplier_type`)";
-$extraWhere = "`u`.`status` IN (1, 2) AND `u`.`tbl_company_idtbl_company`='$companyID' AND `ua`.`idtbl_supplier_type` != 5";
+$extraWhere = "`u`.`status` IN (1, 2) AND `u`.`tbl_company_branch_idtbl_company_branch`='$branchID' AND `ua`.`idtbl_supplier_type` != 5";
 
 echo json_encode(
 	SSP::simple( $_POST, $sql_details, $table, $primaryKey, $columns,$joinQuery, $extraWhere)

@@ -16,5 +16,10 @@ class Productserial extends CI_Controller {
 		$this->load->model('Productserialinfo');
         $result=$this->Productserialinfo->Getproductdetail();
 	}
+
+	public function Serialdisplay(){
+		$this->load->model('Productserialinfo');
+		$this->Productserialinfo->Serialdisplay();
+	}
 	
 }

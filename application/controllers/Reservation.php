@@ -47,4 +47,12 @@ class Reservation extends CI_Controller {
         $html = $this->Reservationnoteinfo->Buildnotehtml($data);
         $this->Reservationnoteinfo->Streampdf($html, $data['r']->reservation_no);
     }
+    public function Getinvoicelist(){
+        $this->load->model('Reservationinfo');
+        $this->Reservationinfo->Getinvoicelist();
+    }
+    public function Reservationconvert(){
+        $this->load->model('Reservationinfo');
+        $this->Reservationinfo->Reservationconvert();
+    }
 }

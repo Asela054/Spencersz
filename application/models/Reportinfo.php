@@ -14,7 +14,7 @@ class Reportinfo extends CI_Model {
     public function stockReport() {
 
         $category  = $this->input->post('category'); // category id
-        $companyID = $_SESSION['company_id'];
+        $branchID = $_SESSION['branch_id'];
 
         $this->db->select('
             tbl_stock.idtbl_stock,
@@ -44,7 +44,7 @@ class Reportinfo extends CI_Model {
             'tbl_category.idtbl_category = tbl_product.tbl_category_idtbl_category', 'left');
 
         // Common conditions
-        $this->db->where('tbl_stock.tbl_company_idtbl_company', $companyID);
+        $this->db->where('tbl_stock.tbl_company_branch_idtbl_company_branch', $branchID);
         $this->db->where('tbl_stock.tbl_product_idtbl_product IS NOT NULL', null, false);
         $this->db->where_in('tbl_stock.status', [1, 2]);
         $this->db->where('tbl_stock.qty >', 0);   // exclude zero/empty stock rows

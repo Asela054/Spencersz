@@ -80,6 +80,7 @@ include "include/topnavbar.php";
                                             <th>Warranty End</th>
                                             <th>Warranty</th>
                                             <th>Added</th>
+                                            <th class="text-right">Action</th>
                                         </tr>
                                     </thead>
                                 </table>
@@ -95,6 +96,8 @@ include "include/topnavbar.php";
 <?php include "include/footerscripts.php"; ?>
 <script>
     $(document).ready(function() {
+        var editcheck='<?php echo $editcheck; ?>';
+
         var serialtable=null;
         var productname='';
 
@@ -126,6 +129,9 @@ include "include/topnavbar.php";
 
                 case '5':
                     return badge('info', 'Returned by Customer');
+
+                case '6':
+                    return badge('dark', 'Display Item');
 
                 default:
                     return badge('secondary', 'Unknown Status');
@@ -273,10 +279,62 @@ include "include/topnavbar.php";
                         "render": function(data) {
                             return fdate(data);
                         }
+                    },
+                    {
+                        "data": null,
+                        "orderable": false,
+                        "className": 'text-right',
+                        "render": function(data, type, full) {
+                            var button='';
+                            if((full['stock_status']||'').toString().trim()=='1'){
+                                button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Display Item" class="btn btn-dark btn-sm btnDisplay ';if(editcheck!=1){button+='d-none';}button+='" data-serial="'+esc(full['serialno'])+'" id="'+full['idtbl_product_serial']+'"><i class="fas fa-tv"></i></button>';
+                            }
+                            return button;
+                        }
                     }
-                ]
+                ],
+                drawCallback: function() {
+                    $('[data-toggle="tooltip"]').tooltip();
+                },
             });
         }
+
+        $('#tblserial').on('click', '.btnDisplay', function() {
+            var id = $(this).attr('id');
+            var serial = $(this).data('serial');
+
+            Swal.fire({
+                title: 'Mark as Display Item?',
+                html: 'Serial number <b>'+serial+'</b> will be marked as a display item.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Mark',
+                cancelButtonText: 'Cancel',
+                showLoaderOnConfirm: true,
+                preConfirm: function() {
+                    return $.ajax({
+                        type: 'POST',
+                        url: '<?php echo base_url() ?>Productserial/Serialdisplay',
+                        data: { serialID: id },
+                        dataType: 'json'
+                    }).then(function(res) {
+                        if (!res.success) {
+                            Swal.showValidationMessage(res.message);
+                            return false;
+                        }
+                        return res;
+                    }).catch(function() {
+                        Swal.showValidationMessage('Request failed');
+                        return false;
+                    });
+                }
+            }).then(function(result) {
+                if (result.isConfirmed && result.value) {
+                    Swal.fire({ icon: 'success', title: 'Done', text: result.value.message, timer: 1500, showConfirmButton: false });
+                    serialtable.ajax.reload(null, false);
+                }
+            });
+        });
 
         $('#product').on('change', function() {
             var id = $(this).val();
