@@ -400,6 +400,11 @@ $(document).ready(function() {
         ajax: {
             url: "<?php echo base_url() ?>scripts/goodreceivereturnlist.php",
             type: "POST",
+            "data": function(d) {
+                return $.extend({}, d, {
+                    "branch_id": '<?php echo ($_SESSION['branch_id']); ?>',
+                });
+            }
         },
         "order": [
             [0, "desc"]

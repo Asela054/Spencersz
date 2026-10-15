@@ -593,7 +593,7 @@ $(document).ready(function() {
             type: "POST",
             "data": function(d) {
                 return $.extend({}, d, {
-                    "company_id": '<?php echo ($_SESSION['company_id']); ?>',
+                    "branch_id": '<?php echo ($_SESSION['branch_id']); ?>',
                 });
             }
         },

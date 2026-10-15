@@ -49,11 +49,11 @@ $sql_details = array(
 );
 
 require('ssp.customized.class.php' );
-$companyID = (int)$_POST['company_id'];
+$branchID = (int)$_POST['branch_id'];
 
 $joinQuery = "FROM `tbl_porder` AS `u` LEFT JOIN `tbl_supplier` AS `ua` ON (`ua`.`idtbl_supplier` = `u`.`tbl_supplier_idtbl_supplier`) LEFT JOIN `tbl_porder_req` AS `ud` ON (`ud`.`idtbl_porder_req` = `u`.`tbl_porder_req_idtbl_porder_req`) LEFT JOIN `tbl_user` AS `ue` ON (`ue`.`idtbl_user` = `u`.`approve_by`)";
 
-$extraWhere = "`u`.`status` IN (1,2) AND `u`.`tbl_company_idtbl_company`='$companyID'";
+$extraWhere = "`u`.`status` IN (1,2) AND `u`.`tbl_company_branch_idtbl_company_branch`='$branchID'";
 
 echo json_encode(
 	SSP::simple( $_POST, $sql_details, $table, $primaryKey, $columns, $joinQuery, $extraWhere)

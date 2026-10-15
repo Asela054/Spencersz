@@ -286,4 +286,71 @@ class Reservationinfo extends CI_Model{
         $this->session->set_flashdata('msg', json_encode($actionObj));
         redirect('Reservation');
     }
+
+    public function Getinvoicelist(){
+        $term=$this->input->post('q');
+
+        $this->db->select('idtbl_invoice, invoice_no');
+        $this->db->from('tbl_invoice');
+        $this->db->where('status', 1);
+        if(!empty($term)){
+            $this->db->like('invoice_no', $term);
+        }
+        $this->db->order_by('idtbl_invoice', 'DESC');
+        $this->db->limit(30);
+        $rows=$this->db->get()->result();
+
+        $out=array();
+        foreach($rows as $r){
+            $out[]=array('id'=>$r->idtbl_invoice, 'text'=>$r->invoice_no);
+        }
+        echo json_encode(array('results'=>$out));
+    }
+
+    public function Reservationconvert(){
+        $userID=$_SESSION['userid'];
+        $recordID=$this->input->post('recordID');
+        $invoiceID=$this->input->post('invoiceID');
+        $updatedatetime=date('Y-m-d H:i:s');
+
+        if(empty($recordID) || empty($invoiceID)){
+            echo json_encode(array('success'=>false, 'message'=>'Please select an invoice'));
+            return;
+        }
+
+        $this->db->where('idtbl_invoice', $invoiceID);
+        $this->db->where('status', 1);
+        if($this->db->count_all_results('tbl_invoice')==0){
+            echo json_encode(array('success'=>false, 'message'=>'Invalid invoice'));
+            return;
+        }
+
+        $this->db->where('tbl_invoice_idtbl_invoice', $invoiceID);
+        $this->db->where('status', 1);
+        $this->db->where('idtbl_reservation !=', $recordID);
+        if($this->db->count_all_results('tbl_reservation')>0){
+            echo json_encode(array('success'=>false, 'message'=>'This invoice is already linked to another reservation'));
+            return;
+        }
+
+        $this->db->trans_begin();
+
+        $this->db->where('idtbl_reservation', $recordID);
+        $this->db->where('reserve_status', 1);  
+        $this->db->update('tbl_reservation', array(
+            'reserve_status'=>'2',
+            'tbl_invoice_idtbl_invoice'=>$invoiceID,
+            'updateuser'=>$userID,
+            'updatedatetime'=>$updatedatetime
+        ));
+        $affected=$this->db->affected_rows();
+
+        if($this->db->trans_status()===FALSE || $affected==0){
+            $this->db->trans_rollback();
+            echo json_encode(array('success'=>false, 'message'=>'Reservation could not be converted'));
+        } else {
+            $this->db->trans_commit();
+            echo json_encode(array('success'=>true, 'message'=>'Reservation converted successfully'));
+        }
+    }
 }

@@ -75,7 +75,7 @@ $(document).ready(function() {
         url: "<?php echo base_url() ?>scripts/advancereportlist.php",
         type: "POST",
         dataType: "json",
-        data: {company_id: '<?php echo (int)$_SESSION['company_id']; ?>'},
+        data: {branch_id: '<?php echo (int)$_SESSION['branch_id']; ?>'},
         success: function(res) {
             allRows = res.data || [];
             render();

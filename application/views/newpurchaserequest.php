@@ -375,7 +375,7 @@ $(document).ready(function() {
             url: "<?php echo base_url() ?>scripts/newpurchaserequestlist.php",
             type: "POST",
             "data": function(d) {
-                return $.extend({}, d, { "company_id": '<?php echo ($_SESSION['company_id']); ?>' });
+                return $.extend({}, d, { "branch_id": '<?php echo ($_SESSION['branch_id']); ?>' });
             }
         },
         "order": [[0, "desc"]],

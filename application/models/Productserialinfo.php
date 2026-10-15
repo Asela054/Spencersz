@@ -53,4 +53,35 @@ class Productserialinfo extends CI_Model{
         $obj->summary=$summary;
         echo json_encode($obj);
     }
+
+    public function Serialdisplay(){
+        $userID=$_SESSION['userid'];
+        $serialID=$this->input->post('serialID');
+        $updatedatetime=date('Y-m-d H:i:s');
+
+        if(empty($serialID)){
+            echo json_encode(array('success'=>false, 'message'=>'Invalid serial'));
+            return;
+        }
+
+        $this->db->trans_begin();
+
+        $this->db->where('idtbl_product_serial', $serialID);
+        $this->db->where('status', 1);
+        $this->db->where('stock_status', 1);  
+        $this->db->update('tbl_product_serial', array(
+            'stock_status'=>'6',
+            'updateuser'=>$userID,
+            'updatedatetime'=>$updatedatetime
+        ));
+        $affected=$this->db->affected_rows();
+
+        if($this->db->trans_status()===FALSE || $affected==0){
+            $this->db->trans_rollback();
+            echo json_encode(array('success'=>false, 'message'=>'Only in-stock serial numbers can be marked as display items'));
+        } else {
+            $this->db->trans_commit();
+            echo json_encode(array('success'=>true, 'message'=>'Serial number marked as display item'));
+        }
+    }
 }

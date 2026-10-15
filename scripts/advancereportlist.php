@@ -9,7 +9,7 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
 
-$companyID = (int) ($_POST['company_id'] ?? 0);
+$branchID = (int) ($_POST['branch_id'] ?? 0);
 
     $conn = new mysqli($db_host, $db_username, $db_password, $db_name);
 $conn->set_charset('utf8mb4');
@@ -27,12 +27,12 @@ $sql = "SELECT
         LEFT JOIN `tbl_product`   AS `p`  ON `p`.`idtbl_product`    = `s`.`tbl_product_idtbl_product`
         LEFT JOIN `tbl_unit`      AS `un` ON `un`.`idtbl_unit`      = `p`.`tbl_unit_idtbl_unit`
         WHERE `s`.`status` IN (1,2)
-          AND `s`.`tbl_company_idtbl_company` = ?
+          AND `s`.`tbl_company_branch_idtbl_company_branch` = ?
           AND `s`.`qty` > 0
         ORDER BY `p`.`product_name`, `s`.`batchno`";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param('i', $companyID);
+$stmt->bind_param('i', $branchID);
 $stmt->execute();
 $result = $stmt->get_result();
 
