@@ -650,6 +650,13 @@ include "include/topnavbar.php";
 								</div>
 							</div>
 
+                            <div class="d-flex mb-2">
+                                <button class="btn btn-outline-secondary btn-sm flex-fill mr-1" onclick="openHoldList()">
+                                    [F7] Held Bills <span id="holdCountBadge" class="badge badge-danger">0</span>
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm flex-fill" onclick="openQuotationList()">[F9] Quotations</button>
+                            </div>
+
 							<button
 								class="btn btn-spencersz btn-lg w-100 py-3 fw-bold shadow text-uppercase tracking-wider"
 								style="font-size: 0.95rem;" onclick="completeTransaction()">
@@ -877,6 +884,47 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
+
+<!-- MODAL 4: HOLD LIST -->
+<div class="modal fade" id="holdListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white py-2">
+                <h6 class="modal-title fw-bold text-light">Held Bills</h6>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="thead-light">
+                        <tr><th>Hold No</th>
+                            <th>Time</th>
+                            <th>Customer / Note</th>
+                            <th class="text-center">Items</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="holdListBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 4: QUOTATION LIST -->
+<div class="modal fade" id="quotationListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2"><h6 class="modal-title fw-bold">Quotations (not yet converted)</h6>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button></div>
+            <div class="modal-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="thead-light"><tr><th>Quotation No</th><th>Date</th><th>Customer</th><th class="text-right">Total</th><th></th></tr></thead>
+                    <tbody id="quotationListBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 <script>
 	$(document).ready(function () {
@@ -1060,12 +1108,15 @@ include "include/topnavbar.php";
 	// Active Cart State
 	let cart = [];
     let pendingProduct = null; // product waiting for a serial
+    let activeHoldId = null;        // id of the held bill that is currently loaded
+    let activeQuotationId = null;   // id of the quotation being converted to an invoice
 
 	document.addEventListener("DOMContentLoaded", function () {
 		renderCartTable();
         loadPaytypelist();
         // addPaymentRow('Cash');
 		setupKeyboardHotkeys();
+        refreshHoldCount();
 	});
 
     document.addEventListener("click", function (e) {
@@ -1073,8 +1124,8 @@ include "include/topnavbar.php";
         if (!e.target.closest("#autocompleteBox, #barcodeInput")) document.getElementById("autocompleteBox").style.display = "none";
     });
 
-    document.getElementById("receiptPreviewModal").addEventListener("hidden.bs.modal", function () {
-        document.getElementById("invoiceTypeSelect").value = "Retail Tax Invoice (VAT)";
+    $('#receiptPreviewModal').on('hidden.bs.modal', function () {
+        $('#invoiceTypeSelect').val('Retail Tax Invoice (VAT)');
     });
 
 	// Cart Rendering & Operations
@@ -1231,9 +1282,8 @@ include "include/topnavbar.php";
 	// }
 
 	function openCatalogModal() {
-		const modal = new bootstrap.Modal(document.getElementById("catalogModal"));
 		renderCatalogModalTable();
-		modal.show();
+        $('#catalogModal').modal('show');
 	}
 
 	function renderCatalogModalTable() {
@@ -1258,15 +1308,11 @@ include "include/topnavbar.php";
 	}
 
 	function addItemFromCatalog(sku) {
-		const prod = productCatalog.find(p => p.sku === sku);
-		if (prod) {
-			// addItemToCart(prod);
-            selectProduct(prod);
-			const modalEl = document.getElementById("catalogModal");
-			const modal = bootstrap.Modal.getInstance(modalEl);
-			if (modal) modal.hide();
-		}
-	}
+        const prod = productCatalog.find(p => p.sku === sku);
+        if (!prod) return;   
+        $('#catalogModal').modal('hide');
+        selectProduct(prod);
+    }
 
 	// Totals & Split Payments Calculations
 	function recalculateInvoice() {
@@ -1489,7 +1535,9 @@ include "include/topnavbar.php";
             fulfillment: document.querySelector('input[name="fulfillmentRadio"]:checked').value,
             discount: parseFloat(document.getElementById("discountInput").value) || 0,
             items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty })),
-            payments: collectPayments()
+            payments: collectPayments(),
+            holdId: activeHoldId,
+            quotationId: activeQuotationId
         };
 
         const btn = document.getElementById("btnSaveInvoice");
@@ -1504,6 +1552,9 @@ include "include/topnavbar.php";
                 if (res.status == 1) {
                     const savedId = res.invoice_id;
 
+                    activeHoldId = null; 
+                    activeQuotationId = null; 
+                    refreshHoldCount();
                     cart = [];
                     renderCartTable();
                     resetPayments();
@@ -1544,28 +1595,30 @@ include "include/topnavbar.php";
         }).then((result) => {
             if (result.isConfirmed) {
                 cart = [];
+                activeHoldId = null; 
+                activeQuotationId = null;
                 renderCartTable();
                 window.location.reload();
             }
         });
 	}
 
-	function holdInvoiceDraft() {
-		if (cart.length === 0) return;
+	// function holdInvoiceDraft() {
+	// 	if (cart.length === 0) return;
 
-        Swal.fire({
-            title: 'Invoice Held',
-            text: "Invoice held in Terminal Draft Queue #01.",
-            icon: 'success',
-            confirmButtonColor: '#D0111B', // Matches your red theme
-            confirmButtonText: 'OK'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                cart = [];
-                renderCartTable();
-            }
-        });
-	}
+    //     Swal.fire({
+    //         title: 'Invoice Held',
+    //         text: "Invoice held in Terminal Draft Queue #01.",
+    //         icon: 'success',
+    //         confirmButtonColor: '#D0111B', // Matches your red theme
+    //         confirmButtonText: 'OK'
+    //     }).then((result) => {
+    //         if (result.isConfirmed) {
+    //             cart = [];
+    //             renderCartTable();
+    //         }
+    //     });
+	// }
 
 	function printQuotation() {
 		if (cart.length === 0) return;
@@ -1596,7 +1649,13 @@ include "include/topnavbar.php";
 				completeTransaction();
 			} else if (e.key === "Escape") {
 				clearInvoiceCart();
-			}
+			}else if (e.key === "F7") { 
+                e.preventDefault(); 
+                openHoldList(); 
+            }else if (e.key === "F9") { 
+                e.preventDefault(); 
+                openQuotationList(); 
+            }
 		});
 	}
 
@@ -1748,22 +1807,6 @@ include "include/topnavbar.php";
     }
 
     // ---------- Payment helpers ----------
-    // const PAYMENT_MODES = [
-    //     { group: "Cash", type: "cash", items: ["Cash"] },
-    //     { group: "Credit / Debit Cards", type: "card", items: [
-    //         "Commercial Bank Credit Card", "HNB Credit Card", "Sampath Credit Card", "BOC Credit Card",
-    //         "People's Bank Credit Card", "NTB Credit Card", "Seylan Credit Card", "DFCC Credit Card",
-    //         "Debit Card (Any Bank)"] },
-    //     { group: "0% Installment (Card)", type: "installment", items: [
-    //         "Sampath 0% Installment", "Commercial Bank 0% Installment", "HNB 0% Installment",
-    //         "BOC 0% Installment", "People's Bank 0% Installment", "NTB 0% Installment",
-    //         "Seylan 0% Installment"] },
-    //     { group: "Cheque", type: "cheque", items: ["Cheque"] },
-    //     { group: "Online / QR / Wallet", type: "transfer", items: [
-    //         "Online Bank Transfer", "LANKAQR", "FriMi", "Genie", "eZ Cash"] },
-    //     { group: "Gift Voucher", type: "voucher", items: ["Gift Voucher"] }
-    // ];
-
     const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
     const fmtLKR = n => "LKR " + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -2123,5 +2166,174 @@ include "include/topnavbar.php";
         $('#invoicePdfFrame').attr('src', 'about:blank');   // free the PDF
         window.location.reload();
     });
+
+    // ============================= Hold Invoice Part ===================================
+    function holdEsc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+
+    function resetInvoiceForm() {
+        cart = [];
+        $('#discountInput').val(0);
+        $('#custSearchInput, #custNameInput, #custIDInput').val('');
+        $('#creditnoteid').html('<option value="">-- None --</option>');
+        $('#invoiceTypeSelect').val('Retail Tax Invoice (VAT)');
+        activeHoldId = null;
+        activeQuotationId = null;
+        resetPayments();
+        renderCartTable();      // recalculates totals and payable
+    }
+
+    function holdInvoiceDraft() {
+        if (cart.length === 0) {
+            Swal.fire({ icon: 'info', title: 'Cart is empty', timer: 1500, showConfirmButton: false });
+            return;
+        }
+        Swal.fire({
+            title: activeHoldId ? 'Update held bill' : 'Hold this bill',
+            input: 'text', inputPlaceholder: 'Note (optional), e.g. customer name',
+            showCancelButton: true, confirmButtonText: 'Hold'
+        }).then(function (r) {
+            if (r.dismiss) return;
+            const payload = {
+                holdId: activeHoldId,
+                label: r.value || '',
+                invoiceType: $('#invoiceTypeSelect').val(),
+                customerNic: $('#custSearchInput').val(),
+                customerName: $('#custNameInput').val(),
+                customerId: $('#custIDInput').val(),
+                fulfillment: $('input[name="fulfillmentRadio"]:checked').val(),
+                discount: parseFloat($('#discountInput').val()) || 0,
+                items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty }))
+            };
+            $.ajax({
+                url: '<?php echo base_url(); ?>Invoice/Holdinvoice', type: 'POST', dataType: 'json',
+                data: { invoice: JSON.stringify(payload) },
+                success: function (res) {
+                    if (res.status == 1) { resetInvoiceForm(); refreshHoldCount(); }
+                    action(res.action);
+                },
+                error: function () { alert('Server error while holding the bill.'); }
+            });
+        });
+    }
+
+    function refreshHoldCount() {
+        $.getJSON('<?php echo base_url(); ?>Invoice/Getholdlist', function (res) {
+            $('#holdCountBadge').text(res.rows ? res.rows.length : 0);
+        });
+    }
+
+    function openHoldList() {
+        $.getJSON('<?php echo base_url(); ?>Invoice/Getholdlist', function (res) {
+            const tb = $('#holdListBody').empty();
+            (res.rows || []).forEach(function (h) {
+                tb.append(
+                    '<tr><td class="font-weight-bold">' + holdEsc(h.hold_no) + '</td>' +
+                    '<td>' + holdEsc(h.insertdatetime) + '</td>' +
+                    '<td>' + holdEsc(h.customer_name || '') + (h.label ? ' <small class="text-muted">&ndash; ' + holdEsc(h.label) + '</small>' : '') + '</td>' +
+                    '<td class="text-center">' + h.item_count + '</td>' +
+                    '<td class="text-right text-nowrap">' +
+                    '<button class="btn btn-sm btn-success" onclick="resumeHold(' + h.id + ')"><i class="fas fa-tasks"></i></button> ' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteHold(' + h.id + ')"><i class="fas fa-trash-alt"></i></button></td></tr>'
+                );
+            });
+            if (!res.rows || !res.rows.length) tb.html('<tr><td colspan="5" class="text-center text-muted py-3">No held bills</td></tr>');
+            $('#holdCountBadge').text(res.rows ? res.rows.length : 0);
+            $('#holdListModal').modal('show');
+        });
+    }
+
+    function resumeHold(id) {
+        if (cart.length && !confirm('The current cart will be replaced. Continue?')) return;
+        $.ajax({
+            url: '<?php echo base_url(); ?>Invoice/Resumehold', type: 'POST', dataType: 'json', data: { id: id },
+            success: function (res) {
+                if (res.status != 1) { action(res.action); return; }
+                $('#holdListModal').modal('hide');
+                loadBillIntoCart(res.bill);
+                activeHoldId = res.bill.id;
+            }
+        });
+    }
+
+    function deleteHold(id) {
+        if (!confirm('Delete this held bill?')) return;
+        $.post('<?php echo base_url(); ?>Invoice/Deletehold', { id: id }, function () { openHoldList(); }, 'json');
+    }
+
+    // shared by held bills and quotations: puts a saved bill back into the cart
+    function loadBillIntoCart(b) {
+        resetPayments();
+        cart = [];
+        const skipped = [];
+
+        (b.items || []).forEach(function (it) {
+            const prod = productCatalog.find(p => p.id == it.id);
+            if (!prod) { skipped.push('Product #' + it.id + ' not found'); return; }
+
+            if (it.serialId) {
+                const s = (prod.serials || []).find(x => x.idtbl_product_serial == it.serialId);
+                if (!s) { skipped.push(prod.name + ': serial is no longer available'); return; }
+                if (cart.some(c => c.serialId == s.idtbl_product_serial)) return;
+                cart.push({
+                    id: prod.id, sku: prod.sku, name: prod.name, warranty: prod.warranty, warrantymonth: prod.warrantymonth,
+                    price: parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price, qty: 1,
+                    serialId: s.idtbl_product_serial, serialno: s.serialno,
+                    costprice: parseFloat(s.costunitprice) || 0, imei: 'S/N: ' + s.serialno
+                });
+            } else {
+                const ex = cart.find(c => c.sku === prod.sku && !c.serialId);
+                if (ex) ex.qty += parseInt(it.qty); else cart.push({ ...prod, qty: parseInt(it.qty), imei: 'N/A' });
+            }
+        });
+
+        $('#custSearchInput').val(b.customerNic || '');
+        $('#custNameInput').val(b.customerName || '');
+        $('#custIDInput').val(b.customerId || '');
+        $('#discountInput').val(b.discount || 0);
+        if (b.fulfillment) $('input[name="fulfillmentRadio"][value="' + b.fulfillment + '"]').prop('checked', true);
+        $('#invoiceTypeSelect').val(b.invoiceType || 'Retail Tax Invoice (VAT)');
+
+        renderCartTable();
+        if (b.customerId) loadCreditNotes(b.customerId);
+        else { $('#creditnoteid').html('<option value="">-- None --</option>'); recalcPayable(); }
+
+        if (skipped.length) {
+            Swal.fire({ icon: 'warning', title: 'Some items were skipped',
+                        html: skipped.map(holdEsc).join('<br>') });
+        }
+    }
+
+    function openQuotationList() {
+        $.getJSON('<?php echo base_url(); ?>Invoice/Getquotationlist', function (res) {
+            const tb = $('#quotationListBody').empty();
+            (res.rows || []).forEach(function (q) {
+                tb.append(
+                    '<tr><td class="font-weight-bold">' + holdEsc(q.invoice_no) + '</td>' +
+                    '<td>' + holdEsc(q.invoice_date) + '</td>' +
+                    '<td>' + holdEsc(q.customer_name || '') + '</td>' +
+                    '<td class="text-right">' + parseFloat(q.net_total).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+                    '<td class="text-right text-nowrap">' +
+                    '<button class="btn btn-sm btn-outline-secondary" onclick="showInvoicePdf(' + q.id + ')">View PDF</button> ' +
+                    '<button class="btn btn-sm btn-success" onclick="convertQuotation(' + q.id + ')">Make Invoice</button></td></tr>'
+                );
+            });
+            if (!res.rows || !res.rows.length) tb.html('<tr><td colspan="5" class="text-center text-muted py-3">No open quotations</td></tr>');
+            $('#quotationListModal').modal('show');
+        });
+    }
+
+    function convertQuotation(id) {
+        if (cart.length && !confirm('The current cart will be replaced. Continue?')) return;
+        $.ajax({
+            url: '<?php echo base_url(); ?>Invoice/Loadquotation', type: 'POST', dataType: 'json', data: { id: id },
+            success: function (res) {
+                if (res.status != 1) { action(res.action); return; }
+                $('#quotationListModal').modal('hide');
+                loadBillIntoCart(res.bill);
+                activeQuotationId = res.bill.id;
+                activeHoldId = null;
+            }
+        });
+    }
 </script>
 <?php include "include/footer.php"; ?>

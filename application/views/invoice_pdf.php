@@ -185,7 +185,12 @@ $grossEx    = round($supply + $discountEx, 2);
         <!-- Words / payment -->
         <table width="100%" class="items mb">
             <tr><td style="width:22%; font-weight:bold;">Total Amount in words</td><td style="width:2%; font-weight:bold;">:</td><td><?= $e($words) ?></td></tr>
+            <?php if ($title === 'QUOTATION'): ?>
+            <tr><td style="font-weight:bold;">Validity</td><td style="font-weight:bold;">:</td>
+                <td>This quotation is valid for 14 days (until <?= date('d-m-Y', strtotime($inv->invoice_date . ' +14 days')) ?>)</td></tr>
+            <?php else: ?>
             <tr><td style="font-weight:bold;">Mode of Payment</td><td style="font-weight:bold;">:</td><td><?= $e($modes) ?></td></tr>
+            <?php endif; ?>
         </table>
 
         <!-- Signatures -->
