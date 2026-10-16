@@ -108,8 +108,8 @@ function GetMaterialList($searchTerm, $searchCategory) {
         $CI = get_instance();
         $CI->db->where('status', 1);
         if(!empty($searchCategory)){$CI->db->where_in('tbl_material_type_idtbl_material_type', $searchCategory);}
-        $CI->db->select('`idtbl_print_material_info`, `materialname`');
-        $CI->db->from('tbl_print_material_info');
+        $CI->db->select('`idtbl_product`, `product_name`');
+        $CI->db->from('tbl_product');
         $CI->db->limit(5);
         $respond=$CI->db->get();
     }
@@ -118,17 +118,17 @@ function GetMaterialList($searchTerm, $searchCategory) {
             $CI = get_instance();
             $CI->db->where('status', 1);
             if(!empty($searchCategory)){$CI->db->where_in('tbl_material_type_idtbl_material_type', $searchCategory);}
-            $CI->db->select('`idtbl_print_material_info`, `materialname`');
-            $CI->db->from('tbl_print_material_info');
-            $CI->db->like('materialname', $searchTerm, 'both'); 
+            $CI->db->select('`idtbl_product`, `product_name`');
+            $CI->db->from('tbl_product');
+            $CI->db->like('product_name', $searchTerm, 'both'); 
             $respond=$CI->db->get();
         }
         else{
             $CI = get_instance();
             $CI->db->where('status', 1);
             if(!empty($searchCategory)){$CI->db->where_in('tbl_material_type_idtbl_material_type', $searchCategory);}
-            $CI->db->select('`idtbl_print_material_info`, `materialname`');
-            $CI->db->from('tbl_print_material_info');
+            $CI->db->select('`idtbl_product`, `product_name`');
+            $CI->db->from('tbl_product');
             $CI->db->limit(5);
             $respond=$CI->db->get();             
         }
@@ -137,7 +137,7 @@ function GetMaterialList($searchTerm, $searchCategory) {
     $data=array();
     
     foreach ($respond->result() as $row) {
-        $data[]=array("id"=>$row->idtbl_print_material_info, "text"=>$row->materialname);
+        $data[]=array("id"=>$row->idtbl_product, "text"=>$row->product_name);
     }   
     echo json_encode($data);
 }

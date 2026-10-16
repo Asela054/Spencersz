@@ -294,6 +294,7 @@ class Invoiceinfo extends CI_Model{
                     ->where('cn.idtbl_credit_note', $cn_id)
                     ->where('i.tbl_customer_idtbl_customer', $customer_id)   // must belong to this customer
                     ->where('cn.status', 1)->where('cn.settle_status', 0)
+                    ->where('cn.approve_status', 1)
                     ->get()->row();
                 if (!$cn) throw new RuntimeException('Credit note not available');
                 $creditUsed = round(min((float)$cn->totalamount, $net), 2);
@@ -577,7 +578,8 @@ class Invoiceinfo extends CI_Model{
             ->join('tbl_invoice i', 'i.idtbl_invoice = cn.tbl_invoice_idtbl_invoice')
             ->where('i.tbl_customer_idtbl_customer', $customer_id)   
             ->where('cn.status', 1)
-            ->where('cn.settle_status', 0)                           
+            ->where('cn.settle_status', 0)   
+            ->where('cn.approve_status', 1)                       
             ->get()->result();
     }
     public function Printinvoice($invoice_id = 0){

@@ -123,42 +123,42 @@
 					}
 				}
 
-				$apiURL = $_SESSION['accountapiurl'].'Api/Createdetailaccount';
+				// $apiURL = $_SESSION['accountapiurl'].'Api/Createdetailaccount';
 
-				// Use http_build_query for safer parameter encoding
-				$postData = http_build_query([
-					'userid' => $userID,
-					'company' => $company_id,
-					'branch' => $branch_id,
-					'optiontype' => '1',
-					'optionid' => $insertId,
-					'optiontext' => $supplier_name
-				]);
+				// // Use http_build_query for safer parameter encoding
+				// $postData = http_build_query([
+				// 	'userid' => $userID,
+				// 	'company' => $company_id,
+				// 	'branch' => $branch_id,
+				// 	'optiontype' => '1',
+				// 	'optionid' => $insertId,
+				// 	'optiontext' => $supplier_name
+				// ]);
 
-				$ch = curl_init();
-				curl_setopt_array($ch, [
-					CURLOPT_URL => $apiURL,
-					CURLOPT_POST => true,
-					CURLOPT_POSTFIELDS => $postData,
-					CURLOPT_RETURNTRANSFER => true,
-					CURLOPT_TIMEOUT => 30,
-					CURLOPT_HTTPHEADER => [
-						'Content-Type: application/x-www-form-urlencoded',
-					]
-				]);
+				// $ch = curl_init();
+				// curl_setopt_array($ch, [
+				// 	CURLOPT_URL => $apiURL,
+				// 	CURLOPT_POST => true,
+				// 	CURLOPT_POSTFIELDS => $postData,
+				// 	CURLOPT_RETURNTRANSFER => true,
+				// 	CURLOPT_TIMEOUT => 30,
+				// 	CURLOPT_HTTPHEADER => [
+				// 		'Content-Type: application/x-www-form-urlencoded',
+				// 	]
+				// ]);
 				
-				$server_output = curl_exec($ch);
-				$curlError = curl_error($ch);
-				$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-				curl_close($ch);
+				// $server_output = curl_exec($ch);
+				// $curlError = curl_error($ch);
+				// $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+				// curl_close($ch);
 
-				// Check both HTTP status and API response
-				$apiResponse = json_decode($server_output, true);
+				// // Check both HTTP status and API response
+				// $apiResponse = json_decode($server_output, true);
 
-				if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
-					$errorMsg = $apiResponse['message'] ?? 'API request failed';
-					throw new Exception($errorMsg);
-				}
+				// if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
+				// 	$errorMsg = $apiResponse['message'] ?? 'API request failed';
+				// 	throw new Exception($errorMsg);
+				// }
 
 				$this->db->trans_commit();
 
@@ -225,42 +225,42 @@
 				$this->db->where('idtbl_supplier', $recordID);
 				$this->db->update('tbl_supplier', $data);
 
-				$apiURL = $_SESSION['accountapiurl'].'Api/Createdetailaccount';
+				// $apiURL = $_SESSION['accountapiurl'].'Api/Createdetailaccount';
 
-				// Use http_build_query for safer parameter encoding
-				$postData = http_build_query([
-					'userid' => $userID,
-					'company' => $company_id,
-					'branch' => $branch_id,
-					'optiontype' => '1',
-					'optionid' => $recordID,
-					'optiontext' => $supplier_name
-				]);
+				// // Use http_build_query for safer parameter encoding
+				// $postData = http_build_query([
+				// 	'userid' => $userID,
+				// 	'company' => $company_id,
+				// 	'branch' => $branch_id,
+				// 	'optiontype' => '1',
+				// 	'optionid' => $recordID,
+				// 	'optiontext' => $supplier_name
+				// ]);
 
-				$ch = curl_init();
-				curl_setopt_array($ch, [
-					CURLOPT_URL => $apiURL,
-					CURLOPT_POST => true,
-					CURLOPT_POSTFIELDS => $postData,
-					CURLOPT_RETURNTRANSFER => true,
-					CURLOPT_TIMEOUT => 30,
-					CURLOPT_HTTPHEADER => [
-						'Content-Type: application/x-www-form-urlencoded',
-					]
-				]);
+				// $ch = curl_init();
+				// curl_setopt_array($ch, [
+				// 	CURLOPT_URL => $apiURL,
+				// 	CURLOPT_POST => true,
+				// 	CURLOPT_POSTFIELDS => $postData,
+				// 	CURLOPT_RETURNTRANSFER => true,
+				// 	CURLOPT_TIMEOUT => 30,
+				// 	CURLOPT_HTTPHEADER => [
+				// 		'Content-Type: application/x-www-form-urlencoded',
+				// 	]
+				// ]);
 				
-				$server_output = curl_exec($ch);
-				$curlError = curl_error($ch);
-				$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-				curl_close($ch);
+				// $server_output = curl_exec($ch);
+				// $curlError = curl_error($ch);
+				// $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+				// curl_close($ch);
 
-				// Check both HTTP status and API response
-				$apiResponse = json_decode($server_output, true);
+				// // Check both HTTP status and API response
+				// $apiResponse = json_decode($server_output, true);
 
-				if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
-					$errorMsg = $apiResponse['message'] ?? 'API request failed';
-					throw new Exception($errorMsg);
-				}
+				// if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
+				// 	$errorMsg = $apiResponse['message'] ?? 'API request failed';
+				// 	throw new Exception($errorMsg);
+				// }
 
 				$this->db->trans_commit();
 

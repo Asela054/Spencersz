@@ -228,6 +228,8 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 						Note</a>
 					<?php } if(in_array("Invoice", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Invoice'; ?>">Invoice </a>
+					<?php } if(in_array("Invoicelist", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Invoice/Invoicelist'; ?>">Invoice List</a>
 					<?php } if(in_array("Creditnote", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Creditnote'; ?>">Credit
 						Note</a>
@@ -235,6 +237,7 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<a class="nav-link" href="<?php echo base_url().'Giftvoucher'; ?>">Gift
 						Voucher</a>
 					<?php } ?>
+                    <!-- <a class="nav-link" href="<?php // echo base_url().'Salesreport'; ?>">Sales report </a> -->
 				</nav>
 			</div>
 			<?php } ?>

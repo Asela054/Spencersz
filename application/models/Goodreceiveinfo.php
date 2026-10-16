@@ -128,7 +128,7 @@
 		$grnID=$this->db->insert_id();
 
 			foreach($tableData as $rowtabledata) {
-				$materialname=$rowtabledata['col_1'];
+				$product_name=$rowtabledata['col_1'];
 				$comment=$rowtabledata['col_2'];
 				$materialID=$rowtabledata['col_3'];
 				$unit=$rowtabledata['col_4'];

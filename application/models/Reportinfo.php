@@ -24,7 +24,7 @@ class Reportinfo extends CI_Model {
             tbl_stock.costunitprice AS unitprice,
             (tbl_stock.qty * tbl_stock.costunitprice) AS total,
             tbl_product.product_code,
-            tbl_product.product_name AS materialname,
+            tbl_product.product_name AS product_name,
             tbl_unit.unit AS measure_type,
             tbl_category.category AS `group`
         ', false);

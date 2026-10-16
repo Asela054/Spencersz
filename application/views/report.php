@@ -175,7 +175,7 @@ function generateTable(type, items) {
         groupTotal += total;
 
         rows += '<tr>' +
-            '<td><div>' + esc(item.materialname) + '</div><div class="code">' + esc(item.product_code) + '</div></td>' +
+            '<td><div>' + esc(item.product_name) + '</div><div class="code">' + esc(item.product_code) + '</div></td>' +
             '<td>' + esc(item.batchno) + '</td>' +
             '<td>' + esc(item.wh_name) + '</td>' +
             '<td class="num">' + fmtQty(qty) + '</td>' +
@@ -233,7 +233,7 @@ function exportToPDF() {
             var q = parseFloat(it.qty) || 0, p = parseFloat(it.unitprice) || 0;
             gq += q; gt += q * p;
             body.push([
-                (it.product_code ? it.product_code + ' - ' : '') + (it.materialname || ''),
+                (it.product_code ? it.product_code + ' - ' : '') + (it.product_name || ''),
                 it.batchno || '', it.wh_name || '', fmtQty(q), it.measure_type || '', fmt(p), fmt(q * p)
             ]);
         });

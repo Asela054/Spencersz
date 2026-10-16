@@ -392,7 +392,7 @@ $(document).ready(function() {
             },
             // {
             //     "data": function(row) {
-            //         return "MO/GRN-0000" + row.tbl_print_grn_idtbl_print_grn;
+            //         return "MO/GRN-0000" + row.tbl_grn_idtbl_grn;
             //     }
             // },
             {
@@ -620,14 +620,14 @@ $(document).ready(function() {
 
                                 $.each(response.data['detailinfo'], function(index, grn) {
                                     var row = '<tr>' +
-                                        '<td data-grndetailid="'+grn.idtbl_print_grndetail+'">' + grn.materialname + '</td>' +
+                                        '<td data-grndetailid="'+grn.idtbl_grndetail+'">' + grn.product_name + '</td>' +
                                         '<td>' + grn.comment + '</td>' +
                                         '<td class="d-none">' + grn
-                                        .idtbl_print_material_info + '</td>' +
+                                        .idtbl_product + '</td>' +
                                         '<td class="unitprice text-right">' + addCommas(grn.unitprice) + '</td>' +
                                         '<td class="d-none">' + grn.saleprice + '</td>' +
                                         '<td class="text-center qty">' + (grn.pieces > 0 ? grn.pieces : grn.qty) + '</td>' +
-                                        '<td class="text-center" data-measureid="'+grn.idtbl_mesurements+'">' + grn.measure_type +
+                                        '<td class="text-center" data-measureid="'+grn.idtbl_unit+'">' + grn.measure_type +
                                         '</td>' +
                                         '<td class="d-none">' + grn.hidetotal + '</td>' +
                                         '<td class="text-right discount">' + grn.unit_discount +
@@ -804,9 +804,9 @@ $(document).ready(function() {
             var row = $(this);
             var grnDetail = {
                 grndetailD: row.find('td:eq(0)').data('grndetailid'),
-                materialname: row.find('td:eq(0)').text(),
+                product_name: row.find('td:eq(0)').text(),
                 comment: row.find('td:eq(1)').text(),
-                idtbl_print_material_info: row.find('td:eq(2)').text(),
+                idtbl_product: row.find('td:eq(2)').text(),
                 unitprice: row.find('td:eq(3)').text(),
                 saleprice: row.find('td:eq(4)').text(),
                 qty: row.find('td:eq(5)').text(),

@@ -17,37 +17,26 @@ class GRNVoucherinfo extends CI_Model{
         return $this->db->get();
     }    
     public function get_grn_details($grnno) {
-        // $this->db->select('tbl_print_grndetail.*, tbl_print_material_info.idtbl_print_material_info, tbl_print_material_info.materialinfocode, tbl_print_material_info.materialname, tbl_measurements.measure_type');
-        $this->db->select('tbl_print_grndetail.*, tbl_print_material_info.idtbl_print_material_info, tbl_print_material_info.materialinfocode, tbl_print_material_info.materialname,
-        CASE 
-            WHEN tbl_print_grndetail.pieces > 0 THEN tbl_measurements2.idtbl_mesurements 
-            ELSE tbl_measurements.idtbl_mesurements 
-        END AS idtbl_mesurements,
-        CASE 
-            WHEN tbl_print_grndetail.pieces > 0 THEN tbl_measurements2.measure_type 
-            ELSE tbl_measurements.measure_type 
-        END AS measure_type', false);
-		$this->db->from('tbl_print_grndetail');
-        $this->db->join('tbl_print_material_info', 'tbl_print_material_info.idtbl_print_material_info = tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info', 'left');
-		$this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail.tbl_print_grn_idtbl_print_grn', 'left');
-		// $this->db->join('tbl_machine', 'tbl_machine.idtbl_machine = tbl_print_grndetail.tbl_machine_id', 'left');
-		$this->db->join('tbl_measurements', 'tbl_measurements.idtbl_mesurements = tbl_print_grndetail.tbl_measurements_idtbl_mesurements', 'left');
-		$this->db->join('tbl_uom_conversions', 'tbl_uom_conversions.main_uom = tbl_print_grndetail.tbl_measurements_idtbl_mesurements', 'left');
-		$this->db->join('tbl_measurements as tbl_measurements2', 'tbl_measurements2.idtbl_mesurements = tbl_uom_conversions.convert_uom', 'left');
-        $this->db->where('tbl_print_grn_idtbl_print_grn', $grnno);
-        $this->db->where('tbl_print_grndetail.status', 1);
+        // $this->db->select('tbl_grndetail.*, tbl_product.idtbl_product, tbl_product.product_code, tbl_product.product_name, tbl_unit.measure_type');
+        $this->db->select('tbl_grndetail.*, tbl_product.idtbl_product, tbl_product.product_code, tbl_product.product_name, idtbl_unit, unit AS measure_type', false);
+		$this->db->from('tbl_grndetail');
+        $this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_grndetail.tbl_product_idtbl_product', 'left');
+		$this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn', 'left');
+		$this->db->join('tbl_unit', 'tbl_unit.idtbl_unit = tbl_product.tbl_unit_idtbl_unit', 'left');
+        $this->db->where('tbl_grn_idtbl_grn', $grnno);
+        $this->db->where('tbl_grndetail.status', 1);
         $query = $this->db->get();
 
-        $this->db->select('`idtbl_print_grn`, `grn_no`, `vatamount`, `total`, `discount`, `subtotal`, `vat`');
-        $this->db->from('tbl_print_grn');
-        $this->db->where('idtbl_print_grn', $grnno);
+        $this->db->select('`idtbl_grn`, `grn_no`, `vatamount`, `total`, `discount`, `subtotal`, `vat`');
+        $this->db->from('tbl_grn');
+        $this->db->where('idtbl_grn', $grnno);
         $this->db->where('status', 1);
     
         $respond=$this->db->get();
         
         if ($query->num_rows() > 0) {
             $obj=new stdClass();
-            $obj->idtbl_print_grn=$respond->row(0)->idtbl_print_grn;
+            $obj->idtbl_grn=$respond->row(0)->idtbl_grn;
             $obj->grn_no=$respond->row(0)->grn_no;
             $obj->vatamount=$respond->row(0)->vatamount;
             $obj->total=$respond->row(0)->total;
@@ -95,7 +84,7 @@ class GRNVoucherinfo extends CI_Model{
             'status' => '1',
             'insertdatetime' => $updatedatetime,
             'tbl_user_idtbl_user' => $userID,
-            'tbl_print_grn_idtbl_print_grn' => $grnno,
+            'tbl_grn_idtbl_grn' => $grnno,
             'tbl_company_idtbl_company'=> $company_id, 
 			'tbl_company_branch_idtbl_company_branch'=> $branch_id
         );
@@ -104,8 +93,8 @@ class GRNVoucherinfo extends CI_Model{
         $grnvoucherID = $this->db->insert_id();
 
         $this->db->select('grntype');
-        $this->db->from('tbl_print_grn');
-        $this->db->where('idtbl_print_grn', $grnno);
+        $this->db->from('tbl_grn');
+        $this->db->where('idtbl_grn', $grnno);
         $this->db->where('status', 1);
         $respondgrn=$this->db->get();
     
@@ -123,12 +112,12 @@ class GRNVoucherinfo extends CI_Model{
                 'status' => '1',
                 'insertdatetime' => $updatedatetime,
                 'tbl_user_idtbl_user' => $userID,
-                'tbl_print_grn_idtbl_print_grn' => $grnno,
-                'tbl_print_material_info_idtbl_print_material_info' => $grn['idtbl_print_material_info'],
-                'tbl_print_grndetail_idtbl_print_grndetail' => $grndetailID
+                'tbl_grn_idtbl_grn' => $grnno,
+                'tbl_product_idtbl_product' => $grn['idtbl_product'],
+                'tbl_grndetail_idtbl_grndetail' => $grndetailID
             );
     
-            $this->db->insert('tbl_print_grndetail_after_costing', $data);
+            $this->db->insert('tbl_grndetail_after_costing', $data);
         }
     
         // Check if costDetails is empty
@@ -158,8 +147,8 @@ class GRNVoucherinfo extends CI_Model{
             'updatedatetime'=> $updatedatetime
         );
 
-        $this->db->where('idtbl_print_grn', $grnno);
-        $this->db->update('tbl_print_grn', $dataupdategrn);
+        $this->db->where('idtbl_grn', $grnno);
+        $this->db->update('tbl_grn', $dataupdategrn);
     
         if ($this->db->trans_status() === TRUE) {
             $this->db->trans_commit();
@@ -202,11 +191,11 @@ class GRNVoucherinfo extends CI_Model{
     public function Goodreceivevoucherview() {
         $recordID=$this->input->post('recordID');
 
-        // $this->db->select("tbl_grn_vouchar_import_cost.*, `tbl_supplier`.`suppliername`, `tbl_supplier`.`telephone_no`, CONCAT(`tbl_supplier`.`address_line1`, ' ', `tbl_supplier`.`address_line2`, ' ', `tbl_supplier`.`city`) AS `address`, `tbl_company`.`company`, `tbl_company_branch`.`branch`, CONCAT(`tbl_company`.`address1`, ' ', `tbl_company`.`address2`) AS `companyaddress`, `tbl_print_grn`.`subtotalcost`, `tbl_print_grn`.`discountcost`, `tbl_print_grn`.`vatamountcost`, `tbl_print_grn`.`totalcost`");
-        $this->db->select("tbl_grn_vouchar_import_cost.*, `tbl_supplier`.`suppliername`, `tbl_supplier`.`telephone_no`, CONCAT(`tbl_supplier`.`address_line1`, ' ', `tbl_supplier`.`address_line2`, ' ', `tbl_supplier`.`city`) AS `address`, `tbl_company`.`company`, `tbl_company_branch`.`branch`, CONCAT(`tbl_company`.`address1`, ' ', `tbl_company`.`address2`) AS `companyaddress`, `tbl_print_grn`.`subtotalcost`, `tbl_print_grn`.`discountcost`, `tbl_print_grn`.`vatamountcost`, `tbl_print_grn`.`totalcost`, `tbl_print_grn`.`grntype`");
+        // $this->db->select("tbl_grn_vouchar_import_cost.*, `tbl_supplier`.`suppliername`, `tbl_supplier`.`telephone_no`, CONCAT(`tbl_supplier`.`address_line1`, ' ', `tbl_supplier`.`address_line2`, ' ', `tbl_supplier`.`city`) AS `address`, `tbl_company`.`company`, `tbl_company_branch`.`branch`, CONCAT(`tbl_company`.`address1`, ' ', `tbl_company`.`address2`) AS `companyaddress`, `tbl_grn`.`subtotalcost`, `tbl_grn`.`discountcost`, `tbl_grn`.`vatamountcost`, `tbl_grn`.`totalcost`");
+        $this->db->select("tbl_grn_vouchar_import_cost.*, `tbl_supplier`.`suppliername`, `tbl_supplier`.`telephone_no`, CONCAT(`tbl_supplier`.`address_line1`, ' ', `tbl_supplier`.`address_line2`, ' ', `tbl_supplier`.`city`) AS `address`, `tbl_company`.`company`, `tbl_company_branch`.`branch`, CONCAT(`tbl_company`.`address1`, ' ', `tbl_company`.`address2`) AS `companyaddress`, `tbl_grn`.`subtotalcost`, `tbl_grn`.`discountcost`, `tbl_grn`.`vatamountcost`, `tbl_grn`.`totalcost`, `tbl_grn`.`grntype`");
         $this->db->from('tbl_grn_vouchar_import_cost');
-        $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn', 'left');
-        $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
+        $this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn', 'left');
+        $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
         $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_grn_vouchar_import_cost.tbl_company_idtbl_company', 'left');
         $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_grn_vouchar_import_cost.tbl_company_branch_idtbl_company_branch', 'left');
         $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
@@ -223,31 +212,31 @@ class GRNVoucherinfo extends CI_Model{
     
         $responddetail=$this->db->get();
 
-        $grnID=$respond->row(0)->tbl_print_grn_idtbl_print_grn;
+        $grnID=$respond->row(0)->tbl_grn_idtbl_grn;
 
         if($respond->row(0)->grntype==4){
-            $this->db->select('tbl_print_grndetail_after_costing.costunitprice,tbl_print_grndetail_after_costing.qty,tbl_print_grndetail_after_costing.total,tbl_print_grn.grndate,tbl_print_grn.grn_no,tbl_print_grn.tbl_material_group_idtbl_material_group, tbl_print_grndetail.comment AS `material_display`,tbl_measurements.measure_type, tbl_print_grndetail.unitprice, tbl_print_grndetail.unit_discount');
-            $this->db->from('tbl_print_grndetail_after_costing');
+            $this->db->select('tbl_grndetail_after_costing.costunitprice,tbl_grndetail_after_costing.qty,tbl_grndetail_after_costing.total,tbl_grn.grndate,tbl_grn.grn_no, tbl_grndetail.comment AS `material_display`,tbl_unit.unit AS measure_type, tbl_grndetail.unitprice, tbl_grndetail.unit_discount');
+            $this->db->from('tbl_grndetail_after_costing');
 
-            $this->db->join('tbl_print_grndetail', 'tbl_print_grndetail.idtbl_print_grndetail = tbl_print_grndetail_after_costing.tbl_print_grndetail_idtbl_print_grndetail AND tbl_print_grndetail.tbl_print_grn_idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
+            $this->db->join('tbl_grndetail', 'tbl_grndetail.idtbl_grndetail = tbl_grndetail_after_costing.tbl_grndetail_idtbl_grndetail AND tbl_grndetail.tbl_grn_idtbl_grn = tbl_grndetail_after_costing.tbl_grn_idtbl_grn', 'left');
 
-            $this->db->join('tbl_print_material_info', 'tbl_print_material_info.idtbl_print_material_info = tbl_print_grndetail_after_costing.tbl_print_material_info_idtbl_print_material_info', 'left');
-            $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
-            $this->db->join('tbl_measurements', 'tbl_measurements.idtbl_mesurements = tbl_print_grndetail_after_costing.measure_type_id', 'left');
-            $this->db->where('tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', $grnID);
-            $this->db->where('tbl_print_grndetail_after_costing.status', 1);
+            $this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_grndetail_after_costing.tbl_product_idtbl_product', 'left');
+            $this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grndetail_after_costing.tbl_grn_idtbl_grn', 'left');
+            $this->db->join('tbl_unit', 'tbl_unit.idtbl_unit = tbl_grndetail_after_costing.measure_type_id', 'left');
+            $this->db->where('tbl_grndetail_after_costing.tbl_grn_idtbl_grn', $grnID);
+            $this->db->where('tbl_grndetail_after_costing.status', 1);
         }
         else{
-            $this->db->select('tbl_print_grndetail_after_costing.costunitprice,tbl_print_grndetail_after_costing.qty,tbl_print_grndetail_after_costing.total,tbl_print_grn.grndate,tbl_print_grn.grn_no,tbl_print_grn.tbl_material_group_idtbl_material_group, CONCAT(`tbl_print_material_info`.`materialinfocode`, " / ", `tbl_print_material_info`.`materialname`) AS `material_display`,tbl_measurements.measure_type, tbl_print_grndetail.unitprice, tbl_print_grndetail.unit_discount');
-            $this->db->from('tbl_print_grndetail_after_costing');
+            $this->db->select('tbl_grndetail_after_costing.costunitprice,tbl_grndetail_after_costing.qty,tbl_grndetail_after_costing.total,tbl_grn.grndate,tbl_grn.grn_no, CONCAT(`tbl_product`.`product_code`, " / ", `tbl_product`.`product_name`) AS `material_display`,tbl_unit.unit AS measure_type, tbl_grndetail.unitprice, tbl_grndetail.unit_discount');
+            $this->db->from('tbl_grndetail_after_costing');
 
-            $this->db->join('tbl_print_grndetail', 'tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info = tbl_print_grndetail_after_costing.tbl_print_material_info_idtbl_print_material_info AND tbl_print_grndetail.tbl_print_grn_idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
+            $this->db->join('tbl_grndetail', 'tbl_grndetail.tbl_product_idtbl_product = tbl_grndetail_after_costing.tbl_product_idtbl_product AND tbl_grndetail.tbl_grn_idtbl_grn = tbl_grndetail_after_costing.tbl_grn_idtbl_grn', 'left');
 
-            $this->db->join('tbl_print_material_info', 'tbl_print_material_info.idtbl_print_material_info = tbl_print_grndetail_after_costing.tbl_print_material_info_idtbl_print_material_info', 'left');
-            $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
-            $this->db->join('tbl_measurements', 'tbl_measurements.idtbl_mesurements = tbl_print_grndetail_after_costing.measure_type_id', 'left');
-            $this->db->where('tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', $grnID);
-            $this->db->where('tbl_print_grndetail_after_costing.status', 1);
+            $this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_grndetail_after_costing.tbl_product_idtbl_product', 'left');
+            $this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grndetail_after_costing.tbl_grn_idtbl_grn', 'left');
+            $this->db->join('tbl_unit', 'tbl_unit.idtbl_unit = tbl_grndetail_after_costing.measure_type_id', 'left');
+            $this->db->where('tbl_grndetail_after_costing.tbl_grn_idtbl_grn', $grnID);
+            $this->db->where('tbl_grndetail_after_costing.status', 1);
         }
 
 		$respondgrndetail=$this->db->get();
@@ -337,45 +326,45 @@ class GRNVoucherinfo extends CI_Model{
         $branchid=$_SESSION['branch_id'];
 
         if(!isset($searchTerm)){        
-            $this->db->select('`tbl_print_grn`.`idtbl_print_grn`, `tbl_print_grn`.`grn_no`, `tbl_print_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
-            $this->db->from('tbl_print_grn');
-            $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
-            // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn = tbl_print_grn.idtbl_print_grn', 'left');
-            $this->db->where('tbl_print_grn.status', 1);
-            $this->db->where('tbl_print_grn.approvestatus', 1);
+            $this->db->select('`tbl_grn`.`idtbl_grn`, `tbl_grn`.`grn_no`, `tbl_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
+            $this->db->from('tbl_grn');
+            $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
+            // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn = tbl_grn.idtbl_grn', 'left');
+            $this->db->where('tbl_grn.status', 1);
+            $this->db->where('tbl_grn.approvestatus', 1);
             // $this->db->where('tbl_grn_vouchar_import_cost.approvestatus', 0);
-            $this->db->where('tbl_print_grn.voucherissue', 0);
-            $this->db->where('tbl_print_grn.tbl_company_idtbl_company', $companyid);
-            $this->db->where('tbl_print_grn.tbl_company_branch_idtbl_company_branch', $branchid);
+            $this->db->where('tbl_grn.voucherissue', 0);
+            $this->db->where('tbl_grn.tbl_company_idtbl_company', $companyid);
+            $this->db->where('tbl_grn.tbl_company_branch_idtbl_company_branch', $branchid);
             $this->db->limit(5); 
             $respond = $this->db->get();
 		}
 		else{            
             if(!empty($searchTerm)){
-				$this->db->select('`tbl_print_grn`.`idtbl_print_grn`, `tbl_print_grn`.`grn_no`, `tbl_print_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
-                $this->db->from('tbl_print_grn');
-                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
-                // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn = tbl_print_grn.idtbl_print_grn', 'left');
-                $this->db->where('tbl_print_grn.status', 1);
-                $this->db->where('tbl_print_grn.approvestatus', 1);
+				$this->db->select('`tbl_grn`.`idtbl_grn`, `tbl_grn`.`grn_no`, `tbl_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
+                $this->db->from('tbl_grn');
+                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
+                // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn = tbl_grn.idtbl_grn', 'left');
+                $this->db->where('tbl_grn.status', 1);
+                $this->db->where('tbl_grn.approvestatus', 1);
                 // $this->db->where('tbl_grn_vouchar_import_cost.approvestatus', 0);
-                $this->db->where('tbl_print_grn.voucherissue', 0);
-                $this->db->where('tbl_print_grn.tbl_company_idtbl_company', $companyid);
-                $this->db->where('tbl_print_grn.tbl_company_branch_idtbl_company_branch', $branchid);
-                $this->db->like('`tbl_print_grn`.`grn_no`', $searchTerm, 'both'); 
+                $this->db->where('tbl_grn.voucherissue', 0);
+                $this->db->where('tbl_grn.tbl_company_idtbl_company', $companyid);
+                $this->db->where('tbl_grn.tbl_company_branch_idtbl_company_branch', $branchid);
+                $this->db->like('`tbl_grn`.`grn_no`', $searchTerm, 'both'); 
                 $respond = $this->db->get();
 			}
 			else{
-				$this->db->select('`tbl_print_grn`.`idtbl_print_grn`, `tbl_print_grn`.`grn_no`, `tbl_print_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
-                $this->db->from('tbl_print_grn');
-                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
-                // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn = tbl_print_grn.idtbl_print_grn', 'left');
-                $this->db->where('tbl_print_grn.status', 1);
-                $this->db->where('tbl_print_grn.approvestatus', 1);
+				$this->db->select('`tbl_grn`.`idtbl_grn`, `tbl_grn`.`grn_no`, `tbl_grn`.`invoicenum`, `tbl_supplier`.`suppliername`');
+                $this->db->from('tbl_grn');
+                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
+                // $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn = tbl_grn.idtbl_grn', 'left');
+                $this->db->where('tbl_grn.status', 1);
+                $this->db->where('tbl_grn.approvestatus', 1);
                 // $this->db->where('tbl_grn_vouchar_import_cost.approvestatus', 0);
-                $this->db->where('tbl_print_grn.voucherissue', 0);
-                $this->db->where('tbl_print_grn.tbl_company_idtbl_company', $companyid);
-                $this->db->where('tbl_print_grn.tbl_company_branch_idtbl_company_branch', $branchid);
+                $this->db->where('tbl_grn.voucherissue', 0);
+                $this->db->where('tbl_grn.tbl_company_idtbl_company', $companyid);
+                $this->db->where('tbl_grn.tbl_company_branch_idtbl_company_branch', $branchid);
                 $this->db->limit(5); 
                 $respond = $this->db->get();
 			}
@@ -384,7 +373,7 @@ class GRNVoucherinfo extends CI_Model{
         $data=array();
         
         foreach ($respond->result() as $row) {
-            $data[]=array("id"=>$row->idtbl_print_grn, "text"=>$row->grn_no, "suppname" => $row->suppliername, "invoicenum" => $row->invoicenum);
+            $data[]=array("id"=>$row->idtbl_grn, "text"=>$row->grn_no, "suppname" => $row->suppliername, "invoicenum" => $row->invoicenum);
         }
         
         echo json_encode($data);
@@ -398,7 +387,7 @@ class GRNVoucherinfo extends CI_Model{
         $updatedatetime=date('Y-m-d H:i:s');
     
         if($type==3) {
-            $this->db->select('`tbl_print_grn_idtbl_print_grn`');
+            $this->db->select('`tbl_grn_idtbl_grn`');
 			$this->db->from('tbl_grn_vouchar_import_cost');
 			$this->db->where('idtbl_grn_vouchar_import_cost', $recordID);
 
@@ -425,8 +414,8 @@ class GRNVoucherinfo extends CI_Model{
                 'updateuser'=> $userID,
                 'updatedatetime'=> $updatedatetime);
     
-            $this->db->where('tbl_print_grn_idtbl_print_grn', $respondgrn->row(0)->tbl_print_grn_idtbl_print_grn);
-            $this->db->update('tbl_print_grndetail_after_costing', $datadetailafter);
+            $this->db->where('tbl_grn_idtbl_grn', $respondgrn->row(0)->tbl_grn_idtbl_grn);
+            $this->db->update('tbl_grndetail_after_costing', $datadetailafter);
 
             //Good receive not voucher issue
             $dataupdategrn=array(
@@ -435,8 +424,8 @@ class GRNVoucherinfo extends CI_Model{
                 'updatedatetime'=> $updatedatetime
             );
 
-            $this->db->where('idtbl_print_grn', $respondgrn->row(0)->tbl_print_grn_idtbl_print_grn);
-            $this->db->update('tbl_print_grn', $dataupdategrn);
+            $this->db->where('idtbl_grn', $respondgrn->row(0)->tbl_grn_idtbl_grn);
+            $this->db->update('tbl_grn', $dataupdategrn);
             
             $this->db->trans_complete();
     
@@ -475,234 +464,6 @@ class GRNVoucherinfo extends CI_Model{
             }
         }
     }
-    // public function GRNVoucherapprove(){
-    //     $this->db->trans_begin();
-    //     $userID=$_SESSION['userid'];
-    //     $company=$_SESSION['company_id'];
-    //     $branch=$_SESSION['branch_id'];
-    //     $recordID=$this->input->post('recordID');
-    //     $confirmnot=$this->input->post('confirmnot');
-    //     $updatedatetime=date('Y-m-d H:i:s');
-
-    //     if($confirmnot==1){
-
-    //         // Other cost approve
-    //         $data=array(
-    //             'approvestatus'=> $confirmnot,
-    //             'updateuser'=> $userID,
-    //             'updatedatetime'=> $updatedatetime
-    //         );
-
-    //         $this->db->where('idtbl_grn_vouchar_import_cost', $recordID);
-    //         $this->db->update('tbl_grn_vouchar_import_cost', $data);
-            
-    //         // Update grn unit price with other cost
-    //         $this->db->select('`tbl_print_grndetail_after_costing`.`costunitprice`, `tbl_print_grndetail_after_costing`.`total`, `tbl_print_grndetail_after_costing`.`tbl_print_material_info_idtbl_print_material_info`, `tbl_print_grndetail_after_costing`.`tbl_print_grn_idtbl_print_grn`');
-    //         $this->db->from('tbl_print_grndetail_after_costing');
-    //         $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
-    //         $this->db->where('tbl_print_grndetail_after_costing.status', 1);
-    //         $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
-
-    //         $respond=$this->db->get();
-
-    //         $newnettotal=0;
-
-    //         foreach($respond->result() as $rowaftercostdata){
-    //             $dataupdategrndetail=array(
-    //                 'costunitprice'=> $rowaftercostdata->costunitprice,
-    //                 'total'=> $rowaftercostdata->total,
-    //                 'updateuser'=> $userID,
-    //                 'updatedatetime'=> $updatedatetime
-    //             );
-    //             $this->db->where('tbl_print_grn_idtbl_print_grn', $rowaftercostdata->tbl_print_grn_idtbl_print_grn);
-    //             $this->db->where('tbl_print_material_info_idtbl_print_material_info', $rowaftercostdata->tbl_print_material_info_idtbl_print_material_info);
-    //             $this->db->update('tbl_print_grndetail', $dataupdategrndetail);
-
-    //             $newnettotal+=$rowaftercostdata->total;
-    //         }
-
-    //         $this->db->select('`tbl_print_grn`.`vat`, `tbl_print_grn`.`idtbl_print_grn`, `tbl_print_grn`.`grn_no`, `tbl_print_grn`.`grntype`, `tbl_print_grn`.`grndate`, `tbl_print_grn`.`tbl_supplier_idtbl_supplier`, `tbl_print_grn`.`vatamount`, `tbl_print_grn`.`total`, `tbl_supplier`.`suppliername`, `tbl_grn_vouchar_import_cost`.`grnsubtotal`, `tbl_grn_vouchar_import_cost`.`grndiscount`, `tbl_grn_vouchar_import_cost`.`grnvatamount`, `tbl_grn_vouchar_import_cost`.`grntotal`');
-    //         $this->db->from('tbl_grn_vouchar_import_cost');
-    //         $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn', 'left');
-    //         $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
-    //         $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
-
-    //         $respondgrn=$this->db->get();
-            
-    //         // $newvattotal=($newnettotal*$respondgrn->row(0)->vat)/100;
-    //         // $withvattotal=$newnettotal+$newvattotal;
-
-    //         $dataupdategrn=array(
-    //             'subtotalcost'=> $respondgrn->row(0)->grnsubtotal,
-    //             'vatamountcost'=> $respondgrn->row(0)->grnvatamount,
-    //             'discountcost'=> $respondgrn->row(0)->grndiscount,
-    //             'totalcost'=> $respondgrn->row(0)->grntotal,
-    //             'updateuser'=> $userID,
-    //             'updatedatetime'=> $updatedatetime
-    //         );
-
-    //         $this->db->where('idtbl_print_grn', $respondgrn->row(0)->idtbl_print_grn);
-    //         $this->db->update('tbl_print_grn', $dataupdategrn);
-
-    //         // Expences detail insert
-    //         if($respondgrn->row(0)->grntype==1){$expcode='SPR';}
-    //         else if($respondgrn->row(0)->grntype==3){$expcode='GRN';}
-    //         else if($respondgrn->row(0)->grntype==4){$expcode='MAC';}
-
-    //         $dataexpence=array(
-    //             'exptype'=> '1',
-    //             'expcode'=> $expcode,
-    //             'grnno'=> $respondgrn->row(0)->idtbl_print_grn,
-    //             'grndate'=> $respondgrn->row(0)->grndate,
-    //             'amount'=> $respondgrn->row(0)->grntotal,
-    //             'invamount'=> $respondgrn->row(0)->total,
-    //             'status'=> '1',
-    //             'insertdatetime'=> $updatedatetime,
-    //             'tbl_user_idtbl_user'=> $userID,
-    //             'tbl_supplier_idtbl_supplier'=> $respondgrn->row(0)->tbl_supplier_idtbl_supplier,
-    //             'tbl_company_idtbl_company'=> $company,
-    //             'tbl_company_branch_idtbl_company_branch'=> $branch
-    //         );
-    //         $this->db->insert('tbl_expence_info', $dataexpence);
-
-    //         // Parse to account API
-    //         $narration=$respondgrn->row(0)->grn_no.' on '.$respondgrn->row(0)->grndate.' by '.$respondgrn->row(0)->suppliername;
-
-    //         if($company==1){
-    //             $chartofaccount=115;
-    //             $detailaccount=0;
-    //             $vatreserve=141;
-    //         }
-
-    //         $segregationdata=array();
-
-    //         $obj=new stdClass();
-    //         $obj->amount=str_replace(",", "", $newnettotal);
-    //         $obj->narration=$narration;
-    //         $obj->chartaccount=$chartofaccount;
-    //         $obj->detailaccount=$detailaccount;
-
-    //         array_push($segregationdata, $obj);
-
-    //         if($respondgrn->row(0)->vatamount>0){
-    //             $obj=new stdClass();
-    //             $obj->amount=$respondgrn->row(0)->vatamount;
-    //             $obj->narration=$narration;
-    //             $obj->chartaccount=$vatreserve;
-    //             $obj->detailaccount=$detailaccount;
-
-    //             array_push($segregationdata, $obj);
-    //         }
-
-    //         $segregationdataencode=json_encode($segregationdata);
-    //         $supplier=$respondgrn->row(0)->tbl_supplier_idtbl_supplier;
-    //         $invoice=$respondgrn->row(0)->idtbl_print_grn;
-    //         $invoiceamount=$respondgrn->row(0)->grntotal;
-
-    //         $apiURL=$_SESSION['accountapiurl'].'Api/Payablesegregationinsertupdate';
-
-    //         $ch = curl_init();
-    //         curl_setopt($ch, CURLOPT_URL, $apiURL);
-    //         curl_setopt($ch, CURLOPT_POST, 1);
-    //         curl_setopt($ch, CURLOPT_POSTFIELDS, "userid=$userID&company=$company&branch=$branch&supplier=$supplier&invoice=$invoice&invoiceamount=$invoiceamount&segregationdata=$segregationdataencode");
-    //         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    //         $server_output = curl_exec($ch);
-    //         $err = curl_error($ch);
-    //         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    //         curl_close($ch);
-
-    //         // print_r($server_output);
-            
-    //         if ($this->db->trans_status() === TRUE && $httpCode == 200) {
-    //             $this->db->trans_commit();
-
-    //             $actionObj = new stdClass();
-    //             $actionObj->icon = 'fas fa-save';
-    //             $actionObj->title = '';
-    //             $actionObj->message = 'GRN Voucher Confirmed Successfully';
-    //             $actionObj->url = '';
-    //             $actionObj->target = '_blank';
-    //             $actionObj->type = 'success';
-
-    //             $actionJSON = json_encode($actionObj);
-
-    //             $obj = new stdClass();
-    //             $obj->status = 1;
-    //             $obj->action = $actionJSON;
-
-    //             echo json_encode($obj);
-    //         } else {
-    //             $this->db->trans_rollback();
-
-    //             $actionObj = new stdClass();
-    //             $actionObj->icon = 'fas fa-exclamation-triangle';
-    //             $actionObj->title = '';
-    //             $actionObj->message = 'Record Error';
-    //             $actionObj->url = '';
-    //             $actionObj->target = '_blank';
-    //             $actionObj->type = 'danger';
-
-    //             $actionJSON = json_encode($actionObj);
-
-    //             $obj = new stdClass();
-    //             $obj->status = 0;
-    //             $obj->action = $actionJSON;
-
-    //             echo json_encode($obj);
-    //         }
-    //     }
-    //     else{            
-    //         // Other cost approve
-    //         $data=array(
-    //             'approvestatus'=> $confirmnot,
-    //             'updateuser'=> $userID,
-    //             'updatedatetime'=> $updatedatetime
-    //         );
-
-    //         $this->db->where('idtbl_grn_vouchar_import_cost', $recordID);
-    //         $this->db->update('tbl_grn_vouchar_import_cost', $data);
-            
-    //         $this->db->trans_complete();
-
-    //         if ($this->db->trans_status() === TRUE) {
-    //             $this->db->trans_commit();
-                
-    //             $actionObj=new stdClass();
-    //             $actionObj->icon='fas fa-times';
-    //             $actionObj->title='';
-    //             $actionObj->message='Record Rejected Successfully';
-    //             $actionObj->url='';
-    //             $actionObj->target='_blank';
-    //             $actionObj->type='primary';
-    
-    //             $actionJSON=json_encode($actionObj);
-                
-    //             $obj=new stdClass();
-    //             $obj->status=1;
-    //             $obj->action=$actionJSON;
-    
-    //             echo json_encode($obj);            
-    //         } else {
-    //             $this->db->trans_rollback();
-    
-    //             $actionObj=new stdClass();
-    //             $actionObj->icon='fas fa-warning';
-    //             $actionObj->title='';
-    //             $actionObj->message='Record Error';
-    //             $actionObj->url='';
-    //             $actionObj->target='_blank';
-    //             $actionObj->type='danger';
-    
-    //             $actionJSON=json_encode($actionObj);
-                
-    //             $obj=new stdClass();
-    //             $obj->status=0;
-    //             $obj->action=$actionJSON;
-    
-    //             echo json_encode($obj);       
-    //         }
-    //     }
-    // }
     public function GRNVoucherapprove() {
         $userID = $_SESSION['userid'];
         $company = $_SESSION['company_id'];
@@ -719,10 +480,10 @@ class GRNVoucherinfo extends CI_Model{
     
             if ($confirmnot == 1) {
                  // Get GRN details
-                $this->db->select('`tbl_print_grn`.`batchno`, `tbl_print_grn`.`vat`, `tbl_print_grn`.`idtbl_print_grn`, `tbl_print_grn`.`grn_no`, `tbl_print_grn`.`grntype`, `tbl_print_grn`.`grndate`, `tbl_print_grn`.`tbl_supplier_idtbl_supplier`, `tbl_print_grn`.`vatamount`, `tbl_print_grn`.`total`, `tbl_supplier`.`suppliername`, `tbl_grn_vouchar_import_cost`.`grnsubtotal`, `tbl_grn_vouchar_import_cost`.`grndiscount`, `tbl_grn_vouchar_import_cost`.`grnvatamount`, `tbl_grn_vouchar_import_cost`.`grntotal`');
+                $this->db->select('`tbl_grn`.`batchno`, `tbl_grn`.`vat`, `tbl_grn`.`idtbl_grn`, `tbl_grn`.`grn_no`, `tbl_grn`.`grntype`, `tbl_grn`.`grndate`, `tbl_grn`.`tbl_supplier_idtbl_supplier`, `tbl_grn`.`vatamount`, `tbl_grn`.`total`, `tbl_supplier`.`suppliername`, `tbl_grn_vouchar_import_cost`.`grnsubtotal`, `tbl_grn_vouchar_import_cost`.`grndiscount`, `tbl_grn_vouchar_import_cost`.`grnvatamount`, `tbl_grn_vouchar_import_cost`.`grntotal`');
                 $this->db->from('tbl_grn_vouchar_import_cost');
-                $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn', 'left');
-                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
+                $this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn', 'left');
+                $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
                 $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
     
                 $respondgrn = $this->db->get();
@@ -740,10 +501,10 @@ class GRNVoucherinfo extends CI_Model{
                 $this->db->update('tbl_grn_vouchar_import_cost', $data);
                 
                 // Update GRN unit price with other cost
-                $this->db->select('`tbl_print_grndetail_after_costing`.`costunitprice`, `tbl_print_grndetail_after_costing`.`total`, `tbl_print_grndetail_after_costing`.`tbl_print_material_info_idtbl_print_material_info`, `tbl_print_grndetail_after_costing`.`tbl_print_grn_idtbl_print_grn`, `tbl_print_grndetail_after_costing`.`tbl_print_grndetail_idtbl_print_grndetail`');
-                $this->db->from('tbl_print_grndetail_after_costing');
-                $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn = tbl_print_grndetail_after_costing.tbl_print_grn_idtbl_print_grn', 'left');
-                $this->db->where('tbl_print_grndetail_after_costing.status', 1);
+                $this->db->select('`tbl_grndetail_after_costing`.`costunitprice`, `tbl_grndetail_after_costing`.`total`, `tbl_grndetail_after_costing`.`tbl_product_idtbl_product`, `tbl_grndetail_after_costing`.`tbl_grn_idtbl_grn`, `tbl_grndetail_after_costing`.`tbl_grndetail_idtbl_grndetail`');
+                $this->db->from('tbl_grndetail_after_costing');
+                $this->db->join('tbl_grn_vouchar_import_cost', 'tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn = tbl_grndetail_after_costing.tbl_grn_idtbl_grn', 'left');
+                $this->db->where('tbl_grndetail_after_costing.status', 1);
                 $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
     
                 $respond = $this->db->get();
@@ -756,45 +517,25 @@ class GRNVoucherinfo extends CI_Model{
                         'updateuser' => $userID,
                         'updatedatetime' => $updatedatetime
                     );
-                    $this->db->where('tbl_print_grn_idtbl_print_grn', $rowaftercostdata->tbl_print_grn_idtbl_print_grn);
-                    $this->db->where('tbl_print_material_info_idtbl_print_material_info', $rowaftercostdata->tbl_print_material_info_idtbl_print_material_info);
+                    $this->db->where('tbl_grn_idtbl_grn', $rowaftercostdata->tbl_grn_idtbl_grn);
+                    $this->db->where('tbl_product_idtbl_product', $rowaftercostdata->tbl_product_idtbl_product);
                     if($grnData->grntype==4){
-                        $this->db->where('idtbl_print_grndetail', $rowaftercostdata->tbl_print_grndetail_idtbl_print_grndetail);
+                        $this->db->where('idtbl_grndetail', $rowaftercostdata->tbl_grndetail_idtbl_grndetail);
                     }
-                    $this->db->update('tbl_print_grndetail', $dataupdategrndetail);
+                    $this->db->update('tbl_grndetail', $dataupdategrndetail);
     
                     $newnettotal += $rowaftercostdata->total;
 
                     $dataupdatestock = array(
-                        'unitprice' => $rowaftercostdata->costunitprice,
-                        'total' => $rowaftercostdata->total,
+                        'costunitprice' => $rowaftercostdata->costunitprice,
                         'updateuser' => $userID,
                         'updatedatetime' => $updatedatetime
                     );
-                    $this->db->where('tbl_print_material_info_idtbl_print_material_info', $rowaftercostdata->tbl_print_material_info_idtbl_print_material_info);
+                    $this->db->where('tbl_product_idtbl_product', $rowaftercostdata->tbl_product_idtbl_product);
                     $this->db->where('tbl_company_idtbl_company', $company);
                     $this->db->where('tbl_company_branch_idtbl_company_branch', $branch);
                     $this->db->where('batchno', $grnData->batchno);
-                    $this->db->update('tbl_print_stock', $dataupdatestock);
-
-                    //Update job card issue material unit price update
-                    $sqlupdateissuematerial = "UPDATE tbl_jobcard_issue_meterial jim
-                            INNER JOIN tbl_jobcard jc ON jc.idtbl_jobcard = jim.tbl_jobcard_idtbl_jobcard
-                            SET jim.unitprice = ?, jim.updateuser = ?, jim.updatedatetime = ?
-                            WHERE jim.tbl_print_material_info_idtbl_print_material_info = ?
-                            AND jc.tbl_company_idtbl_company = ?
-                            AND jc.tbl_company_branch_idtbl_company_branch = ?
-                            AND jim.batchno = ?";
-
-                    $this->db->query($sqlupdateissuematerial, array(
-                        $rowaftercostdata->costunitprice,
-                        $userID,
-                        $updatedatetime,
-                        $rowaftercostdata->tbl_print_material_info_idtbl_print_material_info,
-                        $company,
-                        $branch,
-                        $grnData->batchno
-                    ));
+                    $this->db->update('tbl_stock', $dataupdatestock);
                 }
     
                 // Update GRN with cost details
@@ -807,62 +548,62 @@ class GRNVoucherinfo extends CI_Model{
                     'updatedatetime' => $updatedatetime
                 );
                 
-                $this->db->where('idtbl_print_grn', $grnData->idtbl_print_grn);
-                $this->db->update('tbl_print_grn', $dataupdategrn);
+                $this->db->where('idtbl_grn', $grnData->idtbl_grn);
+                $this->db->update('tbl_grn', $dataupdategrn);
 
-                // GET API SEGREGATION DATA
-                $APIstatus = $this->load->model('Apiinfo');
-                $APIstatus = $this->Apiinfo->GRNApi($grnData->idtbl_print_grn);
+                // // GET API SEGREGATION DATA
+                // $APIstatus = $this->load->model('Apiinfo');
+                // $APIstatus = $this->Apiinfo->GRNApi($grnData->idtbl_grn);
                 
-                $segregationdataencode = json_encode($APIstatus);
-                $supplier = $grnData->tbl_supplier_idtbl_supplier;
-                $invoice = $grnData->grn_no;
-                $invoicedate = $grnData->grndate;
-                $invoiceamount = $grnData->grntotal;
+                // $segregationdataencode = json_encode($APIstatus);
+                // $supplier = $grnData->tbl_supplier_idtbl_supplier;
+                // $invoice = $grnData->grn_no;
+                // $invoicedate = $grnData->grndate;
+                // $invoiceamount = $grnData->grntotal;
     
-                // Make API call
-                $apiURL = $_SESSION['accountapiurl'].'Api/Payablesegregationinsertupdate';
+                // // Make API call
+                // $apiURL = $_SESSION['accountapiurl'].'Api/Payablesegregationinsertupdate';
                 
-                // Use http_build_query for safer parameter encoding
-                $postData = http_build_query([
-                    'userid' => $userID,
-                    'company' => $company,
-                    'branch' => $branch,
-                    'supplier' => $supplier,
-                    'invoice' => $invoice,
-                    'invoicedate' => $invoicedate,
-                    'invoiceamount' => $invoiceamount,
-                    'segregationdata' => $segregationdataencode
-                ]);
+                // // Use http_build_query for safer parameter encoding
+                // $postData = http_build_query([
+                //     'userid' => $userID,
+                //     'company' => $company,
+                //     'branch' => $branch,
+                //     'supplier' => $supplier,
+                //     'invoice' => $invoice,
+                //     'invoicedate' => $invoicedate,
+                //     'invoiceamount' => $invoiceamount,
+                //     'segregationdata' => $segregationdataencode
+                // ]);
 
-                $ch = curl_init();
-                curl_setopt_array($ch, [
-                    CURLOPT_URL => $apiURL,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $postData,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/x-www-form-urlencoded',
-                    ]
-                ]);
+                // $ch = curl_init();
+                // curl_setopt_array($ch, [
+                //     CURLOPT_URL => $apiURL,
+                //     CURLOPT_POST => true,
+                //     CURLOPT_POSTFIELDS => $postData,
+                //     CURLOPT_RETURNTRANSFER => true,
+                //     CURLOPT_TIMEOUT => 30,
+                //     CURLOPT_HTTPHEADER => [
+                //         'Content-Type: application/x-www-form-urlencoded',
+                //     ]
+                // ]);
                 
-                $server_output = curl_exec($ch);
-                $curlError = curl_error($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
+                // $server_output = curl_exec($ch);
+                // $curlError = curl_error($ch);
+                // $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                // curl_close($ch);
 
-                // print_r($server_output);
-                // die();
-                // Check both HTTP status and API response
-                $apiResponse = json_decode($server_output, true);
+                // // print_r($server_output);
+                // // die();
+                // // Check both HTTP status and API response
+                // $apiResponse = json_decode($server_output, true);
                 
-                if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
-                    $errorMsg = $apiResponse['message'] ?? 'API request failed';
-                    throw new Exception($errorMsg);
-                }   
+                // if ($httpCode != 200 || !isset($apiResponse['status']) || $apiResponse['status'] !== 'success') {
+                //     $errorMsg = $apiResponse['message'] ?? 'API request failed';
+                //     throw new Exception($errorMsg);
+                // }   
             } else {
-                $this->db->select('tbl_print_grn_idtbl_print_grn');
+                $this->db->select('tbl_grn_idtbl_grn');
                 $this->db->form('tbl_grn_vouchar_import_cost');
                 $this->db->where('idtbl_grn_vouchar_import_cost', $recordID);
                 $respond = $this->db->get();
@@ -894,11 +635,11 @@ class GRNVoucherinfo extends CI_Model{
                     'updatedatetime' => $updatedatetime
                 );
     
-                $this->db->where('tbl_print_grn_idtbl_print_grn', $respond->row(0)->tbl_print_grn_idtbl_print_grn);
-                $this->db->update('tbl_print_grndetail_after_costing', $data);
+                $this->db->where('tbl_grn_idtbl_grn', $respond->row(0)->tbl_grn_idtbl_grn);
+                $this->db->update('tbl_grndetail_after_costing', $data);
 
                 //Good receive not voucher issue
-                $this->db->select('`tbl_print_grn_idtbl_print_grn`');
+                $this->db->select('`tbl_grn_idtbl_grn`');
                 $this->db->from('tbl_grn_vouchar_import_cost');
                 $this->db->where('idtbl_grn_vouchar_import_cost', $recordID);
             
@@ -910,8 +651,8 @@ class GRNVoucherinfo extends CI_Model{
                     'updatedatetime'=> $updatedatetime
                 );
 
-                $this->db->where('idtbl_print_grn', $respond->row(0)->tbl_print_grn_idtbl_print_grn);
-                $this->db->update('tbl_print_grn', $dataupdategrn);
+                $this->db->where('idtbl_grn', $respond->row(0)->tbl_grn_idtbl_grn);
+                $this->db->update('tbl_grn', $dataupdategrn);
             }
 
             if ($this->db->trans_status() === FALSE) {
@@ -954,8 +695,8 @@ class GRNVoucherinfo extends CI_Model{
 
         $this->db->select("tbl_grn_vouchar_import_cost.*, `tbl_supplier`.`suppliername`, `tbl_supplier`.`telephone_no`, CONCAT(`tbl_supplier`.`address_line1`, ' ', `tbl_supplier`.`address_line2`, ' ', `tbl_supplier`.`city`) AS `address`, `tbl_company`.`company`, `tbl_company_branch`.`branch`, CONCAT(`tbl_company`.`address1`, ' ', `tbl_company`.`address2`) AS `companyaddress`");
         $this->db->from('tbl_grn_vouchar_import_cost');
-        $this->db->join('tbl_print_grn', 'tbl_print_grn.idtbl_print_grn = tbl_grn_vouchar_import_cost.tbl_print_grn_idtbl_print_grn', 'left');
-        $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_print_grn.tbl_supplier_idtbl_supplier', 'left');
+        $this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grn_vouchar_import_cost.tbl_grn_idtbl_grn', 'left');
+        $this->db->join('tbl_supplier', 'tbl_supplier.idtbl_supplier = tbl_grn.tbl_supplier_idtbl_supplier', 'left');
         $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_grn_vouchar_import_cost.tbl_company_idtbl_company', 'left');
         $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_grn_vouchar_import_cost.tbl_company_branch_idtbl_company_branch', 'left');
         $this->db->where('tbl_grn_vouchar_import_cost.idtbl_grn_vouchar_import_cost', $recordID);
@@ -971,29 +712,6 @@ class GRNVoucherinfo extends CI_Model{
         $this->db->where('tbl_grn_vouchar_import_cost_detail.status', 1);
     
         $responddetail=$this->db->get();
-
-        // $this->db->select('*, COALESCE(tbl_print_grn.idtbl_print_grn, 0) AS idtbl_print_grn, COALESCE(tbl_print_grn.total, 0) AS grn_total, COALESCE(tbl_print_grn.discount, 0) AS discount, COALESCE(tbl_print_grndetail.qty, 0) AS qty, COALESCE(tbl_print_grndetail.unitprice, 0) AS unitprice');
-        // $this->db->from('tbl_print_grn');
-        // $this->db->join('tbl_print_grndetail', 'tbl_print_grn.idtbl_print_grn = tbl_print_grndetail.tbl_print_grn_idtbl_print_grn', 'left');
-        // $this->db->join('tbl_print_material_info', 'tbl_print_grndetail.tbl_print_material_info_idtbl_print_material_info = tbl_print_material_info.idtbl_print_material_info', 'left');
-        // $this->db->join('tbl_machine', 'tbl_print_grndetail.tbl_machine_id = tbl_machine.idtbl_machine', 'left');
-        // $this->db->join('tbl_supplier', 'tbl_print_grn.tbl_supplier_idtbl_supplier = tbl_supplier.idtbl_supplier', 'left');
-        // $this->db->join('tbl_location', 'tbl_print_grn.tbl_location_idtbl_location = tbl_location.idtbl_location', 'left');
-        // $this->db->join('tbl_order_type', 'tbl_print_grn.tbl_order_type_idtbl_order_type = tbl_order_type.idtbl_order_type', 'left');
-        // $this->db->join('tbl_measurements', 'tbl_print_grndetail.tbl_measurements_idtbl_mesurements = tbl_measurements.idtbl_mesurements', 'left');
-        // $this->db->where('tbl_print_grn.idtbl_print_grn' ,$recordID);
-        // $query = $this->db->get();
-
-        // if ($query->num_rows() > 0) {
-        //     $company_id = $query->row(0)->tbl_company_idtbl_company;
-        
-        //     $prefix = 'MO';
-        //     if ($company_id == 2) {
-        //         $prefix = 'FT';
-        //     } elseif ($company_id == 3) {
-        //         $prefix = 'RM';
-        //     }
-        // }
 
         $dataArray = [];
         $count = 0;
