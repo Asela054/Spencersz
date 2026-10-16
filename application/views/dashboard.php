@@ -412,7 +412,7 @@ $change = $cards['sales_change'];
 												<td><?php echo ds_e($r->invoice_no); ?></td>
 												<td><?php echo date('d M Y', strtotime($r->invoice_date)); ?></td>
 												<td><?php echo ds_e($r->customer); ?></td>
-												<td class="num"><?php echo ds_money($r->total); ?></td>
+												<td class="num"><?php echo ds_money($r->net_total); ?></td>
 											</tr>
 										<?php } } ?>
 										</tbody>

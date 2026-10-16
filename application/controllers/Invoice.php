@@ -59,7 +59,6 @@ class Invoice extends CI_Controller {
             ->order_by('idtbl_invoice', 'DESC')->limit(50)->get('tbl_invoice')->result();
         echo json_encode(['status' => 1, 'rows' => $rows]);
     }
-
     public function Loadquotation(){
         $branch_id=$_SESSION['branch_id'];
         $id = (int)$this->input->post('id');
@@ -78,5 +77,9 @@ class Invoice extends CI_Controller {
             'invoiceType' => 'Retail Tax Invoice (VAT)',          // converting to a normal invoice
             'fulfillment' => $q->fulfillment, 'discount' => (float)$q->discount, 'items' => $items,
         ]]);
+    }
+    public function Invoicelist(){
+        $result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
+        $this->load->view('invoicelist', $result);
     }
 }

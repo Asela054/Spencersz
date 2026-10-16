@@ -41,7 +41,7 @@ $columns = array(
 	array( 'db' => '`derived_table`.`approvestatus`', 'dt' => 'approvestatus', 'field' => 'approvestatus' ),
 	array( 'db' => '`derived_table`.`status`', 'dt' => 'status', 'field' => 'status' ),
 	array( 'db' => '`derived_table`.`checkby`', 'dt' => 'checkby', 'field' => 'checkby' ),
-	array( 'db' => '`derived_table`.`tbl_print_grn_idtbl_print_grn`', 'dt' => 'tbl_print_grn_idtbl_print_grn', 'field' => 'tbl_print_grn_idtbl_print_grn' ),
+	array( 'db' => '`derived_table`.`tbl_grn_idtbl_grn`', 'dt' => 'tbl_grn_idtbl_grn', 'field' => 'tbl_grn_idtbl_grn' ),
 	array( 'db' => '`derived_table`.`name`', 'dt' => 'name', 'field' => 'name' ),
 	array( 'db' => '`derived_table`.`status_display`', 'dt' => 'status_display', 'field' => 'status_display' )
 );
@@ -78,7 +78,7 @@ $joinQuery = "FROM (
             ELSE 'Pending'
         END AS status_display
     FROM `tbl_grn_vouchar_import_cost` AS `u` 
-    LEFT JOIN `tbl_print_grn` AS `ua` ON (`ua`.`idtbl_print_grn` = `u`.`tbl_print_grn_idtbl_print_grn`)
+    LEFT JOIN `tbl_grn` AS `ua` ON (`ua`.`idtbl_grn` = `u`.`tbl_grn_idtbl_grn`)
     LEFT JOIN `tbl_supplier` AS `ub` ON (`ub`.`idtbl_supplier` = `ua`.`tbl_supplier_idtbl_supplier`)
     LEFT JOIN `tbl_user` AS `uc` ON (`uc`.`idtbl_user` = `u`.`approveby`)
     WHERE `u`.`status` IN (1, 2) 
