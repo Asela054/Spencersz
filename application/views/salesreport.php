@@ -18,20 +18,17 @@ include "include/topnavbar.php";
                     </div>
                 </div>
             </div>
-            <div class="container-fluid mt-2 p-0 p-2">
-                <div class="card">
-                    <div class="card-body p-0 p-2">
-
-                        <ul class="nav nav-pills mb-2" id="reportTabs">
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="1">1. Daily Sales</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="2">2. Product / Brand / Category</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="3">3. Gross Profit</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="4">4. Customer Sales &amp; Statement</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="5">5. Credit Ageing</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link" data-report="6">6. Sales Return</a></li>
-                        </ul>
-                        <hr class="mt-1">
-
+            <div class="container-fluid mt-2 p-0 p-2 sx">
+                <div class="sx-tabs" id="reportTabs">
+                    <a href="#" class="sx-tab on" data-report="1"><i class="far fa-calendar-alt"></i> Daily Sales</a>
+                    <a href="#" class="sx-tab" data-report="2"><i class="fas fa-list"></i> Product / Brand / Category</a>
+                    <a href="#" class="sx-tab" data-report="3"><i class="fas fa-euro-sign"></i> Gross Profit</a>
+                    <a href="#" class="sx-tab" data-report="4"><i class="fas fa-shopping-basket"></i> Customer Sales &amp; Statement</a>
+                    <a href="#" class="sx-tab" data-report="5"><i class="fas fa-wallet"></i> Credit Ageing</a>
+                    <a href="#" class="sx-tab" data-report="6"><i class="fas fa-exchange-alt"></i> Sales Return</a>
+                </div>
+                <div class="sx-panel">
+                    <div class="sx-filter">
                         <div class="form-row align-items-end mb-2">
                             <div class="col-auto f-item" data-f="dates">
                                 <label class="small font-weight-bold text-dark mb-1">From</label>
@@ -172,8 +169,8 @@ $(document).ready(function() {
     function selectReport(n) {
         current = n;
         var cfg = R[n];
-        $('#reportTabs .nav-link').removeClass('active');
-        $('#reportTabs .nav-link[data-report="' + n + '"]').addClass('active');
+        $('#reportTabs .sx-tab').removeClass('on');
+        $('#reportTabs .sx-tab[data-report="' + n + '"]').addClass('on');
 
         $('.f-item').hide();
         cfg.show.forEach(function(k) { $('.f-item[data-f="' + k + '"]').show(); });
@@ -224,7 +221,7 @@ $(document).ready(function() {
             data: rows,
             columns: cols,
             order: [],                      // the server already sorts the rows
-            scrollX: true,
+            // scrollX: true,
             pageLength: 25,
             dom: "<'row'<'col-sm-5'B><'col-sm-2'l><'col-sm-5'f>>" + "<'row'<'col-sm-12'tr>>" +
                 "<'row'<'col-sm-5'i><'col-sm-7'p>>",
@@ -252,7 +249,7 @@ $(document).ready(function() {
         });
     }
 
-    $('#reportTabs').on('click', '.nav-link', function(e) {
+    $('#reportTabs').on('click', '.sx-tab', function(e) {
         e.preventDefault();
         selectReport(parseInt($(this).data('report')));
     });
