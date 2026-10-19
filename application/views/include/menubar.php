@@ -237,7 +237,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<a class="nav-link" href="<?php echo base_url().'Giftvoucher'; ?>">Gift
 						Voucher</a>
 					<?php } ?>
-                    <!-- <a class="nav-link" href="<?php // echo base_url().'Salesreport'; ?>">Sales report </a> -->
 				</nav>
 			</div>
 			<?php } ?>
@@ -294,6 +293,14 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php if(in_array("Soldserial",$permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Soldserial'; ?>">Sold Serial Lookup</a><?php } ?>
 				</nav>
 			</div>
+			<?php } ?>
+
+            <!-- Sales Report -->
+			<?php if(in_array("Salesreport", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Salesreport'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-cash-register"></i></div>
+				<span>Sales Report</span>
+			</a>
 			<?php } ?>
 
 			<!-- Tax Control Menu New Added -->
