@@ -7,40 +7,60 @@ $e  = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); 
 <head>
 <meta charset="utf-8">
 <style>
-    @page { margin: 0; }
-    body { margin: 0; font-family: 'DejaVu Sans', sans-serif; font-size: 9.5px; color: #111; }
-    .wrap { padding: 14px 28px 40px 28px; }
-    .band { background: #D0111B; height: 14px; }
-    .band-bot { position: fixed; bottom: 0; left: 0; right: 0; height: 14px; background: #D0111B; }
+    /* LQ-310 (dot matrix, A4): black only, no images, no fills.
+       Increase margin-top if you print on pre-printed letterhead stationery. */
+    @page {
+        margin-top: 30px;
+        margin-bottom: 50px;
+        margin-left: 30px;
+        margin-right: 30px;
+    }
+    body { margin: 0; font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #000; background: #fff; }
+
+    /* Repeating text footer on every page */
+    .page-footer {
+        position: fixed;
+        bottom: -38px;
+        left: 0;
+        right: 0;
+        height: 20px;
+        text-align: center;
+        font-size: 9px;
+        border-top: 1px solid #000;
+        padding-top: 3px;
+    }
+
     table { border-collapse: collapse; }
     .mb { margin-bottom: 6px; }
-    .box { border: 1.3px solid #D0111B; padding: 5px 8px; vertical-align: top; }
+    .box { border: 1px solid #000; padding: 5px 8px; vertical-align: top; }
     .gap { width: 2%; }
-    .items td, .items th { border: 1px solid #D0111B; padding: 3px 5px; }
-    .items th { background: #FBE3E4; font-size: 9px; }
+    .items td, .items th { border: 1px solid #000; padding: 3px 5px; }
+    .items th { font-size: 10px; font-weight: bold; }
+    .items tr { page-break-inside: avoid; }
     .num { text-align: right; }
     .ctr { text-align: center; }
 </style>
 </head>
 <body>
-<div class="band"></div>
-<div class="band-bot"></div>
+
+<!-- Repeating Footer (every page) -->
+<div class="page-footer">&copy; Bartack by Erav Technology - 071 657 8718 / 070 330 0061 - 65</div>
+
 <div class="wrap">
 
+    <!-- Company (text only, no logo) -->
     <table width="100%" class="mb">
         <tr>
-            <td style="width:20%; text-align:center; vertical-align:middle;">
-                <?php if ($logo): ?><img src="<?= $logo ?>" style="width:85px;"><?php endif; ?>
-            </td>
-            <td style="width:80%; vertical-align:middle;">
-                <div style="color:#D0111B; font-size:30px; font-weight:bold;"><?= $e(strtoupper($company['name'])) ?></div>
-                <div style="font-size:12px; font-weight:bold;"><?= $e($company['address']) ?></div>
+            <td style="text-align:center;">
+                <div style="font-size:20px; font-weight:bold;"><?= $e(strtoupper($company['name'])) ?></div>
+                <div style="font-size:11px; font-weight:bold;"><?= $e($company['address']) ?></div>
                 <div>TIN: <?= $e($company['tin']) ?> &nbsp;|&nbsp; Tel: <?= $e($company['tel']) ?></div>
             </td>
         </tr>
     </table>
 
-    <div style="background:#D0111B; color:#fff; font-size:22px; font-weight:bold; padding:4px 0; text-align:center;" class="mb">CREDIT NOTE</div>
+    <!-- Title -->
+    <div style="font-size:18px; font-weight:bold; padding:3px 0; text-align:center; letter-spacing:2px; border-top:2px solid #000; border-bottom:2px solid #000;" class="mb">CREDIT NOTE</div>
 
     <table width="100%" class="mb">
         <tr>
@@ -77,8 +97,8 @@ $e  = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); 
             <td class="ctr"><?= $e($it->product_code) ?></td>
             <td>
                 <?= $e($it->product_name) ?>
-                <?php if ($it->serialno): ?><br><span style="font-size:8px;">S/N: <?= $e($it->serialno) ?></span><?php endif; ?>
-                <?php if ($it->remark): ?><br><span style="font-size:8px;">Reason: <?= $e($it->remark) ?></span><?php endif; ?>
+                <?php if ($it->serialno): ?><br><span style="font-size:9px;">S/N: <?= $e($it->serialno) ?></span><?php endif; ?>
+                <?php if ($it->remark): ?><br><span style="font-size:9px;">Reason: <?= $e($it->remark) ?></span><?php endif; ?>
             </td>
             <td class="ctr"><?= (int)$it->qty ?></td>
             <td class="num"><?= $fm($it->unitprice / $rate) ?></td>
@@ -87,20 +107,20 @@ $e  = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); 
         <?php endforeach; ?>
         <tr><td colspan="4">Total Value (excluding VAT)</td><td class="num"><?= $fm($cn->subtotal) ?></td></tr>
         <tr><td colspan="4">VAT Amount @ <?= (float)$cn->vat_rate ?>%</td><td class="num"><?= $fm($cn->vatamount) ?></td></tr>
-        <tr><td colspan="4" style="font-weight:bold; font-size:10.5px;">Total Credit including VAT</td>
-            <td class="num" style="font-weight:bold; font-size:10.5px;"><?= $fm($cn->totalamount) ?></td></tr>
+        <tr><td colspan="4" style="font-weight:bold; font-size:11px;">Total Credit including VAT</td>
+            <td class="num" style="font-weight:bold; font-size:11px;"><?= $fm($cn->totalamount) ?></td></tr>
     </table>
 
     <table width="100%">
         <tr>
             <td class="box" style="width:49%; height:70px;">
                 <div style="font-weight:bold;">Customer Acknowledgment</div>
-                <div style="margin-top:36px; border-top:1px solid #D0111B; text-align:center; font-size:8.5px; padding-top:2px;">Signature</div>
+                <div style="margin-top:36px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
             </td>
             <td class="gap"></td>
             <td class="box" style="width:49%; height:70px;">
                 <div style="font-weight:bold;">Authorized Signature</div>
-                <div style="margin-top:36px; border-top:1px solid #D0111B; text-align:center; font-size:8.5px; padding-top:2px;">Signature</div>
+                <div style="margin-top:36px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
             </td>
         </tr>
     </table>

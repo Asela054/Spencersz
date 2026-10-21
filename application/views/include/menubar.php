@@ -318,6 +318,14 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			</a>
 			<?php } ?>
 
+            <!-- Tax & Accounts Reports  -->
+			<?php if(in_array("Accountreport", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Accountreport'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-file"></i></div>
+				<span>Tax & Accounts Reports </span>
+			</a>
+			<?php } ?>
+
 			<!-- Tax Control Menu New Added -->
 			<?php if(in_array("Taxcontrol", $permissionallowed)){ ?>
 			<a class="nav-link" href="<?php echo base_url().'Taxcontrol'; ?>">
