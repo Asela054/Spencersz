@@ -1,18 +1,7 @@
 <?php
 class PorderPrintinfo extends CI_Model{
 
-    private $logoPath    = 'images/logo.jpeg';
-    private $faviconPath = 'images/favicon.jpeg';
-
-    private function imgData($relativePath){
-        $full = FCPATH . ltrim($relativePath, '/');
-        if (!is_file($full)) {
-            return '';
-        }
-        $ext  = strtolower(pathinfo($full, PATHINFO_EXTENSION));
-        $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
-        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($full));
-    }
+    private $rowsPerPage = 14;   // item rows per A4 page (blank rows pad the table)
 
     public function Printinvoice($x){
         $recordID = (int)$x;
@@ -48,11 +37,6 @@ class PorderPrintinfo extends CI_Model{
         $companydetails = $this->db->get();
         $co = $companydetails->row();
 
-        $dots = '...................................';
-        $preparedByName   = !empty($co->preparedByName)   ? htmlspecialchars($co->preparedByName)   : $dots;
-        $authorizedByName = !empty($co->authorizedByName) ? htmlspecialchars($co->authorizedByName) : $dots;
-        $contactNo = $dots;
-
         $net = (float)$po->nettotal;
 
         $respond2 = $this->db->query(
@@ -69,193 +53,245 @@ class PorderPrintinfo extends CI_Model{
             array($recordID)
         );
 
-        $remarkFeild = trim((string)$po->remark);
-        $supplierId  = (int)$po->tbl_supplier_idtbl_supplier;
+        $remark     = trim((string)$po->remark);
+        $supplierId = (int)$po->tbl_supplier_idtbl_supplier;
 
-        // Supplier address lines
-        $addr = array();
-        foreach (array($po->address_line1, $po->address_line2, $po->city) as $part) {
-            $part = trim((string)$part);
-            if ($part !== '') { $addr[] = htmlspecialchars($part); }
+        // Supplier name (supplier 65 = one-time supplier, name is typed in the remark)
+        $supName = array($po->suppliername);
+        if ($supplierId == 65 && $remark !== '') {
+            $supName[] = $remark;
         }
-        $tp = (strlen((string)$po->telephone_no) >= 9) ? htmlspecialchars($po->telephone_no) : '';
+        $supAddr = array($po->address_line1, $po->address_line2, $po->city);
+        $tp = (strlen((string)$po->telephone_no) >= 9) ? $po->telephone_no : '';
 
-        $logo    = $this->imgData($this->logoPath);
-        $favicon = $this->imgData($this->faviconPath);
+        $coTel = trim($co->companymobile . ' / ' . $co->companyphone, ' /');
 
-        $red     = '#c8102e';
-        $darkred = '#8a0c20';
-
-        $html = '<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Purchase Order - ' . htmlspecialchars((string)$po->porder_no) . '</title>
-<style>
-    @page { size: A4 portrait; margin: 130px 32px 120px 32px; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; margin: 0; }
-
-    header { position: fixed; top: -130px; left: -32px; right: -32px; height: 100px; }
-    footer { position: fixed; bottom: -120px; left: 0; right: 0; height: 110px; }
-
-    .watermark-wrap { position: fixed; top: 290px; left: 0; right: 0; text-align: center; }
-    .watermark { width: 250px; opacity: 0.06; }
-
-    .box-title { background: ' . $red . '; color: #fff; font-weight: bold; font-size: 10px;
-                 letter-spacing: 1px; padding: 5px 10px; text-transform: uppercase; }
-    .box-body  { border: 1px solid #e3c4ca; border-top: none; padding: 8px 10px; line-height: 1.55; }
-
-    table.items { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 16px; }
-    table.items th { background: ' . $darkred . '; color: #fff; font-size: 10px; text-transform: uppercase;
-                     letter-spacing: .5px; padding: 8px 6px; border: 1px solid ' . $darkred . '; }
-    table.items td { padding: 7px 6px; border-bottom: 1px solid #ead5d9; font-size: 11px; vertical-align: top; }
-    table.items tr.alt td { background: #fbf1f3; }
-    table.items thead { display: table-header-group; }
-    table.items tr { page-break-inside: avoid; }
-
-    table.totals { border-collapse: collapse; width: 100%; }
-    table.totals td { padding: 7px 10px; font-size: 11px; }
-    .grand td { background: ' . $red . '; color: #fff; font-weight: bold; font-size: 13px; }
-
-    .pagenum:before { content: counter(page); }
-    .sig-line { border-top: 1px solid #555; padding-top: 4px; font-size: 10px; text-align: center; color: #444; }
-</style>
-</head>
-<body>';
-
-        if ($favicon !== '') {
-            $html .= '<div class="watermark-wrap"><img class="watermark" src="' . $favicon . '"></div>';
+        $pages = array_chunk($respond2->result(), $this->rowsPerPage);
+        if (empty($pages)) {
+            $pages = array(array());
         }
+        $totalPages = count($pages);
+        $body = '';
 
-        // ---------- HEADER (repeats on every page) ----------
-        $html .= '
-<header>
-    <table style="width:100%;border-collapse:collapse;background:' . $red . ';">
-        <tr>
-            <td style="width:55%;padding:0;">'
-            . ($logo !== '' ? '<img src="' . $logo . '" style="height:100px;">' : '<span style="color:#fff;font-size:20px;font-weight:bold;padding:20px;">' . htmlspecialchars((string)$co->companyname) . '</span>') .
-            '</td>
-            <td style="width:45%;text-align:right;padding:0 38px 0 0;color:#fff;vertical-align:middle;">
-                <div style="font-size:24px;font-weight:bold;letter-spacing:2px;">PURCHASE ORDER</div>
-                <div style="font-size:12px;margin-top:4px;">No: ' . htmlspecialchars((string)$po->porder_no) . '</div>
-            </td>
-        </tr>
-    </table>
-    <div style="height:5px;background:' . $darkred . ';"></div>
-</header>';
+        foreach ($pages as $index => $lines) {
+            $isLast = ($index == $totalPages - 1);
 
-        // ---------- FOOTER (repeats on every page) ----------
-        $html .= '<footer>';
-        if ($supplierId != 65 && $remarkFeild !== '') {
-            $html .= '<div style="font-size:10px;font-weight:bold;margin-bottom:6px;color:' . $darkred . ';">Remark: ' . htmlspecialchars($remarkFeild) . '</div>';
-        }
-        $html .= '
-    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-        <tr>
-            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $preparedByName . '</div><div class="sig-line">Prepared by</div></td>
-            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $authorizedByName . '</div><div class="sig-line">Authorized by</div></td>
-            <td style="width:30%;padding:0 10px;"><div style="height:22px;text-align:center;font-size:10px;">' . $contactNo . '</div><div class="sig-line">Contact No</div></td>
-        </tr>
-    </table>
-    <div style="margin-top:8px;border-top:2px solid ' . $red . ';padding-top:5px;font-size:9px;color:#666;text-align:center;">
-        This is a computer-generated document. No signature is required. &nbsp;|&nbsp; Page <span class="pagenum"></span>
-    </div>
-</footer>';
+            $p  = $this->lq_head('PURCHASE ORDER', $co->companyname, $co->companyaddress,
+                          array('Tel: ' . $coTel, 'E-Mail: ' . $co->companyemail));
 
-        // ---------- INFO BOXES ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-<tr>
-    <td style="width:49%;vertical-align:top;padding:0;">
-        <div class="box-title">Supplier</div>
-        <div class="box-body">
-            <div style="font-size:13px;font-weight:bold;">' . htmlspecialchars((string)$po->suppliername) . '</div>';
-        if ($supplierId == 65 && $remarkFeild !== '') {
-            $html .= '<div style="font-weight:bold;">' . htmlspecialchars($remarkFeild) . '</div>';
-        }
-        foreach ($addr as $line) {
-            $html .= '<div>' . $line . '</div>';
-        }
-        if ($tp !== '') {
-            $html .= '<div>Tel: ' . $tp . '</div>';
-        }
-        $html .= '<div style="margin-top:6px;">Attn: ..............................................</div>
-        </div>
-    </td>
-    <td style="width:2%;"></td>
-    <td style="width:49%;vertical-align:top;padding:0;">
-        <div class="box-title">Order Details</div>
-        <div class="box-body">
-            <div style="font-size:12px;font-weight:bold;text-transform:uppercase;">' . htmlspecialchars((string)$co->companyname) . '</div>
-            <div style="text-transform:uppercase;">' . htmlspecialchars((string)$co->companyaddress) . '</div>
-            <div>Phone: ' . htmlspecialchars((string)$co->companymobile) . ' / ' . htmlspecialchars((string)$co->companyphone) . '</div>
-            <div>E-Mail: ' . htmlspecialchars((string)$co->companyemail) . '</div>
-            <div style="margin-top:4px;"><b>PO No:</b> ' . htmlspecialchars((string)$po->porder_no) . '</div>
-            <div><b>Date:</b> ' . htmlspecialchars((string)$po->orderdate) . '</div>'
-            . ($company_id == 1 ? '<div><b>Our VAT No:</b> 103305667-7000</div>' : '') . '
-        </div>
-    </td>
-</tr>
-</table>';
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(array('PO No', $po->porder_no))),
+                $this->lq_kv(array(array('Date', $po->orderdate)))
+            ));
+            $p .= $this->lq_sp(6);
 
-        // ---------- ITEMS TABLE ----------
-        $html .= '
-<table class="items">
-    <thead>
-        <tr>
-            <th style="width:6%;">#</th>
-            <th style="width:13%;">Code</th>
-            <th style="width:33%;text-align:left;">Item Description</th>
-            <th style="width:9%;">Qty</th>
-            <th style="width:9%;">UOM</th>
-            <th style="width:15%;text-align:right;">Unit Price</th>
-            <th style="width:15%;text-align:right;">Total</th>
-        </tr>
-    </thead>
-    <tbody>';
-
-        $i = 0;
-        foreach ($respond2->result() as $rowlist) {
-            $i++;
-            $desc = (string)$rowlist->product_name;
-            if (trim((string)$rowlist->comment) !== '') {
-                $desc .= ' - ' . $rowlist->comment;
+            $rightPairs = array(
+                array('Purchaser Name', $co->companyname),
+                array('Address', $co->companyaddress),
+                array('Telephone No.', $coTel)
+            );
+            if ($company_id == 1) {
+                $rightPairs[] = array('Our VAT No', '103305667-7000');
             }
-            $html .= '<tr class="' . ($i % 2 == 0 ? 'alt' : '') . '">
-                <td style="text-align:center;color:#888;">' . $i . '</td>
-                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->product_code) . '</td>
-                <td>' . htmlspecialchars($desc) . '</td>
-                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->qty) . '</td>
-                <td style="text-align:center;">' . htmlspecialchars((string)$rowlist->measure_type) . '</td>
-                <td style="text-align:right;">' . number_format((float)$rowlist->unitprice, 2) . '</td>
-                <td style="text-align:right;font-weight:bold;">' . number_format((float)$rowlist->netprice, 2) . '</td>
-            </tr>';
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(
+                    array('Supplier Name', $supName),
+                    array('Address', $supAddr),
+                    array('Telephone No.', $tp),
+                    array('Attn', '....................................')
+                )),
+                $this->lq_kv($rightPairs)
+            ));
+            $p .= $this->lq_sp(8);
+
+            $p .= '<table class="items">
+                <thead><tr>
+                    <th style="width:5%;">#</th>
+                    <th style="width:14%;">Item Code</th>
+                    <th style="width:35%;text-align:left;">Description of Goods</th>
+                    <th style="width:8%;">Qty</th>
+                    <th style="width:8%;">UOM</th>
+                    <th style="width:14%;">Unit Price</th>
+                    <th style="width:16%;">Amount (Rs.)</th>
+                </tr></thead><tbody>';
+
+            $n = $index * $this->rowsPerPage;
+            foreach ($lines as $r) {
+                $n++;
+                $desc = (string)$r->product_name;
+                if (trim((string)$r->comment) !== '') {
+                    $desc .= ' - ' . $r->comment;
+                }
+                $p .= '<tr>
+                    <td style="text-align:center;">' . $n . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($r->product_code) . '</td>
+                    <td>' . $this->lq_e($desc) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($r->qty) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($r->measure_type) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$r->unitprice, 2) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$r->netprice, 2) . '</td>
+                </tr>';
+            }
+            $p .= $this->lq_pad_rows(count($lines), $this->rowsPerPage, 7);
+            $p .= '</tbody></table>';
+
+            if ($isLast) {
+                $p .= $this->lq_totals(array(
+                    array('Total (Excl)', number_format($net, 2)),
+                    array('Tax', ''),
+                    array('Total (Incl)', number_format($net, 2), true)
+                ), 16);
+
+                if ($supplierId != 65 && $remark !== '') {
+                    $p .= $this->lq_sp(6);
+                    $p .= $this->lq_boxes(array($this->lq_kv(array(array('Remark', $remark)))));
+                }
+
+                $p .= $this->lq_sp(8);
+                $p .= $this->lq_sign(array(
+                    array('Prepared by', $co->preparedByName, 'Signature'),
+                    array('Authorized by', $co->authorizedByName, 'Signature'),
+                    array('Contact No', '', '')
+                ));
+            } else {
+                $p .= '<div class="cont">Continued on next page...</div>';
+            }
+
+            $body .= $this->lq_page($p, $isLast, $index + 1, $totalPages);
         }
 
-        $html .= '</tbody></table>';
-
-        // ---------- TOTALS (once, after last item) ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;margin-top:14px;page-break-inside:avoid;">
-<tr>
-    <td style="width:58%;"></td>
-    <td style="width:42%;">
-        <table class="totals">
-            <tr><td style="border-bottom:1px solid #ead5d9;">Total (Excl)</td><td style="text-align:right;border-bottom:1px solid #ead5d9;">' . number_format($net, 2) . '</td></tr>
-            <tr><td style="border-bottom:1px solid #ead5d9;">Tax</td><td style="text-align:right;border-bottom:1px solid #ead5d9;">&nbsp;</td></tr>
-            <tr class="grand"><td>Total (Incl)</td><td style="text-align:right;">' . number_format($net, 2) . '</td></tr>
-        </table>
-    </td>
-</tr>
-</table>';
-
-        $html .= '</body></html>';
+        $html = $this->lq_doc('Purchase Order - ' . $po->porder_no, $body);
 
         $this->load->library('pdf');
         $this->pdf->setPaper('A4', 'portrait');
         $this->pdf->loadHtml($html);
         $this->pdf->render();
-        $this->pdf->stream("MULTI OFFSET PRINTERS-PURCHASE ORDER- " . $recordID . ".pdf", array("Attachment" => 0));
+        $this->pdf->stream($this->lq_filename(strtoupper($co->companyname) . ' - PURCHASE ORDER - ' . $po->porder_no) . '.pdf', array("Attachment" => 0));
     }
 
+    /* ================= LQ-310 print design helpers (black and white, A4 portrait) ================= */
+
+    private function lq_e($v){
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+
+    private function lq_val($v){
+        if (is_array($v)) {
+            $lines = array();
+            foreach ($v as $line) {
+                $line = trim((string)$line);
+                if ($line !== '') { $lines[] = $this->lq_e($line); }
+            }
+            return empty($lines) ? '&nbsp;' : implode('<br>', $lines);
+        }
+        $v = trim((string)$v);
+        return $v === '' ? '&nbsp;' : $this->lq_e($v);
+    }
+
+    private function lq_css(){
+        return '
+@page { size: A4 portrait; margin: 8mm; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10px; color: #000; margin: 0; line-height: 1.3; }
+table { border-collapse: collapse; width: 100%; }
+.title { border-top: 2px solid #000; border-bottom: 2px solid #000; text-align: center; font-size: 20px; font-weight: bold; letter-spacing: 3px; padding: 5px 0; }
+.co { text-align: center; padding: 8px 0; line-height: 1.45; }
+.coname { font-size: 14px; font-weight: bold; }
+table.outer { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: 100%; }
+td.half { border: 1px solid #000; padding: 3px 6px; vertical-align: top; }
+table.kv { table-layout: fixed; }
+table.kv td { border: none; padding: 2px 0; vertical-align: top; }
+table.kv td.k { width: 34%; font-weight: bold; }
+table.kv td.c { width: 4%; }
+table.items { table-layout: fixed; }
+table.items th { border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; }
+table.items td { border: 1px solid #000; padding: 2px 5px; font-size: 10px; height: 19px; vertical-align: middle; }
+table.items tr { page-break-inside: avoid; }
+table.tot { table-layout: fixed; }
+table.tot td { border: 1px solid #000; padding: 3px 6px; font-size: 10px; }
+table.tot td.n { text-align: right; }
+table.tot tr.b td { font-weight: bold; font-size: 11px; }
+.sigline { border-top: 1px solid #000; text-align: center; font-size: 9px; padding-top: 2px; }
+.sp { font-size: 1px; line-height: 1px; }
+.pg { text-align: right; font-size: 9px; margin-top: 4px; }
+.cont { text-align: right; font-size: 10px; font-weight: bold; margin-top: 6px; }
+.section { font-size: 11px; font-weight: bold; margin: 0 0 4px 0; }';
+    }
+
+    private function lq_head($title, $companyName, $address, $contactLines = array()){
+        $h  = '<div class="title">' . $this->lq_e($title) . '</div>';
+        $h .= '<div class="co"><div class="coname">' . $this->lq_e($companyName) . '</div>';
+        if (trim((string)$address) !== '') { $h .= '<div>' . $this->lq_e($address) . '</div>'; }
+        foreach ($contactLines as $l) {
+            if (trim((string)$l) !== '') { $h .= '<div>' . $this->lq_e($l) . '</div>'; }
+        }
+        return $h . '</div>';
+    }
+
+    private function lq_kv($pairs){
+        $h = '<table class="kv">';
+        foreach ($pairs as $p) {
+            $h .= '<tr><td class="k">' . $this->lq_e($p[0]) . '</td><td class="c">:</td><td>' . $this->lq_val($p[1]) . '</td></tr>';
+        }
+        return $h . '</table>';
+    }
+
+    private function lq_boxes($cells){
+        $n   = count($cells);
+        $gap = 2;
+        $w   = (100 - $gap * ($n - 1)) / $n;
+        $h   = '<table class="outer"><tr>';
+        foreach ($cells as $i => $c) {
+            if ($i > 0) { $h .= '<td style="width:' . $gap . '%;"></td>'; }
+            $h .= '<td class="half" style="width:' . $w . '%;">' . $c . '</td>';
+        }
+        return $h . '</tr></table>';
+    }
+
+    private function lq_sp($px = 6){
+        return '<div class="sp" style="height:' . (int)$px . 'px;">&nbsp;</div>';
+    }
+
+    private function lq_pad_rows($used, $perPage, $cols){
+        $h = '';
+        for ($k = $used; $k < $perPage; $k++) {
+            $h .= '<tr>' . str_repeat('<td>&nbsp;</td>', $cols) . '</tr>';
+        }
+        return $h;
+    }
+
+    private function lq_totals($rows, $amountWidth = 22){
+        $h = '<table class="tot">';
+        foreach ($rows as $r) {
+            $bold = !empty($r[2]);
+            $h .= '<tr' . ($bold ? ' class="b"' : '') . '><td style="width:' . (100 - $amountWidth) . '%;">' . $this->lq_e($r[0]) . '</td>'
+                . '<td class="n" style="width:' . $amountWidth . '%;">' . $this->lq_e($r[1]) . '</td></tr>';
+        }
+        return $h . '</table>';
+    }
+
+    private function lq_sign($items){
+        $cells = array();
+        foreach ($items as $it) {
+            $name    = isset($it[1]) ? trim((string)$it[1]) : '';
+            $caption = isset($it[2]) ? $it[2] : 'Signature';
+            $cells[] = '<b>' . $this->lq_e($it[0]) . '</b>'
+                . '<div style="height:38px;text-align:center;padding-top:22px;">' . ($name !== '' ? $this->lq_e($name) : '&nbsp;') . '</div>'
+                . '<div class="sigline">' . ($caption !== '' ? $this->lq_e($caption) : '&nbsp;') . '</div>';
+        }
+        return $this->lq_boxes($cells);
+    }
+
+    private function lq_page($inner, $isLast, $pageNo, $total){
+        return '<div' . ($isLast ? '' : ' style="page-break-after:always;"') . '>' . $inner
+            . '<div class="pg">Page ' . (int)$pageNo . ' of ' . (int)$total . '</div></div>';
+    }
+
+    private function lq_doc($title, $body){
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
+            . $this->lq_css() . '</style></head><body>' . $body . '</body></html>';
+    }
+
+    private function lq_filename($s){
+        return trim(preg_replace('/[^A-Za-z0-9 _.\-]+/', '-', $s));
+    }
 }
