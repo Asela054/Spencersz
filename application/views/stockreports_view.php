@@ -112,7 +112,7 @@ $defBranch = (int)(isset($_SESSION['branch_id']) ? $_SESSION['branch_id'] : 0);
 							<?php } ?>
 
 							<div class="col mb-2 text-md-right">
-								<button type="button" id="btnRun" class="btn sx-go"><i class="fas fa-sync-alt mr-1"></i> Run report</button>
+								<button type="button" id="btnRun" class="btn sx-go"><i class="fas fa-sync-alt mr-1"></i> Run</button>
 							</div>
 						</div>
 					</div>

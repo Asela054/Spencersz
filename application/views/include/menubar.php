@@ -264,21 +264,16 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 
 
 			<!-- Report Menu New Added -->
-			<?php if(in_array("Stocklistreport", $permissionallowed) || in_array("Stockcard", $permissionallowed) || in_array("Reorderstockreport", $permissionallowed) || in_array("Stocktransferreport", $permissionallowed) || in_array("Deadstockreport", $permissionallowed) || in_array("Stockvaluationreport", $permissionallowed)){ ?>
-			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse" data-target="#collapseStockRpt" aria-expanded="false" aria-controls="collapseStockRpt">
+			<?php
+			$stockRptPages = ['Stocklistreport','Stockcard','Reorderstockreport','Stocktransferreport','Deadstockreport','Stockvaluationreport'];
+			$stockRptEntry = '';
+			foreach ($stockRptPages as $p) {
+				if (in_array($p, $permissionallowed)) { $stockRptEntry = $p; break; }
+			}
+			if ($stockRptEntry !== '') { ?>
+			<a class="nav-link <?php echo in_array($functionmenu, $stockRptPages) ? 'active' : ''; ?>" href="<?php echo base_url() . $stockRptEntry; ?>">
 				<div class="nav-link-icon"><i class="fas fa-chart-bar"></i></div><span>Stock Reports</span>
-				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if(in_array($functionmenu, ['Stocklistreport','Stockcard','Reorderstockreport','Stocktransferreport','Deadstockreport','Stockvaluationreport'])){echo 'show';} ?>" id="collapseStockRpt" data-parent="#accordionSidenav">
-				<nav class="sidenav-menu-nested nav accordion">
-					<?php if(in_array("Stocklistreport", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Stocklistreport'; ?>">Current Stock</a><?php } ?>
-					<?php if(in_array("Stockcard", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Stockcard'; ?>">Stock Card</a><?php } ?>
-					<?php if(in_array("Reorderstockreport", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Reorderstockreport'; ?>">Low Stock &amp; Reorder</a><?php } ?>
-					<?php if(in_array("Stocktransferreport", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Stocktransferreport'; ?>">Stock Transfers</a><?php } ?>
-					<?php if(in_array("Deadstockreport", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Deadstockreport'; ?>">Dead / Slow Moving</a><?php } ?>
-					<?php if(in_array("Stockvaluationreport", $permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Stockvaluationreport'; ?>">Valuation</a><?php } ?>
-				</nav>
-			</div>
 			<?php } ?>
 
 			<?php if(in_array("Serialhistory",$permissionallowed) || in_array("Serialstock",$permissionallowed) || in_array("Soldserial",$permissionallowed)){ ?>
@@ -293,6 +288,26 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php if(in_array("Soldserial",$permissionallowed)){ ?><a class="nav-link" href="<?php echo base_url().'Soldserial'; ?>">Sold Serial Lookup</a><?php } ?>
 				</nav>
 			</div>
+			<?php } ?>
+
+			<?php
+			$purchRptPages = ['Purchasereport','Postatusreport','Grnreturnreport'];
+			$purchRptEntry = '';
+			foreach ($purchRptPages as $p) {
+				if (in_array($p, $permissionallowed)) { $purchRptEntry = $p; break; }
+			}
+			if ($purchRptEntry !== '') { ?>
+			<a class="nav-link <?php echo in_array($functionmenu, $purchRptPages) ? 'active' : ''; ?>" href="<?php echo base_url() . $purchRptEntry; ?>">
+				<div class="nav-link-icon"><i class="fas fa-shopping-basket"></i></div><span>Purchasing Reports</span>
+			</a>
+			<?php } ?>
+
+			<!-- Reservationreport -->
+			<?php if(in_array("Reservationreport", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Reservationreport'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-calendar-check"></i></div>
+				<span>Reservation Report</span>
+			</a>
 			<?php } ?>
 
             <!-- Sales Report -->
