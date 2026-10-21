@@ -1,154 +1,11 @@
 <?php
-use Dompdf\Dompdf;
-use Dompdf\Options;
-
 class PdfGRNinfo extends CI_Model {
 
-    // Image paths are relative to FCPATH
-    private $logoPath    = 'images/logo.jpeg';
-    private $faviconPath = 'images/favicon.jpeg';
-
-    private $red  = '#c8102e';
-    private $dark = '#2b2b2b';
+    private $rowsPerPage        = 14;  // GRN item rows per A4 page
+    private $voucherRowsPerPage = 9;   // voucher item rows per page (leaves room for the importation split)
 
     /* ------------------------------------------------------------------
-     * Shared helpers  (GRN style: white header, info strip, boxed signatures)
-     * ------------------------------------------------------------------ */
-    private function e($v){
-        return htmlspecialchars((string)$v);
-    }
-
-    private function imgData($relativePath){
-        $full = FCPATH . ltrim($relativePath, '/');
-        if (!is_file($full)) {
-            return '';
-        }
-        $ext  = strtolower(pathinfo($full, PATHINFO_EXTENSION));
-        $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
-        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($full));
-    }
-
-    private function addressLines($parts){
-        $out = array();
-        foreach ($parts as $p) {
-            $p = trim((string)$p);
-            if ($p !== '') { $out[] = $this->e($p); }
-        }
-        return $out;
-    }
-
-    private function css($wmTop){
-        $r = $this->red;
-        $d = $this->dark;
-        return '
-    @page { size: A4; margin: 118px 32px 125px 32px; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; margin: 0; }
-
-    header { position: fixed; top: -118px; left: 0; right: 0; height: 100px; }
-    footer { position: fixed; bottom: -125px; left: 0; right: 0; height: 115px; }
-
-    .watermark-wrap { position: fixed; top: ' . $wmTop . 'px; left: 0; right: 0; text-align: center; }
-    .watermark { width: 250px; opacity: 0.05; }
-
-    .lbl { font-size: 8px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-    .val { font-size: 12px; font-weight: bold; color: ' . $d . '; margin-top: 2px; }
-
-    table.strip { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 4px; }
-    table.strip td { background: #f5f5f5; border-top: 3px solid ' . $r . '; padding: 8px 10px; vertical-align: top; }
-
-    .party { border-left: 3px solid ' . $r . '; padding-left: 10px; line-height: 1.55; }
-    .party .name { font-size: 13px; font-weight: bold; color: ' . $d . '; }
-    .tag { font-size: 9px; font-weight: bold; color: ' . $r . '; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3px; }
-
-    table.items { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 18px; }
-    table.items th { background: #f4f4f4; color: ' . $d . '; font-size: 9px; text-transform: uppercase; letter-spacing: .5px;
-                     padding: 8px 5px; border-top: 1px solid #ddd; border-bottom: 2px solid ' . $r . '; }
-    table.items td { padding: 7px 5px; border-bottom: 1px solid #e5e5e5; font-size: 11px; vertical-align: top; }
-    table.items td.recv { background: #fdeef0; font-weight: bold; text-align: center; }
-    table.items thead { display: table-header-group; }
-    table.items tr { page-break-inside: avoid; }
-
-    table.totals { border-collapse: collapse; width: 100%; }
-    table.totals td { padding: 7px 10px; font-size: 11px; border-bottom: 1px solid #e5e5e5; }
-    table.totals tr.grand td { background: ' . $d . '; color: #fff; font-weight: bold; font-size: 13px; border-bottom: none; }
-
-    .note { border: 1px dashed #bbb; padding: 8px 10px; line-height: 1.5; }
-    .section-title { margin-top: 20px; font-size: 12px; font-weight: bold; color: ' . $d . ';
-                     border-left: 4px solid ' . $r . '; padding-left: 8px; }
-
-    table.sign { width: 100%; border-collapse: separate; border-spacing: 8px 0; table-layout: fixed; }
-    table.sign td { border: 1px solid #bbb; height: 62px; vertical-align: top; padding: 5px 8px; }
-    .pagenum:before { content: counter(page); }';
-    }
-
-    private function headerHtml($title, $badgeLabel, $badgeValue, $companyName){
-        $logo = $this->imgData($this->logoPath);
-        $left = ($logo !== '')
-            ? '<img src="' . $logo . '" style="height:70px;">'
-            : '<span style="font-size:18px;font-weight:bold;color:' . $this->red . ';">' . $this->e($companyName) . '</span>';
-
-        return '
-<header>
-    <table style="width:100%;border-collapse:collapse;">
-        <tr>
-            <td style="width:40%;vertical-align:middle;padding:0;">' . $left . '</td>
-            <td style="width:60%;text-align:right;vertical-align:middle;padding:0;">
-                <div style="font-size:24px;font-weight:bold;letter-spacing:1px;color:' . $this->dark . ';">' . $this->e($title) . '</div>
-                <div style="margin-top:6px;">
-                    <span style="background:' . $this->dark . ';color:#fff;font-size:11px;font-weight:bold;padding:4px 12px;letter-spacing:1px;">'
-                    . $this->e($badgeLabel) . ' &nbsp;' . $this->e($badgeValue) . '</span>
-                </div>
-            </td>
-        </tr>
-    </table>
-    <div style="height:3px;background:' . $this->red . ';margin-top:8px;"></div>
-    <div style="height:1px;background:#ddd;margin-top:2px;"></div>
-</header>';
-    }
-
-    private function watermarkHtml(){
-        $fav = $this->imgData($this->faviconPath);
-        if ($fav === '') {
-            return '';
-        }
-        return '<div class="watermark-wrap"><img class="watermark" src="' . $fav . '"></div>';
-    }
-
-    private function signatureFooter($labels){
-        $cells = '';
-        foreach ($labels as $l) {
-            $cells .= '<td><div class="lbl">' . $this->e($l) . '</div>
-                <div style="margin-top:34px;font-size:8px;color:#aaa;">Name / Signature / Date</div></td>';
-        }
-        return '
-<footer>
-    <table class="sign"><tr>' . $cells . '</tr></table>
-    <div style="margin-top:8px;font-size:9px;color:#777;text-align:center;">
-        This is a computer-generated document &nbsp;&bull;&nbsp; Page <span class="pagenum"></span>
-    </div>
-</footer>';
-    }
-
-    // $cells = array(array('LABEL','value'), ...)
-    private function infoStrip($cells){
-        $w = floor(100 / count($cells));
-        $html = '<table class="strip"><tr>';
-        foreach ($cells as $c) {
-            $html .= '<td style="width:' . $w . '%;"><div class="lbl">' . $this->e($c[0]) . '</div><div class="val">' . ($c[1] !== '' ? $this->e($c[1]) : '&nbsp;') . '</div></td>';
-        }
-        return $html . '</tr></table>';
-    }
-
-    private function partyBlock($tag, $name, $lines){
-        $h = '<div class="party"><div class="tag">' . $this->e($tag) . '</div><div class="name">' . $name . '</div>';
-        foreach ($lines as $l) {
-            $h .= '<div>' . $l . '</div>';
-        }
-        return $h . '</div>';
-    }
-
-    /* ------------------------------------------------------------------
-     * GOODS RECEIVED NOTE  (A4 landscape)
+     * GOODS RECEIVED NOTE  (A4 portrait, black and white)
      * ------------------------------------------------------------------ */
     public function pdfgrnget($x) {
         $recordID = $x;
@@ -211,10 +68,10 @@ class PdfGRNinfo extends CI_Model {
 
         $q = $query->row();
 
-        $remarkFeild = $q->remark;
-        $totalSum    = $q->grn_subtotal;
-        $grn_total   = $q->grn_total;
-        $grn_vat     = $q->vatamount;
+        $remark    = trim((string)$q->remark);
+        $totalSum  = $q->grn_subtotal;
+        $grn_total = $q->grn_total;
+        $grn_vat   = $q->vatamount;
 
         $this->db->select('tbl_company.company AS companyname,tbl_company.address1 As companyaddress,tbl_company.mobile AS companymobile, tbl_company.phone companyphone,tbl_company.email AS companyemail, tbl_company_branch.branch AS branchname');
         $this->db->from('tbl_grn');
@@ -225,138 +82,100 @@ class PdfGRNinfo extends CI_Model {
         $co = $companydetails->row();
 
         $grnNo = $q->grn_no;
+        $coTel = trim($co->companymobile . ' / ' . $co->companyphone, ' /');
 
-        $supplierAddr = $this->addressLines(array(
-            $q->delivery_address_line1,
-            $q->delivery_address_line2,
-            $q->delivery_city,
-            $q->delivery_state
-        ));
-        $companyLines = array(
-            '<span style="text-transform:uppercase;">' . $this->e($co->companyaddress) . '</span>',
-            'Phone: ' . $this->e($co->companymobile) . ' / ' . $this->e($co->companyphone),
-            'E-Mail: ' . $this->e($co->companyemail)
-        );
+        $supplierAddr = array($q->delivery_address_line1, $q->delivery_address_line2, $q->delivery_city, $q->delivery_state);
 
-        $html = '<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Goods Received Note - ' . $this->e($grnNo) . '</title>
-<style>' . $this->css(135) . '</style>
-</head>
-<body>';
-
-        $html .= $this->watermarkHtml();
-        $html .= $this->headerHtml('GOODS RECEIVED NOTE', 'GRN NO', $grnNo, $co->companyname);
-        $html .= $this->signatureFooter(array('Received by', 'Approved by', 'Accountant'));
-
-        // ---------- INFO STRIP ----------
-        $html .= $this->infoStrip(array(
-            array('GRN No',      $grnNo),
-            array('GRN Date',    $q->grndate),
-            array('Invoice No',  $q->invoicenum),
-            array('PO No',       $q->porder_no),
-            array('Batch No',    $q->batchno)
-        ));
-
-        // ---------- PARTIES ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:16px;">
-<tr>
-    <td style="width:48%;vertical-align:top;padding:0;">'
-        . $this->partyBlock('Received from', $this->e($q->suppliername), $supplierAddr) . '
-    </td>
-    <td style="width:4%;"></td>
-    <td style="width:48%;vertical-align:top;padding:0;">'
-        . $this->partyBlock('Received at', $this->e($co->companyname), $companyLines) . '
-    </td>
-</tr>
-</table>';
-
-        // ---------- ITEMS ----------
-        $html .= '
-<table class="items">
-    <thead>
-        <tr>
-            <th rowspan="2" style="width:4%;">#</th>
-            <th rowspan="2" style="width:13%;text-align:left;">Item Code</th>
-            <th rowspan="2" style="width:31%;text-align:left;">Item Description</th>
-            <th colspan="3">Quantity</th>
-            <th rowspan="2" style="width:7%;">Unit</th>
-            <th rowspan="2" style="width:11%;text-align:right;">Price</th>
-            <th rowspan="2" style="width:12%;text-align:right;">Total</th>
-        </tr>
-        <tr>
-            <th style="width:7%;">Ordered</th>
-            <th style="width:7%;">Prev</th>
-            <th style="width:8%;">Received</th>
-        </tr>
-    </thead>
-    <tbody>';
-
-        $i = 0;
-        foreach ($query->result() as $rowlist) {
-            $i++;
-
-            if ($rowlist->idtbl_category == 4) {
-                $itemDescription = $rowlist->comment;
-            } else {
-                $itemDescription = $rowlist->product_name;
-                if (!empty($rowlist->product_code)) {
-                    $itemDescription .= ' / ' . $rowlist->product_code;
-                }
-            }
-            $price = !empty($rowlist->unitprice) ? $rowlist->unitprice : $rowlist->costunitprice;
-
-            $html .= '<tr>
-                <td style="text-align:center;color:#999;">' . $i . '</td>
-                <td>' . $this->e($rowlist->product_code) . '</td>
-                <td>' . $this->e($itemDescription) . '</td>
-                <td style="text-align:center;">' . $this->e((float)$rowlist->ordered_qty) . '</td>
-                <td style="text-align:center;">' . $this->e((float)$rowlist->prev_qty) . '</td>
-                <td class="recv">' . $this->e((float)$rowlist->qty) . '</td>
-                <td style="text-align:center;">' . $this->e($rowlist->unit) . '</td>
-                <td style="text-align:right;">' . number_format((float)$price, 2) . '</td>
-                <td style="text-align:right;font-weight:bold;">' . number_format((float)$rowlist->total, 2) . '</td>
-            </tr>';
+        $pages = array_chunk($query->result(), $this->rowsPerPage);
+        if (empty($pages)) {
+            $pages = array(array());
         }
-        $html .= '</tbody></table>';
+        $totalPages = count($pages);
+        $body = '';
 
-        // ---------- REMARK + TOTALS ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;margin-top:14px;page-break-inside:avoid;">
-<tr>
-    <td style="width:58%;vertical-align:top;padding-right:24px;">'
-        . (trim((string)$remarkFeild) !== ''
-            ? '<div class="lbl" style="margin-bottom:4px;">Remarks</div><div class="note">' . nl2br($this->e($remarkFeild)) . '</div>'
-            : '') . '
-    </td>
-    <td style="width:42%;vertical-align:top;">
-        <table class="totals">
-            <tr><td>Total (Excl)</td><td style="text-align:right;">' . number_format((float)$totalSum, 2) . '</td></tr>
-            <tr><td>VAT</td><td style="text-align:right;">' . number_format((float)$grn_vat, 2) . '</td></tr>
-            <tr class="grand"><td>Total (Incl)</td><td style="text-align:right;">' . number_format((float)$grn_total, 2) . '</td></tr>
-        </table>
-    </td>
-</tr>
-</table>';
+        foreach ($pages as $index => $lines) {
+            $isLast = ($index == $totalPages - 1);
 
-        $html .= '</body></html>';
+            $p  = $this->lq_head('GOODS RECEIVED NOTE', $co->companyname, $co->companyaddress,
+                          array('Tel: ' . $coTel, 'E-Mail: ' . $co->companyemail));
+
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(array('GRN No', $grnNo), array('GRN Date', $q->grndate), array('Batch No', $q->batchno))),
+                $this->lq_kv(array(array('Invoice No', $q->invoicenum), array('PO No', $q->porder_no)))
+            ));
+            $p .= $this->lq_sp(6);
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(array('Received from', $q->suppliername), array('Address', $supplierAddr))),
+                $this->lq_kv(array(array('Received at', $co->companyname), array('Address', $co->companyaddress), array('Telephone No.', $coTel)))
+            ));
+            $p .= $this->lq_sp(8);
+
+            $p .= '<table class="items">
+                <thead><tr>
+                    <th style="width:13%;">Item Code</th>
+                    <th style="width:29%;text-align:left;">Description of Goods</th>
+                    <th style="width:9%;">Ordered</th>
+                    <th style="width:8%;">Prev</th>
+                    <th style="width:9%;">Received</th>
+                    <th style="width:7%;">Unit</th>
+                    <th style="width:12%;">Price</th>
+                    <th style="width:13%;">Total</th>
+                </tr></thead><tbody>';
+
+            foreach ($lines as $r) {
+                $desc  = ($r->idtbl_category == 4) ? $r->comment : $r->product_name;
+                $price = !empty($r->unitprice) ? $r->unitprice : $r->costunitprice;
+
+                $p .= '<tr>
+                    <td>' . $this->lq_e($r->product_code) . '</td>
+                    <td>' . $this->lq_e($desc) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e((float)$r->ordered_qty) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e((float)$r->prev_qty) . '</td>
+                    <td style="text-align:center;font-weight:bold;">' . $this->lq_e((float)$r->qty) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($r->unit) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$price, 2) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$r->total, 2) . '</td>
+                </tr>';
+            }
+            $p .= $this->lq_pad_rows(count($lines), $this->rowsPerPage, 8);
+            $p .= '</tbody></table>';
+
+            if ($isLast) {
+                $p .= $this->lq_totals(array(
+                    array('Total (Excl)', number_format((float)$totalSum, 2)),
+                    array('VAT', number_format((float)$grn_vat, 2)),
+                    array('Total (Incl)', number_format((float)$grn_total, 2), true)
+                ), 13);
+
+                if ($remark !== '') {
+                    $p .= $this->lq_sp(6);
+                    $p .= $this->lq_boxes(array($this->lq_kv(array(array('Remarks', $remark)))));
+                }
+
+                $p .= $this->lq_sp(8);
+                $p .= $this->lq_sign(array(
+                    array('Received by', '', 'Signature'),
+                    array('Approved by', '', 'Signature'),
+                    array('Accountant', '', 'Signature')
+                ));
+            } else {
+                $p .= '<div class="cont">Continued on next page...</div>';
+            }
+
+            $body .= $this->lq_page($p, $isLast, $index + 1, $totalPages);
+        }
+
+        $html = $this->lq_doc('Goods Received Note - ' . $grnNo, $body);
 
         $this->load->library('pdf');
-
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'landscape');
-        $dompdf->render();
-        $dompdf->stream("Goods Received Note - " . $recordID . ".pdf", array("Attachment" => 0));
+        $this->pdf->setPaper('A4', 'portrait');
+        $this->pdf->loadHtml($html);
+        $this->pdf->render();
+        $this->pdf->stream($this->lq_filename('Goods Received Note - ' . $grnNo) . '.pdf', array("Attachment" => 0));
     }
 
     /* ------------------------------------------------------------------
-     * GOOD RECEIVE VOUCHER  (A4 portrait)
+     * GOOD RECEIVE VOUCHER  (A4 portrait, black and white)
      * ------------------------------------------------------------------ */
     public function VoucherPdf($x){
         $recordID = $x;
@@ -403,157 +222,256 @@ class PdfGRNinfo extends CI_Model {
         AND `tbl_grn_vouchar_import_cost_detail`.`tbl_grn_vouchar_import_cost_idtbl_grn_vouchar_import_cost` = ?";
         $respond2 = $this->db->query($sql2, array(1, $recordID));
 
-        $supplierAddr = $this->addressLines(array($v->address_line1, $v->address_line2, $v->city));
-        $companyLines = array(
-            '<span style="text-transform:uppercase;">' . $this->e($co->companyaddress) . '</span>',
-            'Tel: ' . $this->e($co->companymobile) . ' / ' . $this->e($co->companyphone),
-            'E-Mail: ' . $this->e($co->companyemail)
-        );
+        $coTel = trim($co->companymobile . ' / ' . $co->companyphone, ' /');
+        $supplierAddr = array($v->address_line1, $v->address_line2, $v->city);
 
-        $html = '<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Good Receive Voucher</title>
-<style>' . $this->css(295) . '
-    table.items th { font-size: 8px; padding: 8px 3px; }
-    table.items td { font-size: 10px; padding: 6px 3px; }
-</style>
-</head>
-<body>';
-
-        $html .= $this->watermarkHtml();
-        $html .= $this->headerHtml('GOOD RECEIVE VOUCHER', 'ORDER NO', $v->porder_no, $co->companyname);
-        $html .= $this->signatureFooter(array('Received by', 'Date', 'Signed'));
-
-        // ---------- INFO STRIP ----------
-        $html .= $this->infoStrip(array(
-            array('Account',          ''),
-            array('Date',             $v->grndate),
-            array('Order No',         $v->porder_no),
-            array('Supplier Invoice', $v->invoicenum),
-            array('Our Reference',    $v->invoiceno)
-        ));
-
-        // ---------- PARTIES ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:16px;">
-<tr>
-    <td style="width:48%;vertical-align:top;padding:0;">'
-        . $this->partyBlock('Supplier', $this->e($v->suppliername), $supplierAddr) . '
-    </td>
-    <td style="width:4%;"></td>
-    <td style="width:48%;vertical-align:top;padding:0;">'
-        . $this->partyBlock('Company', $this->e($co->companyname), $companyLines) . '
-    </td>
-</tr>
-</table>';
-
-        // ---------- GRN ITEMS ----------
-        $html .= '
-<table class="items">
-    <thead>
-        <tr>
-            <th style="width:10%;text-align:left;">Item Code</th>
-            <th style="width:23%;text-align:left;">Item Description</th>
-            <th style="width:8%;">Ordered</th>
-            <th style="width:6%;">Prev</th>
-            <th style="width:8%;">Qty</th>
-            <th style="width:6%;">Unit</th>
-            <th style="width:11%;text-align:right;">Price (Ex)</th>
-            <th style="width:7%;">Disc %</th>
-            <th style="width:9%;text-align:right;">Tax</th>
-            <th style="width:12%;text-align:right;">Total (Inc)</th>
-        </tr>
-    </thead>
-    <tbody>';
-
-        foreach ($respondgrn->result() as $g) {
-            $html .= '<tr>
-                <td>' . $this->e($g->product_code) . '</td>
-                <td>' . $this->e($g->product_name) . '</td>
-                <td style="text-align:center;">' . $this->e($g->qty) . '</td>
-                <td style="text-align:center;">0.00</td>
-                <td class="recv">' . $this->e($g->qty) . '</td>
-                <td style="text-align:center;">' . $this->e($g->unit) . '</td>
-                <td style="text-align:right;">' . number_format((float)$g->costunitprice, 2) . '</td>
-                <td style="text-align:center;">' . $this->e($g->unit_discount) . '</td>
-                <td style="text-align:right;">' . number_format((float)$g->costunitprice, 2) . '</td>
-                <td style="text-align:right;font-weight:bold;">' . number_format((float)$g->total, 2) . '</td>
-            </tr>';
+        $pages = array_chunk($respondgrn->result(), $this->voucherRowsPerPage);
+        if (empty($pages)) {
+            $pages = array(array());
         }
-        $html .= '</tbody></table>';
+        $totalPages = count($pages);
+        $body = '';
 
-        // ---------- IMPORTATION SPLIT ----------
-        if ($respond2->num_rows() > 0) {
-            $html .= '
-<div class="section-title">Importation Split - Additional Cost Allocation</div>
-<table class="items" style="margin-top:8px;">
-    <thead>
-        <tr>
-            <th style="width:6%;">#</th>
-            <th style="width:24%;text-align:left;">Cost Type</th>
-            <th style="width:30%;text-align:left;">Description</th>
-            <th style="width:14%;text-align:right;">Amount (Excl)</th>
-            <th style="width:12%;text-align:right;">Tax Amount</th>
-            <th style="width:14%;text-align:right;">Total</th>
-        </tr>
-    </thead>
-    <tbody>';
+        foreach ($pages as $index => $lines) {
+            $isLast = ($index == $totalPages - 1);
 
-            $totalcostamount = 0;
-            $totalcostvatamount = 0;
-            $j = 0;
-            foreach ($respond2->result() as $rowlist) {
-                $j++;
-                $amount = (float)$rowlist->cost_amount;
-                $totalcostamount += $amount;
-                $desc = trim((string)$rowlist->comment) !== '' ? $rowlist->comment : $rowlist->cost_type;
+            $p  = $this->lq_head('GOOD RECEIVE VOUCHER', $co->companyname, $co->companyaddress,
+                          array('Tel: ' . $coTel, 'E-Mail: ' . $co->companyemail));
 
-                $html .= '<tr>
-                    <td style="text-align:center;color:#999;">' . $j . '</td>
-                    <td>' . $this->e($rowlist->cost_type) . '</td>
-                    <td>' . $this->e($desc) . '</td>
-                    <td style="text-align:right;">' . number_format($amount, 2) . '</td>
-                    <td style="text-align:right;">0.00</td>
-                    <td style="text-align:right;font-weight:bold;">' . number_format($amount, 2) . '</td>
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(array('Order No', $v->porder_no), array('Date', $v->grndate))),
+                $this->lq_kv(array(array('Supplier Invoice', $v->invoicenum), array('Our Reference', $v->invoiceno)))
+            ));
+            $p .= $this->lq_sp(6);
+            $p .= $this->lq_boxes(array(
+                $this->lq_kv(array(array('Supplier', $v->suppliername), array('Address', $supplierAddr))),
+                $this->lq_kv(array(array('Company', $co->companyname), array('Address', $co->companyaddress), array('Telephone No.', $coTel)))
+            ));
+            $p .= $this->lq_sp(8);
+
+            $p .= '<table class="items">
+                <thead><tr>
+                    <th style="width:11%;">Item Code</th>
+                    <th style="width:22%;text-align:left;">Description of Goods</th>
+                    <th style="width:8%;">Ordered</th>
+                    <th style="width:6%;">Prev</th>
+                    <th style="width:8%;">Qty</th>
+                    <th style="width:6%;">Unit</th>
+                    <th style="width:12%;">Price (Ex)</th>
+                    <th style="width:7%;">Disc %</th>
+                    <th style="width:9%;">Tax</th>
+                    <th style="width:11%;">Total (Inc)</th>
+                </tr></thead><tbody>';
+
+            foreach ($lines as $g) {
+                $p .= '<tr style="font-size:9px;">
+                    <td>' . $this->lq_e($g->product_code) . '</td>
+                    <td>' . $this->lq_e($g->product_name) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($g->qty) . '</td>
+                    <td style="text-align:center;">0.00</td>
+                    <td style="text-align:center;font-weight:bold;">' . $this->lq_e($g->qty) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($g->unit) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$g->costunitprice, 2) . '</td>
+                    <td style="text-align:center;">' . $this->lq_e($g->unit_discount) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$g->costunitprice, 2) . '</td>
+                    <td style="text-align:right;">' . number_format((float)$g->total, 2) . '</td>
                 </tr>';
             }
+            $p .= $this->lq_pad_rows(count($lines), $this->voucherRowsPerPage, 10);
+            $p .= '</tbody></table>';
 
-            $html .= '</tbody>
-    <tfoot>
-        <tr>
-            <td colspan="3" style="font-weight:bold;padding:7px 5px;background:#f5f5f5;">Importation Split Totals</td>
-            <td style="text-align:right;font-weight:bold;background:#f5f5f5;">' . number_format($totalcostamount, 2) . '</td>
-            <td style="text-align:right;font-weight:bold;background:#f5f5f5;">' . number_format($totalcostvatamount, 2) . '</td>
-            <td style="background:#f5f5f5;">&nbsp;</td>
-        </tr>
-    </tfoot>
-</table>';
+            if ($isLast) {
+                /* ---------- importation split ---------- */
+                if ($respond2->num_rows() > 0) {
+                    $p .= $this->lq_sp(8);
+                    $p .= '<div class="section">Importation Split - Additional Cost Allocation</div>';
+                    $p .= '<table class="items"><thead><tr>
+                            <th style="width:6%;">#</th>
+                            <th style="width:24%;text-align:left;">Cost Type</th>
+                            <th style="width:30%;text-align:left;">Description</th>
+                            <th style="width:14%;">Amount (Excl)</th>
+                            <th style="width:12%;">Tax Amount</th>
+                            <th style="width:14%;">Total</th>
+                        </tr></thead><tbody>';
+
+                    $totalcostamount = 0;
+                    $j = 0;
+                    foreach ($respond2->result() as $rowlist) {
+                        $j++;
+                        $amount = (float)$rowlist->cost_amount;
+                        $totalcostamount += $amount;
+                        $desc = trim((string)$rowlist->comment) !== '' ? $rowlist->comment : $rowlist->cost_type;
+
+                        $p .= '<tr>
+                            <td style="text-align:center;">' . $j . '</td>
+                            <td>' . $this->lq_e($rowlist->cost_type) . '</td>
+                            <td>' . $this->lq_e($desc) . '</td>
+                            <td style="text-align:right;">' . number_format($amount, 2) . '</td>
+                            <td style="text-align:right;">0.00</td>
+                            <td style="text-align:right;">' . number_format($amount, 2) . '</td>
+                        </tr>';
+                    }
+                    $p .= '<tr>
+                            <td colspan="3" style="font-weight:bold;">Importation Split Totals</td>
+                            <td style="text-align:right;font-weight:bold;">' . number_format($totalcostamount, 2) . '</td>
+                            <td style="text-align:right;font-weight:bold;">0.00</td>
+                            <td>&nbsp;</td>
+                        </tr></tbody></table>';
+                }
+
+                $p .= $this->lq_sp(8);
+                $p .= $this->lq_totals(array(
+                    array('Total (Excl)', number_format((float)$v->grnsubtotal, 2)),
+                    array('Tax', number_format((float)$v->vatamount, 2)),
+                    array('Discount', number_format((float)$v->discount, 2)),
+                    array('Total (Incl)', number_format((float)$v->total, 2), true)
+                ), 16);
+
+                $p .= $this->lq_sp(8);
+                $p .= $this->lq_sign(array(
+                    array('Received by', '', 'Signature'),
+                    array('Date', '', ''),
+                    array('Signed', '', 'Signature')
+                ));
+            } else {
+                $p .= '<div class="cont">Continued on next page...</div>';
+            }
+
+            $body .= $this->lq_page($p, $isLast, $index + 1, $totalPages);
         }
 
-        // ---------- TOTALS ----------
-        $html .= '
-<table style="width:100%;border-collapse:collapse;margin-top:16px;page-break-inside:avoid;">
-<tr>
-    <td style="width:58%;"></td>
-    <td style="width:42%;">
-        <table class="totals">
-            <tr><td>Total (Excl)</td><td style="text-align:right;">' . number_format((float)$v->grnsubtotal, 2) . '</td></tr>
-            <tr><td>Tax</td><td style="text-align:right;">' . number_format((float)$v->vatamount, 2) . '</td></tr>
-            <tr><td>Discount</td><td style="text-align:right;">' . number_format((float)$v->discount, 2) . '</td></tr>
-            <tr class="grand"><td>Total (Incl)</td><td style="text-align:right;">' . number_format((float)$v->total, 2) . '</td></tr>
-        </table>
-    </td>
-</tr>
-</table>';
-
-        $html .= '</body></html>';
+        $html = $this->lq_doc('Good Receive Voucher', $body);
 
         $this->load->library('pdf');
         $this->pdf->setPaper('A4', 'portrait');
         $this->pdf->loadHtml($html);
         $this->pdf->render();
-        $this->pdf->stream("Good Receive Voucher - " . $recordID . ".pdf", array("Attachment" => 0));
+        $this->pdf->stream($this->lq_filename('Good Receive Voucher - ' . $recordID) . '.pdf', array("Attachment" => 0));
+    }
+
+    /* ================= LQ-310 print design helpers (black and white, A4 portrait) ================= */
+
+    private function lq_e($v){
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+
+    private function lq_val($v){
+        if (is_array($v)) {
+            $lines = array();
+            foreach ($v as $line) {
+                $line = trim((string)$line);
+                if ($line !== '') { $lines[] = $this->lq_e($line); }
+            }
+            return empty($lines) ? '&nbsp;' : implode('<br>', $lines);
+        }
+        $v = trim((string)$v);
+        return $v === '' ? '&nbsp;' : $this->lq_e($v);
+    }
+
+    private function lq_css(){
+        return '
+@page { size: A4 portrait; margin: 8mm; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10px; color: #000; margin: 0; line-height: 1.3; }
+table { border-collapse: collapse; width: 100%; }
+.title { border-top: 2px solid #000; border-bottom: 2px solid #000; text-align: center; font-size: 20px; font-weight: bold; letter-spacing: 3px; padding: 5px 0; }
+.co { text-align: center; padding: 8px 0; line-height: 1.45; }
+.coname { font-size: 14px; font-weight: bold; }
+table.outer { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: 100%; }
+td.half { border: 1px solid #000; padding: 3px 6px; vertical-align: top; }
+table.kv { table-layout: fixed; }
+table.kv td { border: none; padding: 2px 0; vertical-align: top; }
+table.kv td.k { width: 34%; font-weight: bold; }
+table.kv td.c { width: 4%; }
+table.items { table-layout: fixed; }
+table.items th { border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; }
+table.items td { border: 1px solid #000; padding: 2px 5px; font-size: 10px; height: 19px; vertical-align: middle; }
+table.items tr { page-break-inside: avoid; }
+table.tot { table-layout: fixed; }
+table.tot td { border: 1px solid #000; padding: 3px 6px; font-size: 10px; }
+table.tot td.n { text-align: right; }
+table.tot tr.b td { font-weight: bold; font-size: 11px; }
+.sigline { border-top: 1px solid #000; text-align: center; font-size: 9px; padding-top: 2px; }
+.sp { font-size: 1px; line-height: 1px; }
+.pg { text-align: right; font-size: 9px; margin-top: 4px; }
+.cont { text-align: right; font-size: 10px; font-weight: bold; margin-top: 6px; }
+.section { font-size: 11px; font-weight: bold; margin: 0 0 4px 0; }';
+    }
+
+    private function lq_head($title, $companyName, $address, $contactLines = array()){
+        $h  = '<div class="title">' . $this->lq_e($title) . '</div>';
+        $h .= '<div class="co"><div class="coname">' . $this->lq_e($companyName) . '</div>';
+        if (trim((string)$address) !== '') { $h .= '<div>' . $this->lq_e($address) . '</div>'; }
+        foreach ($contactLines as $l) {
+            if (trim((string)$l) !== '') { $h .= '<div>' . $this->lq_e($l) . '</div>'; }
+        }
+        return $h . '</div>';
+    }
+
+    private function lq_kv($pairs){
+        $h = '<table class="kv">';
+        foreach ($pairs as $p) {
+            $h .= '<tr><td class="k">' . $this->lq_e($p[0]) . '</td><td class="c">:</td><td>' . $this->lq_val($p[1]) . '</td></tr>';
+        }
+        return $h . '</table>';
+    }
+
+    private function lq_boxes($cells){
+        $n   = count($cells);
+        $gap = 2;
+        $w   = (100 - $gap * ($n - 1)) / $n;
+        $h   = '<table class="outer"><tr>';
+        foreach ($cells as $i => $c) {
+            if ($i > 0) { $h .= '<td style="width:' . $gap . '%;"></td>'; }
+            $h .= '<td class="half" style="width:' . $w . '%;">' . $c . '</td>';
+        }
+        return $h . '</tr></table>';
+    }
+
+    private function lq_sp($px = 6){
+        return '<div class="sp" style="height:' . (int)$px . 'px;">&nbsp;</div>';
+    }
+
+    private function lq_pad_rows($used, $perPage, $cols){
+        $h = '';
+        for ($k = $used; $k < $perPage; $k++) {
+            $h .= '<tr>' . str_repeat('<td>&nbsp;</td>', $cols) . '</tr>';
+        }
+        return $h;
+    }
+
+    private function lq_totals($rows, $amountWidth = 22){
+        $h = '<table class="tot">';
+        foreach ($rows as $r) {
+            $bold = !empty($r[2]);
+            $h .= '<tr' . ($bold ? ' class="b"' : '') . '><td style="width:' . (100 - $amountWidth) . '%;">' . $this->lq_e($r[0]) . '</td>'
+                . '<td class="n" style="width:' . $amountWidth . '%;">' . $this->lq_e($r[1]) . '</td></tr>';
+        }
+        return $h . '</table>';
+    }
+
+    private function lq_sign($items){
+        $cells = array();
+        foreach ($items as $it) {
+            $name    = isset($it[1]) ? trim((string)$it[1]) : '';
+            $caption = isset($it[2]) ? $it[2] : 'Signature';
+            $cells[] = '<b>' . $this->lq_e($it[0]) . '</b>'
+                . '<div style="height:38px;text-align:center;padding-top:22px;">' . ($name !== '' ? $this->lq_e($name) : '&nbsp;') . '</div>'
+                . '<div class="sigline">' . ($caption !== '' ? $this->lq_e($caption) : '&nbsp;') . '</div>';
+        }
+        return $this->lq_boxes($cells);
+    }
+
+    private function lq_page($inner, $isLast, $pageNo, $total){
+        return '<div' . ($isLast ? '' : ' style="page-break-after:always;"') . '>' . $inner
+            . '<div class="pg">Page ' . (int)$pageNo . ' of ' . (int)$total . '</div></div>';
+    }
+
+    private function lq_doc($title, $body){
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
+            . $this->lq_css() . '</style></head><body>' . $body . '</body></html>';
+    }
+
+    private function lq_filename($s){
+        return trim(preg_replace('/[^A-Za-z0-9 _.\-]+/', '-', $s));
     }
 }
