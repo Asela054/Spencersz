@@ -114,11 +114,22 @@ class Invoiceinfo extends CI_Model{
                     'warranty_months' => $row->warranty_months
                 );
 
-                $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
-                $this->db->from('tbl_product_serial');
-                $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
-                $this->db->where('status', 1);
-                $this->db->where_in('stock_status', array(1, 5, 6));
+                // $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
+                // $this->db->from('tbl_product_serial');
+                // $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
+                // $this->db->where('status', 1);
+                // $this->db->where_in('stock_status', array(1, 5, 6));
+
+                $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
+                $this->db->from('tbl_product_serial ps');
+                $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
+                $this->db->where('ps.tbl_product_idtbl_product', $row->idtbl_product);
+                $this->db->where('ps.status', 1);
+                $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
+                $this->db->where_in('ps.stock_status', array(1, 5, 6));
+                $this->db->order_by('g.grndate');
+                $this->db->order_by('g.idtbl_grn');
+                $this->db->order_by('ps.idtbl_product_serial');
 
                 $serialRespond = $this->db->get();
                 $productList[count($productList) - 1]['serials'] = $serialRespond->result();
@@ -284,6 +295,20 @@ class Invoiceinfo extends CI_Model{
 
             $net = max(0, round($gross - $discount, 2));
             $vat = round($net - ($net / (1 + $vat_rate / 100)), 2);   // VAT is included in the price
+
+            // FIFO: a serial from a newer GRN cannot be sold while serials of an older GRN are still free
+            if (!$isQuote) {
+                $byProduct = [];
+                foreach ($lines as $l) {
+                    if ($l['tbl_product_serial_idtbl_product_serial']) {
+                        $byProduct[$l['tbl_product_idtbl_product']][] = (int)$l['tbl_product_serial_idtbl_product_serial'];
+                    }
+                }
+                foreach ($byProduct as $pid => $ids) {
+                    $fifo = $this->fifocheck((int)$pid, $branch_id, $ids);
+                    if ($fifo !== true) throw new RuntimeException($fifo);
+                }
+            }
 
             // =============== 2. CREDIT NOTE ===============
             $cn_id = 0; $creditUsed = 0;
@@ -782,5 +807,49 @@ class Invoiceinfo extends CI_Model{
             $out .= ($n < 20) ? $ones[$n] : $tens[(int)($n / 10)] . ($n % 10 ? ' ' . $ones[$n % 10] : '');
         }
         return trim($out);
+    }
+    /* FIFO: a serial from a newer GRN cannot be sold while serials of an older GRN are still free */
+    private function fifocheck($productID, $from, $ids){
+        $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
+                                FROM tbl_product_serial ps
+                                JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
+                                WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                                AND ps.tbl_company_branch_idtbl_company_branch = ?
+                                AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
+                                                WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
+                                ".$this->transferable()."
+                                ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($productID, $from))->result();
+
+        $rank=-1; $last=null; $ranks=array(); $names=array(); $maxSel=-1;
+        foreach($rows as $r){
+            if($r->grn!==$last){ $rank++; $last=$r->grn; $names[$rank]=$r->grn_no.' ('.$r->grndate.')'; }
+            $ranks[(int)$r->id]=$rank;
+            if(in_array((int)$r->id, $ids)){ $maxSel=max($maxSel, $rank); }
+        }
+        foreach($rows as $r){
+            if($ranks[(int)$r->id] < $maxSel && !in_array((int)$r->id, $ids)){
+                return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$ranks[(int)$r->id]].' is still available. Sell the older serial numbers first.';
+            }
+        }
+        return true;
+    }
+
+    // called by the POS page when a serial is chosen
+    public function Fifocheckserial()
+    {
+        $branch_id = $_SESSION['branch_id'];
+        $pid = (int)$this->input->post('product_id');
+        $ids = array_map('intval', (array)$this->input->post('serial_ids'));
+
+        $r = $this->fifocheck($pid, $branch_id, $ids);
+        echo json_encode($r === true ? ['status' => 1] : ['status' => 0, 'message' => $r]);
+    }
+
+    /* only these serial statuses can be transferred:
+       1 = in stock, 5 = returned by customer, 6 = display item
+       everything else (2 sold, 3 returned to supplier, 4 damaged, 7 defective) is excluded.
+       Uses tbl_product_serial only, no tbl_serial_movement lookup. */
+    private function transferable(){
+        return " AND ps.stock_status IN (1, 5, 6) ";
     }
 }

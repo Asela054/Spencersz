@@ -82,4 +82,17 @@ class Invoice extends CI_Controller {
         $result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
         $this->load->view('invoicelist', $result);
     }
+    public function Fifocheckserial(){
+        $productID = (int)$this->input->post('product_id');
+        $from      = (int)$_SESSION['branch_id'];
+        $ids       = array_map('intval', (array)$this->input->post('serial_ids'));
+
+        $result = $this->Invoiceinfo->Fifocheckserial($productID, $from, $ids);
+        
+        if ($result === true) {
+            echo json_encode(['status' => 1]);
+        } else {
+            echo json_encode(['status' => 0, 'message' => is_string($result) ? $result : 'FIFO check failed']);
+        }
+    }
 }
