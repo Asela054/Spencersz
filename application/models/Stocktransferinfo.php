@@ -89,11 +89,11 @@ class Stocktransferinfo extends CI_Model{
         $respond=$this->db->query("SELECT p.idtbl_product AS id, p.product_code AS code, p.product_name AS name, COUNT(ps.idtbl_product_serial) AS free
                                    FROM tbl_product_serial ps
                                    JOIN tbl_product p ON p.idtbl_product = ps.tbl_product_idtbl_product
-                                   WHERE ps.stock_status = 1 AND ps.status = 1 AND p.status = 1
+                                   WHERE ps.status = 1 AND p.status = 1
                                    AND ps.tbl_company_branch_idtbl_company_branch = ?
                                    AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
                                                    WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
-                                   ".$this->notreturned()."
+                                   ".$this->transferable()."
                                    GROUP BY p.idtbl_product, p.product_code, p.product_name
                                    ORDER BY p.product_name", array($from));
         echo json_encode($respond->result());
@@ -106,11 +106,11 @@ class Stocktransferinfo extends CI_Model{
                                         ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate
                                 FROM tbl_product_serial ps
                                 JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
-                                WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                                WHERE ps.tbl_product_idtbl_product = ? AND ps.status = 1
                                 AND ps.tbl_company_branch_idtbl_company_branch = ?
                                 AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
                                                 WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
-                                ".$this->notreturned()."
+                                ".$this->transferable()."
                                 ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($pid, $from));
         echo json_encode($respond->result());
     }
@@ -181,11 +181,11 @@ class Stocktransferinfo extends CI_Model{
             if(!$productID || !count($ids)){ return $this->fail('Invalid item in the transfer.'); }
 
             $ph=$this->placeholders($ids);
-            $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno FROM tbl_product_serial ps
-                                    WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                        $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno FROM tbl_product_serial ps
+                                    WHERE ps.tbl_product_idtbl_product = ? AND ps.status = 1
                                         AND ps.tbl_company_branch_idtbl_company_branch = ?
                                         AND ps.idtbl_product_serial IN ($ph)
-                                        ".$this->notreturned()." FOR UPDATE", array_merge(array($productID, $from), $ids))->result();
+                                        ".$this->transferable()." FOR UPDATE", array_merge(array($productID, $from), $ids))->result();
             if(count($rows)!=count($ids)){ return $this->fail('One or more serial numbers are not available at the sending location.'); }
 
             $locked=$this->db->query("SELECT 1 FROM tbl_stock_transfer_serial WHERE status = 1
@@ -318,7 +318,7 @@ class Stocktransferinfo extends CI_Model{
 
             $bygrn=array();
             foreach($serials as $s){
-                if((int)$s->stock_status!=self::SERIAL_INSTOCK || (int)$s->br!=(int)$t->from_branch_id){
+                if(!in_array((int)$s->stock_status, array(1, 5, 6)) || (int)$s->br!=(int)$t->from_branch_id){
                     return 'Serial '.$s->serialno.' is no longer available at the sending location.';
                 }
                 $bygrn[$s->grn]=isset($bygrn[$s->grn]) ? $bygrn[$s->grn]+1 : 1;
@@ -367,7 +367,7 @@ class Stocktransferinfo extends CI_Model{
                 $this->db->where('idtbl_product_serial', $s->sid);
                 $this->db->update('tbl_product_serial', $data);
 
-                $this->movement($s->sid, self::SERIAL_INSTOCK, self::SERIAL_TRANSIT, $transferID, $detailID, $t->from_branch_id,
+                $this->movement($s->sid, (int)$s->stock_status, self::SERIAL_TRANSIT, $transferID, $detailID, $t->from_branch_id,
                                 'Dispatched on transfer '.$t->transfer_no, $userID);
             }
         }
@@ -462,11 +462,11 @@ class Stocktransferinfo extends CI_Model{
         $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
                                 FROM tbl_product_serial ps
                                 JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
-                                WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                                WHERE ps.tbl_product_idtbl_product = ? AND ps.status = 1
                                 AND ps.tbl_company_branch_idtbl_company_branch = ?
                                 AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
                                                 WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
-                                ".$this->notreturned()."
+                                ".$this->transferable()."
                                 ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($productID, $from))->result();
 
         $rank=-1; $last=null; $ranks=array(); $names=array(); $maxSel=-1;
@@ -544,7 +544,7 @@ class Stocktransferinfo extends CI_Model{
     }
 
     /* serials returned to supplier via GRN return must never be transferred */
-    private function notreturned(){
+    private function transferable(){
         return " AND NOT EXISTS (SELECT 1 FROM tbl_serial_movement sm
                                 WHERE sm.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial
                                 AND sm.movement_type = 4)
