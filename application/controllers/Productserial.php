@@ -22,4 +22,13 @@ class Productserial extends CI_Controller {
 		$this->Productserialinfo->Serialdisplay();
 	}
 	
+	public function Serialdamaged(){
+		$this->load->model('Productserialinfo');
+		$this->Productserialinfo->Serialdamaged();
+	}
+
+	public function Serialdefective(){
+		$this->load->model('Productserialinfo');
+		$this->Productserialinfo->Serialdefective();
+	}
 }
