@@ -13,59 +13,44 @@ $grossEx    = round($supply + $discountEx, 2);
 <head>
 <meta charset="utf-8">
 <style>
-    /* Define page margins to reserve space for fixed header and footer images */
+    /* LQ-310 (dot matrix, A4): black only, no images, no fills.
+       Increase margin-top if you print on pre-printed letterhead stationery. */
     @page {
-        margin-top: 110px;
-        margin-bottom: 70px;
-        margin-left: 28px;
-        margin-right: 28px;
-    }
-    body { 
-        margin: 0; 
-        font-family: 'DejaVu Sans', sans-serif; 
-        font-size: 9.5px; 
-        color: #111; 
-    }
-    
-    /* Repeating Header */
-    .page-header {
-        position: fixed;
-        top: -110px;
-        left: -28px;
-        right: -28px;
-        height: 95px;
-        text-align: center;
-    }
-    .page-header img {
-        width: 100%;
-        height: auto;
-        max-height: 95px;
+        margin-top: 30px;
+        margin-bottom: 50px;
+        margin-left: 30px;
+        margin-right: 30px;
     }
 
-    /* Repeating Footer */
+    /* Repeating text footer on every page */
     .page-footer {
         position: fixed;
-        bottom: -70px;
-        left: -28px;
-        right: -28px;
-        height: 55px;
+        bottom: -38px;
+        left: 0;
+        right: 0;
+        height: 20px;
         text-align: center;
+        font-size: 9px;
+        border-top: 1px solid #000;
+        padding-top: 3px;
     }
-    .page-footer img {
-        width: 100%;
-        height: auto;
-        max-height: 55px;
+    body {
+        margin: 0;
+        font-family: 'DejaVu Sans', sans-serif;
+        font-size: 10px;
+        color: #000;
+        background: #fff;
     }
 
     table { border-collapse: collapse; }
     .mb { margin-bottom: 6px; }
-    .box { border: 1.3px solid #D0111B; padding: 4px 8px; vertical-align: top; }
+    .box { border: 1px solid #000; padding: 4px 8px; vertical-align: top; }
     .gap { width: 2%; }
     .lbl { font-weight: bold; width: 34%; padding: 2px 0; }
     .sep { width: 4%; font-weight: bold; }
     .val { padding: 2px 0; }
-    .items td, .items th { border: 1px solid #D0111B; padding: 3px 5px; }
-    .items th { background: #FBE3E4; font-size: 9px; }
+    .items td, .items th { border: 1px solid #000; padding: 3px 5px; }
+    .items th { font-size: 10px; font-weight: bold; }
     .items tr { page-break-inside: avoid; }
     .num { text-align: right; }
     .ctr { text-align: center; }
@@ -73,31 +58,28 @@ $grossEx    = round($supply + $discountEx, 2);
 </head>
 <body>
 
-    <!-- Repeating Header -->
-    <div class="page-header">
-        <?php if (!empty($headerImg)): ?>
-            <img src="<?= $headerImg ?>" alt="Header">
-        <?php endif; ?>
-    </div>
+    <!-- Repeating Footer (every page) -->
+    <div class="page-footer">&copy; Bartack by Erav Technology - 071 657 8718 / 070 330 0061 - 65</div>
 
-    <!-- Repeating Footer -->
-    <div class="page-footer">
-        <?php if (!empty($footerImg)): ?>
-            <img src="<?= $footerImg ?>" alt="Footer">
-        <?php endif; ?>
-    </div>
-
-    <!-- Main Body Content -->
     <div class="wrap">
 
-        <!-- Title bar -->
-        <table width="100%" class="mb" style="margin-top:6px;">
+        <!-- Title -->
+        <table width="100%" class="mb">
             <tr>
-                <td style="width:28%; vertical-align:middle;"><div style="border-top:2px solid #D0111B;"></div></td>
-                <td style="width:44%; text-align:center;">
-                    <div style="background:#D0111B; color:#fff; font-size:22px; font-weight:bold; padding:4px 0; border:2px solid #D0111B;"><?= $title ?></div>
+                <td style="text-align:center;">
+                    <div style="font-size:18px; font-weight:bold; padding:3px 0; border-top:2px solid #000; border-bottom:2px solid #000; letter-spacing:2px;"><?= $title ?></div>
                 </td>
-                <td style="width:28%; vertical-align:middle;"><div style="border-top:2px solid #D0111B;"></div></td>
+            </tr>
+        </table>
+
+        <!-- Company (text only, replaces header image) -->
+        <table width="100%" class="mb">
+            <tr>
+                <td style="text-align:center;">
+                    <div style="font-size:13px; font-weight:bold;"><?= $e($company['name']) ?></div>
+                    <div><?= $e($company['address']) ?></div>
+                    <div>Tel: <?= $e($company['tel']) ?></div>
+                </td>
             </tr>
         </table>
 
@@ -160,8 +142,8 @@ $grossEx    = round($supply + $discountEx, 2);
                 <td class="ctr"><?= $e($it->product_code) ?></td>
                 <td>
                     <?= $e($it->product_name) ?>
-                    <?php if ($it->serialno): ?><br><span style="font-size:8px; color:#444;">S/N: <?= $e($it->serialno) ?></span><?php endif; ?>
-                    <?php if ($it->warranty_months): ?><span style="font-size:8px; color:#444;"> | Warranty: <?= (int)$it->warranty_months ?> months</span><?php endif; ?>
+                    <?php if ($it->serialno): ?><br><span style="font-size:9px;">S/N: <?= $e($it->serialno) ?></span><?php endif; ?>
+                    <?php if ($it->warranty_months): ?><span style="font-size:9px;"> | Warranty: <?= (int)$it->warranty_months ?> months</span><?php endif; ?>
                 </td>
                 <td class="ctr"><?= (int)$it->qty ?></td>
                 <td class="num"><?= $fm($it->unitprice / $rate) ?></td>
@@ -178,8 +160,8 @@ $grossEx    = round($supply + $discountEx, 2);
             <?php endif; ?>
             <tr><td colspan="4">Total Value of Supply</td><td class="num"><?= $fm($supply) ?></td></tr>
             <tr><td colspan="4">VAT Amount (Total Value of Supply @ <?= (float)$inv->vat_rate ?>%)</td><td class="num"><?= $fm($inv->vatamount) ?></td></tr>
-            <tr><td colspan="4" style="font-weight:bold; font-size:10.5px;">Total Amount / consideration including VAT</td>
-                <td class="num" style="font-weight:bold; font-size:10.5px;"><?= $fm($inv->net_total) ?></td></tr>
+            <tr><td colspan="4" style="font-weight:bold; font-size:11px;">Total Amount / consideration including VAT</td>
+                <td class="num" style="font-weight:bold; font-size:11px;"><?= $fm($inv->net_total) ?></td></tr>
         </table>
 
         <!-- Words / payment -->
@@ -198,12 +180,12 @@ $grossEx    = round($supply + $discountEx, 2);
             <tr>
                 <td class="box" style="width:49%; height:75px;">
                     <div style="font-weight:bold;">Customer Acknowledgment</div>
-                    <div style="margin-top:38px; border-top:1px solid #D0111B; text-align:center; font-size:8.5px; padding-top:2px;">Signature</div>
+                    <div style="margin-top:38px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
                 </td>
                 <td class="gap"></td>
                 <td class="box" style="width:49%; height:75px;">
                     <div style="font-weight:bold;">Security Check Signature</div>
-                    <div style="margin-top:38px; border-top:1px solid #D0111B; text-align:center; font-size:8.5px; padding-top:2px;">Signature</div>
+                    <div style="margin-top:38px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
                 </td>
             </tr>
         </table>

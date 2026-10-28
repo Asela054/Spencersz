@@ -385,6 +385,11 @@ include "include/header.php";
 	.bg-spencersz-primary {
 		background-color: var(--spencersz-primary) !important;
 	}
+
+    .fifo-batch{font-size:.72rem;font-weight:600;background:#f1f3f5;padding:4px 10px;border-bottom:1px solid #e5e7eb}
+    .fifo-note{font-size:.74rem;background:#fff3cd;color:#664d03;padding:6px 10px;border-bottom:1px solid #ffe69c}
+    .autocomplete-item.fifo-blocked{opacity:.6}
+    .fifo-tag{font-size:.65rem;color:#b45309;margin-left:6px}
 </style>
 <?php
 include "include/topnavbar.php";
@@ -921,6 +926,22 @@ include "include/topnavbar.php";
                     <thead class="thead-light"><tr><th>Quotation No</th><th>Date</th><th>Customer</th><th class="text-right">Total</th><th></th></tr></thead>
                     <tbody id="quotationListBody"></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 4: FIFO LIST -->
+<div class="modal fade" id="fifomodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white py-2">
+                <h5 class="modal-title text-light"><i class="fas fa-exclamation-triangle mr-2 text-warning"></i>Older stock must go first (FIFO)</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body" id="fifobody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger btn-sm px-4" data-dismiss="modal">OK</button>
             </div>
         </div>
     </div>
@@ -1539,7 +1560,7 @@ include "include/topnavbar.php";
             holdId: activeHoldId,
             quotationId: activeQuotationId
         };
-
+        
         const btn = document.getElementById("btnSaveInvoice");
         btn.disabled = true;
 
@@ -1687,6 +1708,51 @@ include "include/topnavbar.php";
         );
     }
 
+    // function showSerialList(val) {
+    //     const box = document.getElementById("serialBox");
+    //     if (!pendingProduct) { box.style.display = "none"; return; }
+
+    //     const list = availableSerials(val);
+    //     if (list.length === 0) { box.style.display = "none"; return; }
+
+    //     box.innerHTML = "";
+    //     list.forEach(s => {
+    //         const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : pendingProduct.price;
+    //         const item = document.createElement("div");
+    //         item.className = "autocomplete-item";
+    //         item.innerHTML = `
+    //             <div class="fw-bold font-monospace" style="font-size:0.78rem;">${s.serialno}</div>
+    //             <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${price.toLocaleString()}</span>
+    //         `;
+    //         item.onclick = () => addSerialToCart(pendingProduct, s);
+    //         box.appendChild(item);
+    //     });
+    //     box.style.display = "block";
+    // }
+    function escH(t) {
+        return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // Batch (GRN) ranking for the selected product. Same logic as the server fifocheck().
+    function fifoInfo(prod) {
+        const rankOf = {}, batches = [];
+        let last;
+        (prod.serials || []).forEach(s => {
+            if (s.grn !== last) {
+                last = s.grn;
+                batches.push({
+                    label: (s.batchno || s.grn_no) + ' (' + s.grn_no + ', ' + s.grndate + ')',
+                    batchno: s.batchno || s.grn_no, grn_no: s.grn_no, grndate: s.grndate, free: 0
+                });
+            }
+            const b = batches[batches.length - 1];
+            rankOf[s.idtbl_product_serial] = batches.length - 1;
+            if (!cart.some(c => c.serialId == s.idtbl_product_serial)) b.free++;
+        });
+        const oldest = batches.findIndex(b => b.free > 0);   // oldest batch that still has free serials
+        return { rankOf, batches, oldest };
+    }
+
     function showSerialList(val) {
         const box = document.getElementById("serialBox");
         if (!pendingProduct) { box.style.display = "none"; return; }
@@ -1694,13 +1760,48 @@ include "include/topnavbar.php";
         const list = availableSerials(val);
         if (list.length === 0) { box.style.display = "none"; return; }
 
+        const f = fifoInfo(pendingProduct);
+        const q = (val || "").trim().toLowerCase();
         box.innerHTML = "";
+
+        // typed / scanned serial belongs to a newer batch while older stock is still free
+        if (q) {
+            const ex = list.find(s => s.serialno.toLowerCase() === q);
+            if (ex) {
+                const r = f.rankOf[ex.idtbl_product_serial];
+                if (r > f.oldest) {
+                    const ob = f.batches[f.oldest];
+                    const note = document.createElement("div");
+                    note.className = "fifo-note";
+                    note.innerHTML = `<i class="fas fa-exclamation-triangle mr-1"></i>This serial is from batch <b>${escH(f.batches[r].label)}</b>.
+                        Older stock still available: <b>${escH(ob.label)}</b> (${ob.free}). Sell the older serials first.`;
+                    box.appendChild(note);
+                }
+            }
+        }
+
+        let lastRank = -1;
         list.forEach(s => {
+            const r = f.rankOf[s.idtbl_product_serial];
+            const blocked = r > f.oldest;
+
+            if (r !== lastRank) {
+                lastRank = r;
+                const b = f.batches[r];
+                const h = document.createElement("div");
+                h.className = "fifo-batch";
+                h.innerHTML = `<i class="fas fa-layer-group mr-1"></i>Batch ${escH(b.batchno)} &middot; ${escH(b.grn_no)} &middot; ${escH(b.grndate)}
+                    <span class="badge badge-secondary ml-1">${b.free}</span>` +
+                    (r === f.oldest ? ' <span class="badge badge-success ml-1">Oldest - use first</span>' : '');
+                box.appendChild(h);
+            }
+
             const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : pendingProduct.price;
             const item = document.createElement("div");
-            item.className = "autocomplete-item";
+            item.className = "autocomplete-item" + (blocked ? " fifo-blocked" : "");
             item.innerHTML = `
-                <div class="fw-bold font-monospace" style="font-size:0.78rem;">${s.serialno}</div>
+                <div class="fw-bold font-monospace" style="font-size:0.78rem;">${escH(s.serialno)}
+                    ${blocked ? '<span class="fifo-tag">older stock first</span>' : ''}</div>
                 <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${price.toLocaleString()}</span>
             `;
             item.onclick = () => addSerialToCart(pendingProduct, s);
@@ -1766,7 +1867,22 @@ include "include/topnavbar.php";
         e.target.value = ""; // Clear input after successful addition
     }
 
+    // FIFO check (client side, same as stock transfer), then add
     function addSerialToCart(prod, s) {
+        const f = fifoInfo(prod);
+        const r = f.rankOf[s.idtbl_product_serial];
+
+        // older batch still has free serials -> not allowed
+        if (r > f.oldest) {
+            showFifoModal(prod, s);
+            return;
+        }
+        pushSerialToCart(prod, s);
+    }
+
+    function pushSerialToCart(prod, s) {
+        if (cart.some(c => c.serialId == s.idtbl_product_serial)) return;   // a double Enter must not add it twice
+
         const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price;
 
         cart.push({
@@ -1780,8 +1896,7 @@ include "include/topnavbar.php";
             serialId: s.idtbl_product_serial,
             serialno: s.serialno,
             costprice: parseFloat(s.costunitprice) || 0,
-            imei: "S/N: " + s.serialno,
-            serialno: s.serialno
+            imei: "S/N: " + s.serialno
         });
 
         pendingProduct = null;
@@ -1792,6 +1907,26 @@ include "include/topnavbar.php";
 
         renderCartTable();
         document.getElementById("barcodeInput").focus();
+    }
+
+    function showFifoModal(prod, s) {
+        const f = fifoInfo(prod);
+        const r = f.rankOf[s.idtbl_product_serial];
+        let list = '';
+        f.batches.forEach((b, i) => {
+            if (i < r && b.free > 0) {
+                list += '<li>Batch ' + escH(b.label) + ' - <b>' + b.free + '</b> serial number(s) still in stock</li>';
+            }
+        });
+
+        $('#fifobody').html(
+            '<p>You cannot sell batch <b>' + escH(f.batches[r].label) + '</b> because older serial numbers of this product are still in stock:</p>' +
+            '<ul>' + list + '</ul><p class="mb-0">Sell the older serial numbers first.</p>'
+        );
+        $('#fifomodal').one('hidden.bs.modal', function () {
+            $('#imeiInput').val('').focus();
+            showSerialList('');
+        }).modal('show');
     }
 
     // Only for products WITHOUT serials
