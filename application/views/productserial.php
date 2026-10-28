@@ -133,6 +133,9 @@ include "include/topnavbar.php";
                 case '6':
                     return badge('dark', 'Display Item');
 
+                case '7':
+                    return badge('secondary', 'Defective');
+
                 default:
                     return badge('secondary', 'Unknown Status');
             }
@@ -287,7 +290,12 @@ include "include/topnavbar.php";
                         "render": function(data, type, full) {
                             var button='';
                             if((full['stock_status']||'').toString().trim()=='1'){
-                                button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Display Item" class="btn btn-dark btn-sm btnDisplay ';if(editcheck!=1){button+='d-none';}button+='" data-serial="'+esc(full['serialno'])+'" id="'+full['idtbl_product_serial']+'"><i class="fas fa-tv"></i></button>';
+                                var hide = (editcheck!=1) ? ' d-none' : '';
+                                var attrs = ' data-serial="'+esc(full['serialno'])+'" id="'+full['idtbl_product_serial']+'"';
+
+                                button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Display Item" class="btn btn-dark btn-sm btnMark'+hide+'" data-action="Serialdisplay" data-label="Display Item"'+attrs+'><i class="fas fa-tv"></i></button> ';
+                                button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Damaged" class="btn btn-danger btn-sm btnMark'+hide+'" data-action="Serialdamaged" data-label="Damaged"'+attrs+'><i class="fas fa-heart-broken"></i></button> ';
+                                button+='<button data-toggle="tooltip" data-placement="bottom" title="Mark as Defective" class="btn btn-secondary btn-sm btnMark'+hide+'" data-action="Serialdefective" data-label="Defective"'+attrs+'><i class="fas fa-tools"></i></button>';
                             }
                             return button;
                         }
@@ -299,13 +307,15 @@ include "include/topnavbar.php";
             });
         }
 
-        $('#tblserial').on('click', '.btnDisplay', function() {
+        $('#tblserial').on('click', '.btnMark', function() {
             var id = $(this).attr('id');
             var serial = $(this).data('serial');
+            var action = $(this).data('action');
+            var label = $(this).data('label');
 
             Swal.fire({
-                title: 'Mark as Display Item?',
-                html: 'Serial number <b>'+serial+'</b> will be marked as a display item.',
+                title: 'Mark as '+label+'?',
+                html: 'Serial number <b>'+serial+'</b> will be marked as <b>'+label+'</b>.',
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonText: 'Yes, Mark',
@@ -314,7 +324,7 @@ include "include/topnavbar.php";
                 preConfirm: function() {
                     return $.ajax({
                         type: 'POST',
-                        url: '<?php echo base_url() ?>Productserial/Serialdisplay',
+                        url: '<?php echo base_url() ?>Productserial/'+action,
                         data: { serialID: id },
                         dataType: 'json'
                     }).then(function(res) {
