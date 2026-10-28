@@ -102,14 +102,16 @@ class Stocktransferinfo extends CI_Model{
         $pid=(int)$this->input->post('pid');
         $from=(int)$this->input->post('from');
 
-        $respond=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno AS no
-                                   FROM tbl_product_serial ps
-                                   WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
-                                   AND ps.tbl_company_branch_idtbl_company_branch = ?
-                                   AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
-                                                   WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
-                                   ".$this->notreturned()."
-                                   ORDER BY ps.serialno", array($pid, $from));
+        $respond=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno AS no,
+                                        ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate
+                                FROM tbl_product_serial ps
+                                JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
+                                WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                                AND ps.tbl_company_branch_idtbl_company_branch = ?
+                                AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
+                                                WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
+                                ".$this->notreturned()."
+                                ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($pid, $from));
         echo json_encode($respond->result());
     }
     public function Stocktransferinsert(){
@@ -189,6 +191,9 @@ class Stocktransferinfo extends CI_Model{
             $locked=$this->db->query("SELECT 1 FROM tbl_stock_transfer_serial WHERE status = 1
                                       AND tbl_product_serial_idtbl_product_serial IN ($ph) LIMIT 1", $ids)->row();
             if($locked){ return $this->fail('One or more serial numbers are already in another open transfer.'); }
+
+            $fifo=$this->fifocheck($productID, $from, $ids);          // <-- new
+            if($fifo!==true){ return $this->fail($fifo); }            // <-- new
 
             $data=array(
                 'tbl_stock_transfer_idtbl_stock_transfer'=> $transferID,
@@ -451,6 +456,32 @@ class Stocktransferinfo extends CI_Model{
     }
 
     /* ---------------------------------------------------------- common functions */
+
+    /* FIFO: a serial from a newer GRN cannot be sent while serials of an older GRN are still free */
+    private function fifocheck($productID, $from, $ids){
+        $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
+                                FROM tbl_product_serial ps
+                                JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
+                                WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+                                AND ps.tbl_company_branch_idtbl_company_branch = ?
+                                AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
+                                                WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
+                                ".$this->notreturned()."
+                                ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($productID, $from))->result();
+
+        $rank=-1; $last=null; $ranks=array(); $names=array(); $maxSel=-1;
+        foreach($rows as $r){
+            if($r->grn!==$last){ $rank++; $last=$r->grn; $names[$rank]=$r->grn_no.' ('.$r->grndate.')'; }
+            $ranks[(int)$r->id]=$rank;
+            if(in_array((int)$r->id, $ids)){ $maxSel=max($maxSel, $rank); }
+        }
+        foreach($rows as $r){
+            if($ranks[(int)$r->id] < $maxSel && !in_array((int)$r->id, $ids)){
+                return 'FIFO: batch '.$names[$maxSel].' cannot be selected because older stock from '.$names[$ranks[(int)$r->id]].' is still available. Transfer the older serial numbers first.';
+            }
+        }
+        return true;
+    }
 
     /* the logged-in branch comes from the session ($_SESSION['branch_id']).
        If that branch is not a showroom/warehouse (type 1 or 2) it returns 0 = can act for all locations */

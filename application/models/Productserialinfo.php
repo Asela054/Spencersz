@@ -54,7 +54,8 @@ class Productserialinfo extends CI_Model{
         echo json_encode($obj);
     }
 
-    public function Serialdisplay(){
+    // Generic: moves an IN-STOCK serial to a new stock_status
+    private function Markserial($newstatus, $successmsg, $failmsg){
         $userID=$_SESSION['userid'];
         $serialID=$this->input->post('serialID');
         $updatedatetime=date('Y-m-d H:i:s');
@@ -68,9 +69,9 @@ class Productserialinfo extends CI_Model{
 
         $this->db->where('idtbl_product_serial', $serialID);
         $this->db->where('status', 1);
-        $this->db->where('stock_status', 1);  
+        $this->db->where('stock_status', 1);
         $this->db->update('tbl_product_serial', array(
-            'stock_status'=>'6',
+            'stock_status'=>$newstatus,
             'updateuser'=>$userID,
             'updatedatetime'=>$updatedatetime
         ));
@@ -78,10 +79,22 @@ class Productserialinfo extends CI_Model{
 
         if($this->db->trans_status()===FALSE || $affected==0){
             $this->db->trans_rollback();
-            echo json_encode(array('success'=>false, 'message'=>'Only in-stock serial numbers can be marked as display items'));
+            echo json_encode(array('success'=>false, 'message'=>$failmsg));
         } else {
             $this->db->trans_commit();
-            echo json_encode(array('success'=>true, 'message'=>'Serial number marked as display item'));
+            echo json_encode(array('success'=>true, 'message'=>$successmsg));
         }
+    }
+
+    public function Serialdisplay(){
+        $this->Markserial('6', 'Serial number marked as display item', 'Only in-stock serial numbers can be marked as display items');
+    }
+
+    public function Serialdamaged(){
+        $this->Markserial('4', 'Serial number marked as damaged', 'Only in-stock serial numbers can be marked as damaged');
+    }
+
+    public function Serialdefective(){
+        $this->Markserial('7', 'Serial number marked as defective', 'Only in-stock serial numbers can be marked as defective');
     }
 }

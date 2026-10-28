@@ -16,6 +16,9 @@ include "include/topnavbar.php";
     .tn-sign{display:flex;gap:24px;margin-top:50px;}
     .tn-sign div{flex:1;border-top:1px solid #212529;padding-top:4px;text-align:center;font-size:12px;}
 </style>
+<style>
+    .st-picklist .st-batch{flex:0 0 100%;width:100%;font-size:12px;font-weight:600;background:#f1f3f5;border-radius:3px;padding:4px 8px;margin:6px 0 4px}
+</style>
 <div id="layoutSidenav">
 
 <div id="layoutSidenav_nav">
@@ -204,6 +207,20 @@ include "include/topnavbar.php";
     </div>
 </div>
 
+<div class="modal fade" id="fifomodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle mr-2 text-warning"></i>Older stock must go first (FIFO)</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body" id="fifobody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-sm px-4" data-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 <script>
     $(document).ready(function() {
@@ -215,6 +232,10 @@ include "include/topnavbar.php";
             { key: 5, short: 'Unloaded',       card: 'Unloaded',   label: 'Unloaded',                 icon: 'fa-dolly-flatbed',   color: '#6f42c1', by: 'to',   action: 'Mark as Unloaded',   effect: 'Goods are unloaded and checked at the receiving location.' },
             { key: 6, short: 'Added to Stock', card: 'Completed',  label: 'Added to Stock',           icon: 'fa-check-circle',    color: '#28a745', by: 'to',   action: 'Add to Stock',       effect: 'A new stock record is created for the receiving location and the serial numbers now belong to it.' }
         ];
+
+        $('#fifomodal').on('hidden.bs.modal', function() {
+            if ($('#newmodal').hasClass('show')) { $('body').addClass('modal-open'); }
+        });
 
         var BRANCHES = [];
         var MYBRANCH = 0;
@@ -332,10 +353,12 @@ include "include/topnavbar.php";
         $('#n_from').on('change', function() { draft = []; drawDraft(); loadProducts(); });
         $('#n_product').on('change', showSerials);
         $('#n_selall').on('click', function(e) { e.preventDefault(); $('#n_serials input[type=checkbox]').prop('checked', true); });
+        $('#n_serials').on('change', 'input[type=checkbox]', function() { fifoEnforce(); });
 
         $('#btnadditem').on('click', function() {
             var pid = parseInt($('#n_product').val(), 10), picked = [];
             if (!pid) { notify('Select a product first.', 'warn'); return; }
+             if (!fifoEnforce()) { return; }
             $('#n_serials input:checked').each(function() { picked.push({ id: parseInt($(this).val(), 10), no: $(this).attr('data-no') }); });
             if (!picked.length) { notify('Tick at least one serial number.', 'warn'); return; }
             var found = false;
@@ -638,6 +661,8 @@ include "include/topnavbar.php";
             $.each(draft, function(i, it) { if (it.pid === pid) { $.each(it.serials, function(k, s) { used.push(parseInt(s.id, 10)); }); } });
             return used;
         }
+        var batchNames = {};   // rank -> label, used in the popup
+
         function showSerials() {
             var pid = parseInt($('#n_product').val(), 10), from = $('#n_from').val();
             if (!pid || !from) {
@@ -646,15 +671,54 @@ include "include/topnavbar.php";
                 return;
             }
             api('Getserials', { pid: pid, from: from }, function(rows) {
-                var used = drafted(pid), h = '', n = 0;
-                $.each(rows, function(i, s) {
-                    if ($.inArray(parseInt(s.id, 10), used) > -1) { return; }
-                    n++;
-                    h += '<label class="st-pick"><input type="checkbox" value="' + s.id + '" data-no="' + esc(s.no) + '"><span>' + esc(s.no) + '</span></label>';
+                var used = drafted(pid), h = '', cnt = {}, last = null, rank = -1;
+                var free = $.grep(rows, function(s) { return $.inArray(parseInt(s.id, 10), used) === -1; });
+                $.each(free, function(i, s) { cnt[s.grn] = (cnt[s.grn] || 0) + 1; });
+                batchNames = {};
+
+                $.each(free, function(i, s) {
+                    if (s.grn !== last) {
+                        rank++; last = s.grn;
+                        batchNames[rank] = (s.batchno || s.grn_no) + ' (' + s.grn_no + ', ' + s.grndate + ')';
+                        h += '<div class="st-batch"><i class="fas fa-layer-group mr-1"></i>Batch ' + esc(s.batchno || s.grn_no) +
+                            ' &middot; ' + esc(s.grn_no) + ' &middot; ' + esc(s.grndate) +
+                            ' <span class="badge badge-secondary ml-1">' + cnt[s.grn] + '</span>' +
+                            (rank === 0 ? ' <span class="badge badge-success ml-1">Oldest - use first</span>' : '') + '</div>';
+                    }
+                    h += '<label class="st-pick"><input type="checkbox" value="' + s.id + '" data-no="' + esc(s.no) + '" data-rank="' + rank + '"><span>' + esc(s.no) + '</span></label>';
                 });
-                $('#n_serials').html(n ? h : '<div class="text-muted small p-2">No free serial numbers for this product.</div>');
-                $('#n_avail').text(n + ' serial number(s) available');
+                $('#n_serials').html(free.length ? h : '<div class="text-muted small p-2">No free serial numbers for this product.</div>');
+                $('#n_avail').text(free.length + ' serial number(s) available');
             });
+        }
+
+        /* FIFO: returns true when the selection is valid. Otherwise it swaps the selection for the older
+        serial numbers, shows the popup and returns false. */
+        function fifoEnforce() {
+            var $all = $('#n_serials input[type=checkbox]'), maxRank = -1;
+            $all.filter(':checked').each(function() { maxRank = Math.max(maxRank, parseInt($(this).attr('data-rank'), 10)); });
+            if (maxRank < 0) { return true; }
+
+            var missing = {}, total = 0;
+            $all.each(function() {
+                var r = parseInt($(this).attr('data-rank'), 10);
+                if (!this.checked && r < maxRank) { missing[r] = (missing[r] || 0) + 1; total++; }
+            });
+            if (!total) { return true; }
+
+            var list = '';
+            $.each(missing, function(r, n) { list += '<li>Batch ' + esc(batchNames[r]) + ' - <b>' + n + '</b> serial number(s) still in stock</li>'; });
+
+            $all.each(function() {
+                var r = parseInt($(this).attr('data-rank'), 10);
+                if (r < maxRank) { this.checked = true; }          // load the older serial numbers
+                else if (r === maxRank) { this.checked = false; }  // drop the newer batch selection
+            });
+
+            $('#fifobody').html('<p>You cannot select batch <b>' + esc(batchNames[maxRank]) + '</b> because older serial numbers of this product are still in stock:</p><ul>' + list +
+                                '</ul><p class="mb-0">The older serial numbers have been selected for you. Add them to the transfer first, then pick from the newer batch.</p>');
+            $('#fifomodal').modal('show');
+            return false;
         }
         function drawDraft() {
             var h = '', total = 0;
