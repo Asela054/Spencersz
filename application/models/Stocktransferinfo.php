@@ -543,14 +543,12 @@ class Stocktransferinfo extends CI_Model{
         return implode(',', array_fill(0, count($arr), '?'));
     }
 
-    /* serials returned to supplier via GRN return must never be transferred */
+    /* only these serial statuses can be transferred:
+       1 = in stock, 5 = returned by customer, 6 = display item
+       everything else (2 sold, 3 returned to supplier, 4 damaged, 7 defective) is excluded.
+       Uses tbl_product_serial only, no tbl_serial_movement lookup. */
     private function transferable(){
-        return " AND NOT EXISTS (SELECT 1 FROM tbl_serial_movement sm
-                                WHERE sm.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial
-                                AND sm.movement_type = 4)
-                AND NOT EXISTS (SELECT 1 FROM tbl_grn_return_detail rd
-                                WHERE rd.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial
-                                AND rd.status = 1) ";
+        return " AND ps.stock_status IN (1, 5, 6) ";
     }
 
     private function movement($serialID, $fromstatus, $tostatus, $transferID, $detailID, $branchID, $remark, $userID){
