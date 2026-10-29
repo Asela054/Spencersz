@@ -214,13 +214,13 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			<?php } ?>
 
 			<!-- Invoice Menu New Added -->
-			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed) || in_array("Giftvoucher", $permissionallowed) || in_array("Invoicelist", $permissionallowed)){ ?>
+			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed) || in_array("Giftvoucher", $permissionallowed) || in_array("Invoicelist", $permissionallowed) || in_array("Repair", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
 				data-target="#collapsInvoice" aria-expanded="false" aria-controls="collapsInvoice">
 				<div class="nav-link-icon"><i class="fa fa-file-invoice"></i></div><span>Invoice</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote" || $functionmenu=="Giftvoucher" || $functionmenu2=="Invoicelist"){echo 'show';} ?>"
+			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote" || $functionmenu=="Giftvoucher" || $functionmenu2=="Invoicelist" || $functionmenu=="Repair"){echo 'show';} ?>"
 				id="collapsInvoice" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
 					<?php if(in_array("Dispatchnote", $permissionallowed)){ ?>
@@ -231,11 +231,11 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Invoicelist", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Invoice/Invoicelist'; ?>">Invoice List</a>
 					<?php } if(in_array("Creditnote", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Creditnote'; ?>">Credit
-						Note</a>
+					<a class="nav-link" href="<?php echo base_url().'Creditnote'; ?>">Credit Note</a>
 					<?php } if(in_array("Giftvoucher", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'Giftvoucher'; ?>">Gift
-						Voucher</a>
+					<a class="nav-link" href="<?php echo base_url().'Giftvoucher'; ?>">Gift Voucher</a>
+					<?php } if(in_array("Repair", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Repair'; ?>">Repair</a>
 					<?php } ?>
 				</nav>
 			</div>

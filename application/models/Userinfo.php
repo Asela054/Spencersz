@@ -19,6 +19,7 @@ class Userinfo extends CI_Model{
         $respond=$this->db->get();
 
         $hash_password = password_verify($password, $respond->row(0)->password);
+        
 		if($hash_password === true) {          
             // return $respond->row(0);
             $user_data = $respond->row(0);

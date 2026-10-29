@@ -12,7 +12,7 @@ class Welcome extends CI_Controller {
 		$this->load->model('Userinfo');
         $result=$this->Userinfo->LoginUser();
 		$AccountAPIURL='http://localhost/accountscode/';
-
+        
         if($result['user_data']!=false){
             $user_data=array(
                 'userid'=>$result['user_data']->idtbl_user,
