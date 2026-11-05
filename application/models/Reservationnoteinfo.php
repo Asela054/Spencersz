@@ -1,9 +1,7 @@
 <?php
-use Dompdf\Dompdf;
-use Dompdf\Options;
 class Reservationnoteinfo extends CI_Model{
 
-    // returns all data needed for the printed reservation note, or null
+    // returns all data needed for the printed reservation note / advance receipt, or null
     public function Getnotedata($reservationID){
 
         $this->db->select('r.*, 
@@ -48,222 +46,165 @@ class Reservationnoteinfo extends CI_Model{
         );
     }
 
-    private function rs($n){
-        return number_format((float)$n, 2);
-    }
 
-    private function h($v){
-        return htmlspecialchars((string)$v);
-    }
+    /* =====================================================================
+       Advance Receipt on pre-printed continuous stationery (LQ-310)
+       Artwork = 1600 x 927 px  =  9.5in x 5.5in  =  684 x 396 pt
+       Every x / y / w / h below is in ARTWORK PIXELS measured from the
+       top-left corner of the artwork (converted to pt by px()).
+       Only DATA is printed - the form design is already on the paper.
+       ===================================================================== */
+    private $paperW = 684;     // 9.5in in pt
+    private $paperH = 396;     // 5.5in in pt
+    private $artW   = 1600;    // artwork width in px
 
-    // builds the full A4 HTML layout of the reservation note
-    public function Buildnotehtml($data){
-        $r=$data['r'];
-        $items=$data['items'];
-        $statustext=$data['statustext'];
+    private $shiftX = 0;       // printer calibration in mm (+ moves right)
+    private $shiftY = 0;       // printer calibration in mm (+ moves down)
+    private $guide  = false;   // true = red outline around every field (alignment test)
 
-        if($statustext=='Invoice Completed'){ $statuscolor='#198754'; }
-        else if($statustext=='Cancelled'){ $statuscolor='#6c757d'; }
-        else if($statustext=='Expired'){ $statuscolor='#dc3545'; }
-        else{ $statuscolor='#0d6efd'; }
+    private $fontSize   = 10;  // pt
+    private $lineHeight = 12;  // pt
 
-        $address=trim($r->br_address1.' '.$r->br_address2);
-        if($address==''){ $address=trim($r->co_address1.' '.$r->co_address2); }
-        $tel=trim(($r->br_phone ?: $r->co_phone).' '.($r->br_mobile ?: $r->co_mobile));
+    private $wordsWidth = 75;  // characters per line for the amount in words
 
-        $cusaddr=array_filter(array($r->cus_address1, $r->cus_address2, $r->cus_city), function($v){
-            return trim($v)!='' && trim($v)!='-';
+    // text-line tops for the dotted lines of the form
+    private $yReceived = 329;
+    private $yOf       = 384;
+    private $ySum1     = 439;
+    private $ySum2     = 495;
+    private $ySum3     = 550;
+    private $yAgainst1 = 605;
+    private $yAgainst2 = 661;
+
+    // $data = result of Reservationnoteinfo::Getnotedata($reservationID)
+    public function Buildreceipthtml($data){
+        $r     = $data['r'];
+        $items = $data['items'];
+
+        $amount = (float)$r->advance_amount;
+
+        // customer address (skip empty and "-" parts)
+        $cusaddr = array_filter(array($r->cus_address1, $r->cus_address2, $r->cus_city), function($v){
+            return trim((string)$v) != '' && trim((string)$v) != '-';
         });
 
-        ob_start();
-        ?>
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Reservation Note <?php echo $r->reservation_no ?></title>
-<style>
-    @page { margin: 28px 30px 60px 30px; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; }
-    table { border-collapse: collapse; width: 100%; }
+        // amount in words, wrapped over the three dotted lines
+        $wordLines = explode("\n", wordwrap($this->amount_words($amount), $this->wordsWidth, "\n", true));
 
-    .head { background: #a50f2d; color: #fff; }
-    .head td { padding: 14px 16px; vertical-align: middle; }
-    .company { font-size: 20px; font-weight: bold; }
-    .small { font-size: 10px; }
-    .doc-title { font-size: 18px; font-weight: bold; text-align: right; letter-spacing: 1px; }
-    .accent { height: 4px; background: #6e0b1f; }
+        // being payment against
+        $against1 = 'Advance payment for Reservation No ' . $r->reservation_no;
+        $names = array();
+        foreach ($items as $it) {
+            $names[] = $it->product_name . ' x' . (float)$it->qty;
+        }
+        $against2 = mb_strimwidth(implode(', ', $names), 0, 95, '...');
 
-    .box { border: 1px solid #ddd; }
-    .box-title { background: #f6e9ec; color: #a50f2d; font-weight: bold; font-size: 11px; padding: 6px 10px; border-bottom: 1px solid #ddd; }
-    .box-body { padding: 8px 10px; line-height: 1.6; }
-    .lbl { color: #777; }
+        $p  = $this->at(1240, 161, 270, 30, $this->h($r->reservation_no), 'left', true);                        // No.
+        $p .= $this->at(1285, 248, 190, 30, $this->h(date('d M Y', strtotime($r->reservation_date))));          // Date
 
-    .items th { background: #a50f2d; color: #fff; padding: 7px 6px; font-size: 10.5px; border: 1px solid #a50f2d; }
-    .items td { padding: 7px 6px; border: 1px solid #ddd; vertical-align: top; }
-    .items tr.alt td { background: #fbf4f5; }
-    .r { text-align: right; }
-    .c { text-align: center; }
+        $p .= $this->at(490, $this->yReceived, 985, 30, $this->h($r->customer), 'left', true);                  // RECEIVED with thanks from
+        $p .= $this->at(150, $this->yOf, 1325, 30, $this->h(implode(', ', $cusaddr)));                          // of
 
-    .totals td { padding: 5px 8px; }
-    .totals .grand td { background: #a50f2d; color: #fff; font-weight: bold; font-size: 13px; }
+        if (isset($wordLines[0])) { $p .= $this->at(316, $this->ySum1, 1160, 30, $this->h($wordLines[0])); }   // the sum of Rupees
+        if (isset($wordLines[1])) { $p .= $this->at(125, $this->ySum2, 1355, 30, $this->h($wordLines[1])); }
+        if (isset($wordLines[2])) { $p .= $this->at(125, $this->ySum3, 1355, 30, $this->h($wordLines[2])); }
 
-    .badge { display: inline-block; color: #fff; padding: 3px 10px; font-size: 10px; font-weight: bold; }
-    .terms { font-size: 10px; color: #555; line-height: 1.6; }
-    .sign { border-top: 1px solid #555; padding-top: 4px; text-align: center; font-size: 10px; }
+        $p .= $this->at(357, $this->yAgainst1, 1120, 30, $this->h($against1));                                  // being payment against
+        $p .= $this->at(125, $this->yAgainst2, 1355, 30, $this->h($against2));
 
-    .footer { position: fixed; bottom: -40px; left: 0; right: 0; font-size: 9px; color: #888; text-align: center; border-top: 1px solid #ddd; padding-top: 5px; }
-</style>
-</head>
-<body>
+        $p .= $this->at(188, 730, 244, 36, number_format($amount, 2), 'center', true, 12);                      // Rs.
 
-<!-- Header -->
-<table class="head">
-    <tr>
-        <td style="width:60%;">
-            <div class="company"><?php echo $this->h($r->company) ?></div>
-            <div class="small">
-                <?php echo $this->h($address) ?><br>
-                Tel: <?php echo $this->h($tel) ?>
-                <?php if(!empty($r->co_email)){ echo ' | '.$this->h($r->co_email); } ?>
-                <?php if(!empty($r->co_vat_reg_no)){ echo '<br>VAT Reg No: '.$this->h($r->co_vat_reg_no); } ?>
-            </div>
-        </td>
-        <td style="width:40%;">
-            <div class="doc-title">RESERVATION NOTE</div>
-            <div class="small" style="text-align:right; margin-top:4px;">Branch: <?php echo $this->h($r->branch) ?></div>
-        </td>
-    </tr>
-</table>
-<div class="accent"></div>
+        // Cash/*Cheque No. and the signature are left empty for hand filling
 
-<!-- Customer + reservation details -->
-<table style="margin-top:12px;">
-    <tr>
-        <td style="width:50%; padding-right:6px; vertical-align:top;">
-            <div class="box">
-                <div class="box-title">CUSTOMER DETAILS</div>
-                <div class="box-body">
-                    <b><?php echo $this->h($r->customer) ?></b><br>
-                    <?php echo $this->h(implode(', ', $cusaddr)) ?><br>
-                    <span class="lbl">Tel:</span> <?php echo $this->h($r->customer_phone) ?>
-                    <?php if(!empty($r->cus_vat_no) && $r->cus_vat_no!='-'){ ?>
-                    <br><span class="lbl">VAT No:</span> <?php echo $this->h($r->cus_vat_no) ?>
-                    <?php } ?>
-                </div>
-            </div>
-        </td>
-        <td style="width:50%; padding-left:6px; vertical-align:top;">
-            <div class="box">
-                <div class="box-title">RESERVATION DETAILS</div>
-                <div class="box-body">
-                    <span class="lbl">Reservation No:</span> <b><?php echo $r->reservation_no ?></b><br>
-                    <span class="lbl">Date:</span> <?php echo date('d M Y', strtotime($r->reservation_date)) ?><br>
-                    <span class="lbl">Hold Until:</span> <b><?php echo date('d M Y', strtotime($r->expiry_date)) ?></b><br>
-                    <?php if(!empty($r->invoice_no)){ ?><br><span class="lbl">Invoice No:</span> <?php echo $r->invoice_no ?><?php } ?>
-                </div>
-            </div>
-        </td>
-    </tr>
-</table>
+        $body = '<div style="position:relative;width:' . $this->paperW . 'pt;height:' . ($this->paperH - 4) . 'pt;">' . $p . '</div>';
 
-<!-- Items -->
-<table class="items" style="margin-top:12px;">
-    <thead>
-        <tr>
-            <th style="width:4%;">#</th>
-            <th style="width:13%;">Code</th>
-            <th>Description</th>
-            <th style="width:7%;">Qty</th>
-            <th style="width:14%;">Unit Price</th>
-            <th style="width:15%;">Total</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php $n=0; foreach($items as $item){ $n++; ?>
-        <tr class="<?php echo $n%2==0 ? 'alt' : '' ?>">
-            <td class="c"><?php echo $n ?></td>
-            <td><?php echo $this->h($item->product_code) ?></td>
-            <td>
-                <b><?php echo $this->h($item->product_name) ?></b>
-                <?php if(!empty($item->model_no)){ ?><br><span class="small lbl">Model: <?php echo $this->h($item->model_no) ?></span><?php } ?>
-                <?php if(!empty($item->comment)){ ?><br><span class="small lbl"><?php echo $this->h($item->comment) ?></span><?php } ?>
-            </td>
-            <td class="c"><?php echo (float)$item->qty ?></td>
-            <td class="r"><?php echo $this->rs($item->unitprice) ?></td>
-            <td class="r"><?php echo $this->rs($item->line_total) ?></td>
-        </tr>
-        <?php } ?>
-    </tbody>
-</table>
-
-<!-- Remark + totals -->
-<table style="margin-top:10px;">
-    <tr>
-        <td style="width:55%; vertical-align:top; padding-right:12px;">
-            <?php if(!empty($r->remark)){ ?>
-            <div class="box">
-                <div class="box-title">REMARK</div>
-                <div class="box-body"><?php echo nl2br($this->h($r->remark)) ?></div>
-            </div>
-            <?php } ?>
-        </td>
-        <td style="width:45%; vertical-align:top;">
-            <table class="totals box">
-                <tr><td>Total Qty</td><td class="r"><?php echo (float)$r->total_qty ?></td></tr>
-                <tr><td>Subtotal</td><td class="r"><?php echo $this->rs($r->subtotal) ?></td></tr>
-                <tr>
-                    <td>VAT <?php echo $r->vat_applicable==1 ? '('.(float)$r->vat_rate.'%)' : '(Not applicable)' ?></td>
-                    <td class="r"><?php echo $this->rs($r->vat_amount) ?></td>
-                </tr>
-                <tr class="grand"><td>TOTAL (Rs.)</td><td class="r"><?php echo $this->rs($r->total_amount) ?></td></tr>
-                <tr><td>Advance Paid</td><td class="r"><?php echo $this->rs($r->advance_amount) ?></td></tr>
-                <tr><td><b>Balance to Pay</b></td><td class="r"><b><?php echo $this->rs($r->total_amount-$r->advance_amount) ?></b></td></tr>
-            </table>
-        </td>
-    </tr>
-</table>
-
-<!-- Terms -->
-<div class="box" style="margin-top:12px;">
-    <div class="box-title">TERMS &amp; CONDITIONS</div>
-    <div class="box-body terms">
-        1. The items are held for the customer until <b><?php echo date('d M Y', strtotime($r->expiry_date)) ?></b>. After this date the reservation may be released.<br>
-        2. Stock is allocated and serial numbers are assigned only at the time of invoicing.<br>
-        3. Prices and VAT shown are as at the reservation date and may change if the reservation is renewed.<br>
-        4. Please bring this note when collecting the items.
-    </div>
-</div>
-
-<!-- Signatures -->
-<table style="margin-top:38px;">
-    <tr>
-        <td style="width:30%;"><div class="sign">Prepared By<br><b><?php echo $this->h($r->prepared_by) ?></b></div></td>
-        <td style="width:5%;"></td>
-        <td style="width:30%;"><div class="sign">Authorized By</div></td>
-        <td style="width:5%;"></td>
-        <td style="width:30%;"><div class="sign">Customer Signature</div></td>
-    </tr>
-</table>
-
-<div class="footer">
-    <?php echo $this->h($r->company) ?> &nbsp;|&nbsp; Reservation Note <?php echo $r->reservation_no ?> &nbsp;|&nbsp; Printed on <?php echo date('d M Y, h:i A') ?>
-</div>
-
-</body>
-</html>
-        <?php
-        return ob_get_clean();
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Advance Receipt ' . $this->h($r->reservation_no) . '</title><style>'
+            . '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
+            . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; line-height: ' . $this->lineHeight . 'pt; color: #000; }'
+            . '</style></head><body>' . $body . '</body></html>';
     }
+
     public function Streampdf($html, $reservationno){
         $this->load->library('pdf');
-        $this->pdf->setPaper('A4', 'portrait');
+        $this->pdf->setPaper(array(0, 0, $this->paperW, $this->paperH));
         $this->pdf->loadHtml($html);
         $this->pdf->render();
 
         while (ob_get_level()) { ob_end_clean(); }
 
-        $this->pdf->stream('Reservation Note - '.$reservationno.'.pdf', array('Attachment' => 0));
+        $this->pdf->stream('Advance Receipt - ' . $reservationno . '.pdf', array('Attachment' => 0));
         exit;
+    }
+
+    /* ================= helpers ================= */
+
+    // artwork px -> pt
+    private function px($v){
+        return round($v * $this->paperW / $this->artW, 2);
+    }
+
+    // one absolutely positioned data field; $html must already be escaped
+    private function at($x, $y, $w, $h, $html, $align = 'left', $bold = false, $size = null){
+        $left = $this->px($x) + $this->shiftX * 2.8346;
+        $top  = $this->px($y) + $this->shiftY * 2.8346;
+        $st = 'position:absolute;left:' . $left . 'pt;top:' . $top . 'pt;width:' . $this->px($w) . 'pt;height:' . $this->px($h) . 'pt;'
+            . 'overflow:hidden;text-align:' . $align . ';';
+        if ($bold) { $st .= 'font-weight:bold;'; }
+        if ($size) { $st .= 'font-size:' . $size . 'pt;line-height:' . round($size * 1.2, 1) . 'pt;'; }
+        if ($this->guide) { $st .= 'outline:0.4pt solid #f00;'; }
+        return '<div style="' . $st . '">' . $html . '</div>';
+    }
+
+    private function h($v){
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+
+    // the form already prints "the sum of Rupees", so no "Rupees" in the words
+    private function amount_words($amt){
+        $amt    = round((float)$amt, 2);
+        $rupees = (int)floor($amt);
+        $cents  = (int)round(($amt - $rupees) * 100);
+
+        $t = $this->words($rupees);
+        if ($cents > 0) {
+            $t .= ' and ' . $this->words($cents) . ' Cents';
+        }
+        return $t . ' Only';
+    }
+
+    private function words($n){
+        $n = (int)$n;
+        if ($n == 0) { return 'Zero'; }
+
+        $scales = array(1000000000 => 'Billion', 1000000 => 'Million', 1000 => 'Thousand');
+        $out = '';
+        foreach ($scales as $v => $name) {
+            if ($n >= $v) {
+                $out .= $this->words_below((int)floor($n / $v)) . ' ' . $name . ' ';
+                $n = $n % $v;
+            }
+        }
+        if ($n > 0) { $out .= $this->words_below($n); }
+        return trim($out);
+    }
+
+    // 1 - 999
+    private function words_below($n){
+        $ones = array('', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve',
+                      'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen');
+        $tens = array('', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety');
+
+        $s = '';
+        if ($n >= 100) {
+            $s .= $ones[(int)floor($n / 100)] . ' Hundred ';
+            $n = $n % 100;
+        }
+        if ($n >= 20) {
+            $s .= $tens[(int)floor($n / 10)];
+            if ($n % 10) { $s .= ' ' . $ones[$n % 10]; }
+        } else if ($n > 0) {
+            $s .= $ones[$n];
+        }
+        return trim($s);
     }
 }

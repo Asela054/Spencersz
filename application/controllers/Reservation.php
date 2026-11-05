@@ -37,15 +37,11 @@ class Reservation extends CI_Controller {
     }
     public function Reservationnote($id) {
         $this->load->model('Reservationnoteinfo');
-
         $data = $this->Reservationnoteinfo->Getnotedata($id);
-        if ($data === null) {
-            show_404();
-            return;
+        if ($data) {
+            $html = $this->Reservationnoteinfo->Buildreceipthtml($data);
+            $this->Reservationnoteinfo->Streampdf($html, $data['r']->reservation_no);
         }
-
-        $html = $this->Reservationnoteinfo->Buildnotehtml($data);
-        $this->Reservationnoteinfo->Streampdf($html, $data['r']->reservation_no);
     }
     public function Getinvoicelist(){
         $this->load->model('Reservationinfo');

@@ -1,7 +1,29 @@
 <?php
 class PorderPrintinfo extends CI_Model{
 
-    private $rowsPerPage = 14;   // item rows per A4 page (blank rows pad the table)
+    /* =====================================================================
+       Pre-printed continuous stationery (LQ-310)
+       Artwork = 1382 x 1600 px  =  9.5in x 11in  =  684 x 792 pt
+       Every x / y / w / h below is in ARTWORK PIXELS, measured from the
+       top-left corner of the artwork. They are converted to pt automatically.
+       Only DATA is printed - the form design is already on the paper.
+       ===================================================================== */
+    private $paperW = 684;     // 9.5in in pt
+    private $paperH = 792;     // 11in in pt
+    private $artW   = 1382;    // artwork width in px
+
+    private $shiftX = 0;       // printer calibration in mm (+ moves right)
+    private $shiftY = 0;       // printer calibration in mm (+ moves down)
+    private $guide  = false;   // true = red outline around every field (alignment test)
+
+    private $fontSize   = 9;    // pt
+    private $lineHeight = 10.5; // pt
+
+    // items grid (body of the form: y 535 - 1416)
+    private $rowsPerPage = 18;
+    private $rowTop      = 545;   // first row y
+    private $rowH        = 44;    // row height (2 text lines fit)
+    private $totalY      = 1372;  // total / "continued" line, below the last row
 
     public function Printinvoice($x){
         $recordID = (int)$x;
@@ -21,18 +43,15 @@ class PorderPrintinfo extends CI_Model{
         }
 
         $po = $respond->row(0);
-        $company_id = $po->tbl_company_idtbl_company;
 
         $this->db->select('tbl_company.company AS companyname, tbl_company.address1 AS companyaddress, tbl_company.mobile AS companymobile,
                            tbl_company.phone AS companyphone, tbl_company.email AS companyemail,
                            tbl_company_branch.branch AS branchname,
-                           preparer.name AS preparedByName,
-                           approver.name AS authorizedByName');
+                           tbl_company_branch.address1 AS branchaddress1, tbl_company_branch.address2 AS branchaddress2,
+                           tbl_company_branch.mobile AS branchmobile, tbl_company_branch.phone AS branchphone');
         $this->db->from('tbl_porder');
         $this->db->join('tbl_company', 'tbl_company.idtbl_company = tbl_porder.tbl_company_idtbl_company', 'left');
         $this->db->join('tbl_company_branch', 'tbl_company_branch.idtbl_company_branch = tbl_porder.tbl_company_branch_idtbl_company_branch', 'left');
-        $this->db->join('tbl_user AS preparer', 'preparer.idtbl_user = tbl_porder.tbl_user_idtbl_user', 'left');
-        $this->db->join('tbl_user AS approver', 'approver.idtbl_user = tbl_porder.approve_by', 'left');
         $this->db->where('tbl_porder.idtbl_porder', $recordID);
         $companydetails = $this->db->get();
         $co = $companydetails->row();
@@ -56,15 +75,38 @@ class PorderPrintinfo extends CI_Model{
         $remark     = trim((string)$po->remark);
         $supplierId = (int)$po->tbl_supplier_idtbl_supplier;
 
-        // Supplier name (supplier 65 = one-time supplier, name is typed in the remark)
-        $supName = array($po->suppliername);
+        // ---- "To Messers" : supplier (supplier 65 = one-time supplier, name is typed in the remark)
+        $toLines = array($po->suppliername);
         if ($supplierId == 65 && $remark !== '') {
-            $supName[] = $remark;
+            $toLines[] = $remark;
         }
-        $supAddr = array($po->address_line1, $po->address_line2, $po->city);
-        $tp = (strlen((string)$po->telephone_no) >= 9) ? $po->telephone_no : '';
+        $toLines[] = $po->address_line1;
+        $toLines[] = $po->address_line2;
+        $toLines[] = $po->city;
+        if (strlen((string)$po->telephone_no) >= 9) {
+            $toLines[] = 'Tel: ' . $po->telephone_no;
+        }
 
+        // ---- "Delivery" : receiving branch (falls back to the company address)
+        $brTel = trim($co->branchmobile . ' / ' . $co->branchphone, ' /');
         $coTel = trim($co->companymobile . ' / ' . $co->companyphone, ' /');
+
+        $delLines = array($co->branchname);
+        $brAddr = array(trim((string)$co->branchaddress1), trim((string)$co->branchaddress2));
+        if ($brAddr[0] === '' && $brAddr[1] === '') {
+            $delLines[] = $co->companyaddress;
+        } else {
+            $delLines[] = $brAddr[0];
+            $delLines[] = $brAddr[1];
+        }
+        $delTel = ($brTel !== '') ? $brTel : $coTel;
+        if ($delTel !== '') {
+            $delLines[] = 'Tel: ' . $delTel;
+        }
+
+        // ---- optional fields (left blank for hand writing if the column does not exist)
+        $onOrBefore   = $this->lq_pick($po, array('deliverydate', 'delivery_date', 'requireddate', 'required_date', 'duedate', 'due_date'));
+        $creditPeriod = $this->lq_pick($po, array('creditperiod', 'credit_period', 'creditdays', 'credit_days'));
 
         $pages = array_chunk($respond2->result(), $this->rowsPerPage);
         if (empty($pages)) {
@@ -76,219 +118,119 @@ class PorderPrintinfo extends CI_Model{
         foreach ($pages as $index => $lines) {
             $isLast = ($index == $totalPages - 1);
 
-            $p  = $this->lq_head('PURCHASE ORDER', $co->companyname, $co->companyaddress,
-                          array('Tel: ' . $coTel, 'E-Mail: ' . $co->companyemail));
+            // ---------- header boxes ----------
+            $p  = $this->at(1082, 112, 196, 24, $this->lq_e($po->porder_no));      // No.
+            $p .= $this->at(1082, 163, 196, 24, $this->lq_e($po->orderdate));      // Date
+            $p .= $this->at(115, 245, 380, 118, $this->lq_lines($delLines, true)); // Delivery
+            $p .= $this->at(899, 245, 380, 118, $this->lq_lines($toLines, true));  // To Messers
+            $p .= $this->at(277, 387, 217, 26, $this->lq_e($onOrBefore));          // ON or BEFORE
+            $p .= $this->at(1061, 387, 217, 26, $this->lq_e($creditPeriod));       // Credit Period
 
-            $p .= $this->lq_boxes(array(
-                $this->lq_kv(array(array('PO No', $po->porder_no))),
-                $this->lq_kv(array(array('Date', $po->orderdate)))
-            ));
-            $p .= $this->lq_sp(6);
-
-            $rightPairs = array(
-                array('Purchaser Name', $co->companyname),
-                array('Address', $co->companyaddress),
-                array('Telephone No.', $coTel)
-            );
-            if ($company_id == 1) {
-                $rightPairs[] = array('Our VAT No', '103305667-7000');
-            }
-            $p .= $this->lq_boxes(array(
-                $this->lq_kv(array(
-                    array('Supplier Name', $supName),
-                    array('Address', $supAddr),
-                    array('Telephone No.', $tp),
-                    array('Attn', '....................................')
-                )),
-                $this->lq_kv($rightPairs)
-            ));
-            $p .= $this->lq_sp(8);
-
-            $p .= '<table class="items">
-                <thead><tr>
-                    <th style="width:5%;">#</th>
-                    <th style="width:14%;">Item Code</th>
-                    <th style="width:35%;text-align:left;">Description of Goods</th>
-                    <th style="width:8%;">Qty</th>
-                    <th style="width:8%;">UOM</th>
-                    <th style="width:14%;">Unit Price</th>
-                    <th style="width:16%;">Amount (Rs.)</th>
-                </tr></thead><tbody>';
-
+            // ---------- items grid ----------
             $n = $index * $this->rowsPerPage;
-            foreach ($lines as $r) {
+            foreach ($lines as $i => $r) {
                 $n++;
+                $y = $this->rowTop + $i * $this->rowH;
+
                 $desc = (string)$r->product_name;
                 if (trim((string)$r->comment) !== '') {
                     $desc .= ' - ' . $r->comment;
                 }
-                $p .= '<tr>
-                    <td style="text-align:center;">' . $n . '</td>
-                    <td style="text-align:center;">' . $this->lq_e($r->product_code) . '</td>
-                    <td>' . $this->lq_e($desc) . '</td>
-                    <td style="text-align:center;">' . $this->lq_e($r->qty) . '</td>
-                    <td style="text-align:center;">' . $this->lq_e($r->measure_type) . '</td>
-                    <td style="text-align:right;">' . number_format((float)$r->unitprice, 2) . '</td>
-                    <td style="text-align:right;">' . number_format((float)$r->netprice, 2) . '</td>
-                </tr>';
-            }
-            $p .= $this->lq_pad_rows(count($lines), $this->rowsPerPage, 7);
-            $p .= '</tbody></table>';
 
+                $p .= $this->at(97,   $y, 135, $this->rowH, $n, 'center');                                        // Seq. No.
+                $p .= $this->at(240,  $y, 170, $this->rowH, $this->lq_e($r->product_code));                       // Stock Code
+                $p .= $this->at(424,  $y, 357, $this->rowH, $this->lq_e($desc));                                  // Description
+                $p .= $this->at(787,  $y, 110, $this->rowH, $this->lq_e($r->qty), 'center');                      // Qty
+                $p .= $this->at(897,  $y, 110, $this->rowH, $this->lq_e($r->measure_type), 'center');             // Unit
+                $p .= $this->at(1007, $y, 138, $this->rowH, number_format((float)$r->unitprice, 2), 'right');     // Unit Price
+                $p .= $this->at(1155, $y, 123, $this->rowH, number_format((float)$r->netprice, 2), 'right');      // Value
+            }
+
+            // ---------- total / continued ----------
             if ($isLast) {
-                $p .= $this->lq_totals(array(
-                    array('Total (Excl)', number_format($net, 2)),
-                    array('Tax', ''),
-                    array('Total (Incl)', number_format($net, 2), true)
-                ), 16);
-
-                if ($supplierId != 65 && $remark !== '') {
-                    $p .= $this->lq_sp(6);
-                    $p .= $this->lq_boxes(array($this->lq_kv(array(array('Remark', $remark)))));
-                }
-
-                $p .= $this->lq_sp(8);
-                $p .= $this->lq_sign(array(
-                    array('Prepared by', $co->preparedByName, 'Signature'),
-                    array('Authorized by', $co->authorizedByName, 'Signature'),
-                    array('Contact No', '', '')
-                ));
+                $p .= $this->at(1007, $this->totalY, 138, 28, 'TOTAL', 'right', true);
+                $p .= $this->at(1155, $this->totalY, 123, 28, number_format($net, 2), 'right', true);
             } else {
-                $p .= '<div class="cont">Continued on next page...</div>';
+                $p .= $this->at(416, $this->totalY, 862, 28, 'Continued on next page...', 'right', true);
             }
 
-            $body .= $this->lq_page($p, $isLast, $index + 1, $totalPages);
+            // ---------- bottom-left (free area left of the Director box) ----------
+            if ($isLast && $supplierId != 65 && $remark !== '') {
+                $p .= $this->at(105, 1432, 790, 44, 'Remark : ' . $this->lq_e($remark));
+            }
+            if ($totalPages > 1) {
+                $p .= $this->at(105, 1546, 300, 22, 'Page ' . ($index + 1) . ' of ' . $totalPages);
+            }
+
+            $body .= $this->lq_page($p, $isLast);
         }
 
         $html = $this->lq_doc('Purchase Order - ' . $po->porder_no, $body);
 
         $this->load->library('pdf');
-        $this->pdf->setPaper('A4', 'portrait');
+        $this->pdf->setPaper(array(0, 0, $this->paperW, $this->paperH));
         $this->pdf->loadHtml($html);
         $this->pdf->render();
         $this->pdf->stream($this->lq_filename(strtoupper($co->companyname) . ' - PURCHASE ORDER - ' . $po->porder_no) . '.pdf', array("Attachment" => 0));
     }
 
-    /* ================= LQ-310 print design helpers (black and white, A4 portrait) ================= */
+    /* ================= data-only print helpers (continuous stationery) ================= */
+
+    // artwork px -> pt
+    private function px($v){
+        return round($v * $this->paperW / $this->artW, 2);
+    }
+
+    // one absolutely positioned data field; $html must already be escaped
+    private function at($x, $y, $w, $h, $html, $align = 'left', $bold = false){
+        $left = $this->px($x) + $this->shiftX * 2.8346;
+        $top  = $this->px($y) + $this->shiftY * 2.8346;
+        $st = 'position:absolute;left:' . $left . 'pt;top:' . $top . 'pt;width:' . $this->px($w) . 'pt;height:' . $this->px($h) . 'pt;'
+            . 'overflow:hidden;text-align:' . $align . ';';
+        if ($bold) { $st .= 'font-weight:bold;'; }
+        if ($this->guide) { $st .= 'outline:0.4pt solid #f00;'; }
+        return '<div style="' . $st . '">' . $html . '</div>';
+    }
 
     private function lq_e($v){
         return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     }
 
-    private function lq_val($v){
-        if (is_array($v)) {
-            $lines = array();
-            foreach ($v as $line) {
-                $line = trim((string)$line);
-                if ($line !== '') { $lines[] = $this->lq_e($line); }
+    // several text lines, empty ones skipped, first line optionally bold
+    private function lq_lines($arr, $boldFirst = false){
+        $out = array();
+        foreach ($arr as $line) {
+            $line = trim((string)$line);
+            if ($line !== '') { $out[] = $this->lq_e($line); }
+        }
+        if ($boldFirst && !empty($out)) {
+            $out[0] = '<b>' . $out[0] . '</b>';
+        }
+        return implode('<br>', $out);
+    }
+
+    // first non-empty column found on the row ('' when none exists)
+    private function lq_pick($row, $names){
+        foreach ($names as $n) {
+            if (isset($row->$n)) {
+                $v = trim((string)$row->$n);
+                if ($v !== '' && strpos($v, '0000-00-00') !== 0) { return $v; }
             }
-            return empty($lines) ? '&nbsp;' : implode('<br>', $lines);
         }
-        $v = trim((string)$v);
-        return $v === '' ? '&nbsp;' : $this->lq_e($v);
+        return '';
     }
 
-    private function lq_css(){
-        return '
-@page { size: A4 portrait; margin: 8mm; }
-body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10px; color: #000; margin: 0; line-height: 1.3; }
-table { border-collapse: collapse; width: 100%; }
-.title { border-top: 2px solid #000; border-bottom: 2px solid #000; text-align: center; font-size: 20px; font-weight: bold; letter-spacing: 3px; padding: 5px 0; }
-.co { text-align: center; padding: 8px 0; line-height: 1.45; }
-.coname { font-size: 14px; font-weight: bold; }
-table.outer { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: 100%; }
-td.half { border: 1px solid #000; padding: 3px 6px; vertical-align: top; }
-table.kv { table-layout: fixed; }
-table.kv td { border: none; padding: 2px 0; vertical-align: top; }
-table.kv td.k { width: 34%; font-weight: bold; }
-table.kv td.c { width: 4%; }
-table.items { table-layout: fixed; }
-table.items th { border: 1px solid #000; padding: 4px; font-size: 10px; font-weight: bold; }
-table.items td { border: 1px solid #000; padding: 2px 5px; font-size: 10px; height: 19px; vertical-align: middle; }
-table.items tr { page-break-inside: avoid; }
-table.tot { table-layout: fixed; }
-table.tot td { border: 1px solid #000; padding: 3px 6px; font-size: 10px; }
-table.tot td.n { text-align: right; }
-table.tot tr.b td { font-weight: bold; font-size: 11px; }
-.sigline { border-top: 1px solid #000; text-align: center; font-size: 9px; padding-top: 2px; }
-.sp { font-size: 1px; line-height: 1px; }
-.pg { text-align: right; font-size: 9px; margin-top: 4px; }
-.cont { text-align: right; font-size: 10px; font-weight: bold; margin-top: 6px; }
-.section { font-size: 11px; font-weight: bold; margin: 0 0 4px 0; }';
-    }
-
-    private function lq_head($title, $companyName, $address, $contactLines = array()){
-        $h  = '<div class="title">' . $this->lq_e($title) . '</div>';
-        $h .= '<div class="co"><div class="coname">' . $this->lq_e($companyName) . '</div>';
-        if (trim((string)$address) !== '') { $h .= '<div>' . $this->lq_e($address) . '</div>'; }
-        foreach ($contactLines as $l) {
-            if (trim((string)$l) !== '') { $h .= '<div>' . $this->lq_e($l) . '</div>'; }
-        }
-        return $h . '</div>';
-    }
-
-    private function lq_kv($pairs){
-        $h = '<table class="kv">';
-        foreach ($pairs as $p) {
-            $h .= '<tr><td class="k">' . $this->lq_e($p[0]) . '</td><td class="c">:</td><td>' . $this->lq_val($p[1]) . '</td></tr>';
-        }
-        return $h . '</table>';
-    }
-
-    private function lq_boxes($cells){
-        $n   = count($cells);
-        $gap = 2;
-        $w   = (100 - $gap * ($n - 1)) / $n;
-        $h   = '<table class="outer"><tr>';
-        foreach ($cells as $i => $c) {
-            if ($i > 0) { $h .= '<td style="width:' . $gap . '%;"></td>'; }
-            $h .= '<td class="half" style="width:' . $w . '%;">' . $c . '</td>';
-        }
-        return $h . '</tr></table>';
-    }
-
-    private function lq_sp($px = 6){
-        return '<div class="sp" style="height:' . (int)$px . 'px;">&nbsp;</div>';
-    }
-
-    private function lq_pad_rows($used, $perPage, $cols){
-        $h = '';
-        for ($k = $used; $k < $perPage; $k++) {
-            $h .= '<tr>' . str_repeat('<td>&nbsp;</td>', $cols) . '</tr>';
-        }
-        return $h;
-    }
-
-    private function lq_totals($rows, $amountWidth = 22){
-        $h = '<table class="tot">';
-        foreach ($rows as $r) {
-            $bold = !empty($r[2]);
-            $h .= '<tr' . ($bold ? ' class="b"' : '') . '><td style="width:' . (100 - $amountWidth) . '%;">' . $this->lq_e($r[0]) . '</td>'
-                . '<td class="n" style="width:' . $amountWidth . '%;">' . $this->lq_e($r[1]) . '</td></tr>';
-        }
-        return $h . '</table>';
-    }
-
-    private function lq_sign($items){
-        $cells = array();
-        foreach ($items as $it) {
-            $name    = isset($it[1]) ? trim((string)$it[1]) : '';
-            $caption = isset($it[2]) ? $it[2] : 'Signature';
-            $cells[] = '<b>' . $this->lq_e($it[0]) . '</b>'
-                . '<div style="height:38px;text-align:center;padding-top:22px;">' . ($name !== '' ? $this->lq_e($name) : '&nbsp;') . '</div>'
-                . '<div class="sigline">' . ($caption !== '' ? $this->lq_e($caption) : '&nbsp;') . '</div>';
-        }
-        return $this->lq_boxes($cells);
-    }
-
-    private function lq_page($inner, $isLast, $pageNo, $total){
-        return '<div' . ($isLast ? '' : ' style="page-break-after:always;"') . '>' . $inner
-            . '<div class="pg">Page ' . (int)$pageNo . ' of ' . (int)$total . '</div></div>';
+    private function lq_page($inner, $isLast){
+        return '<div style="position:relative;width:' . $this->paperW . 'pt;height:' . ($this->paperH - 6) . 'pt;'
+            . ($isLast ? '' : 'page-break-after:always;') . '">' . $inner . '</div>';
     }
 
     private function lq_doc($title, $body){
+        $css = '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
+             . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; '
+             . 'line-height: ' . $this->lineHeight . 'pt; color: #000; }';
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
-            . $this->lq_css() . '</style></head><body>' . $body . '</body></html>';
+            . $css . '</style></head><body>' . $body . '</body></html>';
     }
 
     private function lq_filename($s){
