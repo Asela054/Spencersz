@@ -1,11 +1,34 @@
 <?php
 class PdfGRNinfo extends CI_Model {
 
-    private $rowsPerPage        = 14;  // GRN item rows per A4 page
+    /* =====================================================================
+       GRN on pre-printed continuous stationery (LQ-310)
+       Artwork = 1382 x 1600 px  =  9.5in x 11in  =  684 x 792 pt
+       Every x / y / w / h used by the GRN print is in ARTWORK PIXELS measured
+       from the top-left corner of the artwork (converted to pt by px()).
+       Only DATA is printed - the form design is already on the paper.
+       ===================================================================== */
+    private $paperW = 684;     // 9.5in in pt
+    private $paperH = 792;     // 11in in pt
+    private $artW   = 1382;    // artwork width in px
+
+    private $shiftX = 0;       // printer calibration in mm (+ moves right)
+    private $shiftY = 0;       // printer calibration in mm (+ moves down)
+    private $guide  = false;   // true = red outline around every field (alignment test)
+
+    private $fontSize   = 9;    // pt
+    private $lineHeight = 10.5; // pt
+
+    // GRN items grid (body of the form: y 466 - 1342)
+    private $rowsPerPage = 17;    // GRN item rows per page
+    private $rowTop      = 476;   // first row y
+    private $rowH        = 44;    // row height (2 text lines fit)
+    private $totalsY     = 1236;  // first totals line (3 lines, 22 px apart) / "continued" line is the 3rd
+
     private $voucherRowsPerPage = 9;   // voucher item rows per page (leaves room for the importation split)
 
     /* ------------------------------------------------------------------
-     * GOODS RECEIVED NOTE  (A4 portrait, black and white)
+     * GOODS RECEIVED NOTE  (data only, pre-printed continuous paper)
      * ------------------------------------------------------------------ */
     public function pdfgrnget($x) {
         $recordID = $x;
@@ -82,9 +105,24 @@ class PdfGRNinfo extends CI_Model {
         $co = $companydetails->row();
 
         $grnNo = $q->grn_no;
-        $coTel = trim($co->companymobile . ' / ' . $co->companyphone, ' /');
 
         $supplierAddr = array($q->delivery_address_line1, $q->delivery_address_line2, $q->delivery_city, $q->delivery_state);
+        $receivedAt   = (trim((string)$co->branchname) !== '') ? $co->branchname : $co->companyname;
+
+        // left box: supplier
+        $leftBox = $this->lq_e('Received from :') . '<br><b>' . $this->lq_e($q->suppliername) . '</b>';
+        $addrHtml = $this->lq_lines($supplierAddr);
+        if ($addrHtml !== '') {
+            $leftBox .= '<br>' . $addrHtml;
+        }
+
+        // right box: GRN details (label / value pairs)
+        $details = array(
+            array('GRN Date',    $q->grndate),
+            array('Invoice No',  $q->invoicenum),
+            array('Batch No',    $q->batchno),
+            array('Received at', $receivedAt)
+        );
 
         $pages = array_chunk($query->result(), $this->rowsPerPage);
         if (empty($pages)) {
@@ -96,79 +134,61 @@ class PdfGRNinfo extends CI_Model {
         foreach ($pages as $index => $lines) {
             $isLast = ($index == $totalPages - 1);
 
-            $p  = $this->lq_head('GOODS RECEIVED NOTE', $co->companyname, $co->companyaddress,
-                          array('Tel: ' . $coTel, 'E-Mail: ' . $co->companyemail));
+            // ---------- top right boxes ----------
+            $p  = $this->at(1093, 125, 170, 24, $this->lq_e($grnNo));                       // No.      (GRN No)
+            $p .= $this->at(1093, 177, 170, 24, ($index + 1) . ' of ' . $totalPages);       // Page No.
+            $p .= $this->at(1093, 229, 170, 24, $this->lq_e($q->porder_no));                // No.      (PO No)
 
-            $p .= $this->lq_boxes(array(
-                $this->lq_kv(array(array('GRN No', $grnNo), array('GRN Date', $q->grndate), array('Batch No', $q->batchno))),
-                $this->lq_kv(array(array('Invoice No', $q->invoicenum), array('PO No', $q->porder_no)))
-            ));
-            $p .= $this->lq_sp(6);
-            $p .= $this->lq_boxes(array(
-                $this->lq_kv(array(array('Received from', $q->suppliername), array('Address', $supplierAddr))),
-                $this->lq_kv(array(array('Received at', $co->companyname), array('Address', $co->companyaddress), array('Telephone No.', $coTel)))
-            ));
-            $p .= $this->lq_sp(8);
+            // ---------- title box ----------
+            $p .= $this->at(536, 219, 311, 26, 'GOODS RECEIVED NOTE', 'center', true, 10);
 
-            $p .= '<table class="items">
-                <thead><tr>
-                    <th style="width:13%;">Item Code</th>
-                    <th style="width:29%;text-align:left;">Description of Goods</th>
-                    <th style="width:9%;">Ordered</th>
-                    <th style="width:8%;">Prev</th>
-                    <th style="width:9%;">Received</th>
-                    <th style="width:7%;">Unit</th>
-                    <th style="width:12%;">Price</th>
-                    <th style="width:13%;">Total</th>
-                </tr></thead><tbody>';
+            // ---------- two big boxes ----------
+            $p .= $this->at(125, 281, 545, 128, $leftBox);
+            foreach ($details as $i => $d) {
+                $y = 281 + $i * 24;
+                $p .= $this->at(712, $y, 165, 22, $this->lq_e($d[0]) . ' :');
+                $p .= $this->at(885, $y, 380, 22, $this->lq_e($d[1]), 'left', true);
+            }
 
-            foreach ($lines as $r) {
+            // ---------- items grid ----------
+            foreach ($lines as $i => $r) {
+                $y = $this->rowTop + $i * $this->rowH;
+
                 $desc  = ($r->idtbl_category == 4) ? $r->comment : $r->product_name;
                 $price = !empty($r->unitprice) ? $r->unitprice : $r->costunitprice;
 
-                $p .= '<tr>
-                    <td>' . $this->lq_e($r->product_code) . '</td>
-                    <td>' . $this->lq_e($desc) . '</td>
-                    <td style="text-align:center;">' . $this->lq_e((float)$r->ordered_qty) . '</td>
-                    <td style="text-align:center;">' . $this->lq_e((float)$r->prev_qty) . '</td>
-                    <td style="text-align:center;font-weight:bold;">' . $this->lq_e((float)$r->qty) . '</td>
-                    <td style="text-align:center;">' . $this->lq_e($r->unit) . '</td>
-                    <td style="text-align:right;">' . number_format((float)$price, 2) . '</td>
-                    <td style="text-align:right;">' . number_format((float)$r->total, 2) . '</td>
-                </tr>';
+                $p .= $this->at(119,  $y, 124, $this->rowH, $this->lq_e($r->product_code));                         // Stock Code
+                $p .= $this->at(257,  $y, 100, $this->rowH, $this->lq_e($r->model_no));                             // Model No.
+                $p .= $this->at(372,  $y, 438, $this->rowH, $this->lq_e($desc));                                    // Description
+                $p .= $this->at(816,  $y, 95,  $this->rowH, $this->lq_e((float)$r->qty), 'center');                 // Qty.
+                $p .= $this->at(911,  $y, 137, $this->rowH, number_format((float)$price, 2), 'right');              // Unit Price
+                $p .= $this->at(1058, $y, 205, $this->rowH, number_format((float)$r->total, 2), 'right');           // Total
             }
-            $p .= $this->lq_pad_rows(count($lines), $this->rowsPerPage, 8);
-            $p .= '</tbody></table>';
 
+            // ---------- totals / continued (bottom of the grid) ----------
             if ($isLast) {
-                $p .= $this->lq_totals(array(
-                    array('Total (Excl)', number_format((float)$totalSum, 2)),
-                    array('VAT', number_format((float)$grn_vat, 2)),
-                    array('Total (Incl)', number_format((float)$grn_total, 2), true)
-                ), 13);
+                // $p .= $this->at(911, $this->totalsY,      137, 22, 'Sub Total', 'right');
+                // $p .= $this->at(1058, $this->totalsY,     205, 22, number_format((float)$totalSum, 2), 'right');
+                // $p .= $this->at(911, $this->totalsY + 22, 137, 22, 'VAT', 'right');
+                // $p .= $this->at(1058, $this->totalsY + 22, 205, 22, number_format((float)$grn_vat, 2), 'right');
+                $p .= $this->at(911, $this->totalsY + 44, 137, 22, 'Total', 'right', true);
+                $p .= $this->at(1058, $this->totalsY + 44, 205, 22, number_format((float)$grn_total, 2), 'right', true);
 
+                // ---------- wide box under the grid ----------
                 if ($remark !== '') {
-                    $p .= $this->lq_sp(6);
-                    $p .= $this->lq_boxes(array($this->lq_kv(array(array('Remarks', $remark)))));
+                    $p .= $this->at(125, 1360, 1135, 42, 'Remarks : ' . $this->lq_e($remark));
                 }
-
-                $p .= $this->lq_sp(8);
-                $p .= $this->lq_sign(array(
-                    array('Received by', '', 'Signature'),
-                    array('Approved by', '', 'Signature'),
-                    array('Accountant', '', 'Signature')
-                ));
             } else {
-                $p .= '<div class="cont">Continued on next page...</div>';
+                $p .= $this->at(372, $this->totalsY + 44, 438, 22, 'Continued on next page...', 'right', true);
             }
 
-            $body .= $this->lq_page($p, $isLast, $index + 1, $totalPages);
+            $body .= $this->grn_page($p, $isLast);
         }
 
-        $html = $this->lq_doc('Goods Received Note - ' . $grnNo, $body);
+        $html = $this->grn_doc('Goods Received Note - ' . $grnNo, $body);
 
         $this->load->library('pdf');
-        $this->pdf->setPaper('A4', 'portrait');
+        $this->pdf->setPaper(array(0, 0, $this->paperW, $this->paperH));
         $this->pdf->loadHtml($html);
         $this->pdf->render();
         $this->pdf->stream($this->lq_filename('Goods Received Note - ' . $grnNo) . '.pdf', array("Attachment" => 0));
@@ -349,7 +369,49 @@ class PdfGRNinfo extends CI_Model {
         $this->pdf->stream($this->lq_filename('Good Receive Voucher - ' . $recordID) . '.pdf', array("Attachment" => 0));
     }
 
-    /* ================= LQ-310 print design helpers (black and white, A4 portrait) ================= */
+    /* ================= data-only print helpers (GRN on pre-printed stationery) ================= */
+
+    // artwork px -> pt
+    private function px($v){
+        return round($v * $this->paperW / $this->artW, 2);
+    }
+
+    // one absolutely positioned data field; $html must already be escaped
+    private function at($x, $y, $w, $h, $html, $align = 'left', $bold = false, $size = null){
+        $left = $this->px($x) + $this->shiftX * 2.8346;
+        $top  = $this->px($y) + $this->shiftY * 2.8346;
+        $st = 'position:absolute;left:' . $left . 'pt;top:' . $top . 'pt;width:' . $this->px($w) . 'pt;height:' . $this->px($h) . 'pt;'
+            . 'overflow:hidden;text-align:' . $align . ';';
+        if ($bold) { $st .= 'font-weight:bold;'; }
+        if ($size) { $st .= 'font-size:' . $size . 'pt;'; }
+        if ($this->guide) { $st .= 'outline:0.4pt solid #f00;'; }
+        return '<div style="' . $st . '">' . $html . '</div>';
+    }
+
+    // several text lines, empty ones skipped
+    private function lq_lines($arr){
+        $out = array();
+        foreach ($arr as $line) {
+            $line = trim((string)$line);
+            if ($line !== '') { $out[] = $this->lq_e($line); }
+        }
+        return implode('<br>', $out);
+    }
+
+    private function grn_page($inner, $isLast){
+        return '<div style="position:relative;width:' . $this->paperW . 'pt;height:' . ($this->paperH - 6) . 'pt;'
+            . ($isLast ? '' : 'page-break-after:always;') . '">' . $inner . '</div>';
+    }
+
+    private function grn_doc($title, $body){
+        $css = '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
+             . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; '
+             . 'line-height: ' . $this->lineHeight . 'pt; color: #000; }';
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
+            . $css . '</style></head><body>' . $body . '</body></html>';
+    }
+
+    /* ================= LQ-310 print design helpers (black and white, A4 portrait) - used by the voucher ================= */
 
     private function lq_e($v){
         return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
