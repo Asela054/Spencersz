@@ -138,6 +138,11 @@ include "include/topnavbar.php";
                     </div>
                 </div>
 
+                <div id="n_fifobanner" class="alert alert-warning py-2 small mt-2 mb-0 d-none">
+                    <i class="fas fa-unlock-alt mr-1"></i>FIFO ignored, approved by <b id="n_fifoby"></b>.
+                    <a href="#" id="n_fifocancel" class="ml-2">Cancel</a>
+                </div>
+
                 <div class="border rounded p-3 mt-2">
                     <div class="row">
                         <div class="col-md-4 mb-2">
@@ -216,7 +221,37 @@ include "include/topnavbar.php";
             </div>
             <div class="modal-body" id="fifobody"></div>
             <div class="modal-footer">
+                <button type="button" id="btnfifoignore" class="btn btn-outline-danger btn-sm px-3 mr-auto"><i class="fas fa-unlock-alt mr-1"></i>Ignore FIFO</button>
                 <button type="button" class="btn btn-primary btn-sm px-4" data-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="fifoauthmodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-shield mr-2 text-danger"></i>Approve ignoring FIFO</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">A user with FIFO approval permission must enter their username and password.</p>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Username*</label>
+                    <input type="text" id="fa_user" class="form-control form-control-sm" autocomplete="off">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Password*</label>
+                    <input type="password" id="fa_pass" class="form-control form-control-sm" autocomplete="new-password">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="small font-weight-bold">Reason*</label>
+                    <input type="text" id="fa_reason" class="form-control form-control-sm" maxlength="255">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btnfifoapprove" class="btn btn-danger btn-sm px-4"><i class="fas fa-check mr-1"></i>Approve</button>
             </div>
         </div>
     </div>
@@ -233,7 +268,7 @@ include "include/topnavbar.php";
             { key: 6, short: 'Added to Stock', card: 'Completed',  label: 'Added to Stock',           icon: 'fa-check-circle',    color: '#28a745', by: 'to',   action: 'Add to Stock',       effect: 'A new stock record is created for the receiving location and the serial numbers now belong to it.' }
         ];
 
-        $('#fifomodal').on('hidden.bs.modal', function() {
+        $('#fifomodal, #fifoauthmodal').on('hidden.bs.modal', function() {
             if ($('#newmodal').hasClass('show')) { $('body').addClass('modal-open'); }
         });
 
@@ -244,6 +279,8 @@ include "include/topnavbar.php";
         var draft = [];
         var curid = 0;
         var curnote = null;
+        var fifoToken = '';
+        var lastPick = [];
 
         $.each(STEPS, function(i, s) { $('#f_status').append('<option value="' + s.key + '">' + s.short + '</option>'); });
 
@@ -361,11 +398,14 @@ include "include/topnavbar.php";
              if (!fifoEnforce()) { return; }
             $('#n_serials input:checked').each(function() { picked.push({ id: parseInt($(this).val(), 10), no: $(this).attr('data-no') }); });
             if (!picked.length) { notify('Tick at least one serial number.', 'warn'); return; }
+            var viol = fifoToken ? fifoViolates() : false;   // added while FIFO is ignored
             var found = false;
-            $.each(draft, function(i, it) { if (it.pid === pid) { it.serials = it.serials.concat(picked); found = true; } });
+            $.each(draft, function(i, it) {
+                if (it.pid === pid) { it.serials = it.serials.concat(picked); it.ignored = it.ignored || viol; found = true; }
+            });
             if (!found) {
                 var txt = $('#n_product option:selected').text().split(' - ');
-                draft.push({ pid: pid, code: txt[0], name: txt.slice(1).join(' - ').replace(/\s\(\d+\)$/, ''), serials: picked });
+                draft.push({ pid: pid, code: txt[0], name: txt.slice(1).join(' - ').replace(/\s\(\d+\)$/, ''), serials: picked, ignored: viol });
             }
             drawDraft();
             showSerials();
@@ -383,16 +423,23 @@ include "include/topnavbar.php";
             if (!$('#n_date').val() || !$.trim($('#n_vehicle').val()) || !$.trim($('#n_driver').val())) { notify('Enter the date, vehicle number and driver.', 'warn'); return; }
             if (!draft.length) { notify('Add at least one item to the transfer.', 'warn'); return; }
 
-            var items = $.map(draft, function(it) { return { pid: it.pid, serials: $.map(it.serials, function(s) { return s.id; }) }; });
+            var items = $.map(draft, function(it) {
+                return { pid: it.pid, ignored: it.ignored ? 1 : 0, serials: $.map(it.serials, function(s) { return s.id; }) };
+            });
             $('#btnsave').prop('disabled', true);
             api('Stocktransferinsert', {
                 from: from, to: to, date: $('#n_date').val(),
                 vehicle: $.trim($('#n_vehicle').val()), driver: $.trim($('#n_driver').val()),
                 contact: $.trim($('#n_contact').val()), remark: $.trim($('#n_remark').val()),
-                items: JSON.stringify(items)
+                items: JSON.stringify(items),
+                fifotoken: fifoToken
             }, function(res) {
                 $('#btnsave').prop('disabled', false);
-                if (!res.ok) { notify(res.msg, 'err'); return; }
+                if (!res.ok) {
+                    if (res.msg && res.msg.indexOf('FIFO approval') === 0) { clearFifo(); }
+                    notify(res.msg, 'err'); return;
+                }
+                clearFifo();
                 draft = [];
                 loadList();
                 $('#newmodal').one('hidden.bs.modal', function() {
@@ -416,6 +463,43 @@ include "include/topnavbar.php";
             w.document.close();
             w.focus();
             setTimeout(function() { w.print(); }, 300);
+        });
+
+                $('#btnfifoignore').on('click', function() {
+            $('#fifomodal').one('hidden.bs.modal', function() {
+                $('#fa_user, #fa_pass, #fa_reason').val('');
+                $('#fifoauthmodal').modal('show');
+            }).modal('hide');
+        });
+
+        $('#btnfifoapprove').on('click', function() {
+            var u = $.trim($('#fa_user').val()), p = $('#fa_pass').val(), r = $.trim($('#fa_reason').val());
+            if (!u || !p || !r) { notify('Enter the username, password and reason.', 'warn'); return; }
+            $('#btnfifoapprove').prop('disabled', true);
+            api('Fifoignoreverify', { username: u, password: p, reason: r }, function(res) {
+                $('#btnfifoapprove').prop('disabled', false);
+                $('#fa_pass').val('');
+                if (!res.ok) { notify(res.msg, 'err'); return; }
+                fifoToken = res.token;
+                $('#n_fifoby').text(res.approver);
+                $('#n_fifobanner').removeClass('d-none');
+                $('#fifoauthmodal').modal('hide');
+                // restore what the user originally picked
+                $('#n_serials input[type=checkbox]').each(function() {
+                    this.checked = $.inArray(parseInt($(this).val(), 10), lastPick) !== -1;
+                });
+                notify('FIFO ignored. Approved by ' + res.approver + '.', 'ok');
+            });
+        });
+
+        $('#n_fifocancel').on('click', function(e) {
+            e.preventDefault();
+            var n = $.grep(draft, function(it) { return it.ignored; }).length;
+            if (n && !confirm(n + ' product(s) were added with FIFO ignored. Cancelling the approval will remove them from the transfer. Continue?')) { return; }
+            draft = $.grep(draft, function(it) { return !it.ignored; });
+            clearFifo();
+            drawDraft();
+            showSerials();
         });
 
         /* ============ helpers ============ */
@@ -456,6 +540,18 @@ include "include/topnavbar.php";
             setTimeout(function() { $n.removeClass('show'); setTimeout(function() { $n.remove(); }, 300); }, 3200);
         }
         function logfor(t, key) { for (var i = 0; i < t.log.length; i++) { if (parseInt(t.log[i].step, 10) === key) { return t.log[i]; } } return null; }
+
+        function clearFifo() { fifoToken = ''; lastPick = []; $('#n_fifobanner').addClass('d-none'); }
+
+        function fifoViolates() {
+            var $all = $('#n_serials input[type=checkbox]'), maxRank = -1, bad = false;
+            $all.filter(':checked').each(function() { maxRank = Math.max(maxRank, parseInt($(this).attr('data-rank'), 10)); });
+            if (maxRank < 0) { return false; }
+            $all.each(function() {
+                if (!this.checked && parseInt($(this).attr('data-rank'), 10) < maxRank) { bad = true; }
+            });
+            return bad;
+        }
 
         /* ============ summary cards ============ */
         function card(label, num, color, icon, key) {
@@ -694,7 +790,11 @@ include "include/topnavbar.php";
 
         /* FIFO: returns true when the selection is valid. Otherwise it swaps the selection for the older
         serial numbers, shows the popup and returns false. */
+        
         function fifoEnforce() {
+            if (fifoToken) { return true; }     // FIFO ignored with approval
+            lastPick = [];
+            $('#n_serials input:checked').each(function() { lastPick.push(parseInt($(this).val(), 10)); });
             var $all = $('#n_serials input[type=checkbox]'), maxRank = -1;
             $all.filter(':checked').each(function() { maxRank = Math.max(maxRank, parseInt($(this).attr('data-rank'), 10)); });
             if (maxRank < 0) { return true; }
@@ -729,7 +829,9 @@ include "include/topnavbar.php";
                 var chips = '';
                 total += it.serials.length;
                 $.each(it.serials, function(k, s) { chips += '<span class="st-chip">' + esc(s.no) + '</span>'; });
-                h += '<tr><td><div class="font-weight-bold">' + esc(it.name) + '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + it.serials.length + '</td><td>' + chips + '</td>' +
+                h += '<tr><td><div class="font-weight-bold">' + esc(it.name) +
+                     (it.ignored ? ' <span class="badge badge-warning ml-1"><i class="fas fa-unlock-alt mr-1"></i>FIFO ignored</span>' : '') +
+                     '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + it.serials.length + '</td><td>' + chips + '</td>' +
                      '<td class="text-center"><button type="button" class="btn btn-danger btn-sm btnremove" data-index="' + i + '"><i class="fas fa-trash-alt"></i></button></td></tr>';
             });
             if (draft.length) { h += '<tr class="bg-light"><td class="text-right font-weight-bold">Total</td><td class="text-right font-weight-bold">' + total + '</td><td colspan="2"></td></tr>'; }

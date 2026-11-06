@@ -1149,4 +1149,168 @@
 			echo json_encode(array('status' => 2, 'action' => json_encode($actionObj)));
 		}
 	}
+	public function Getgrnbarcodes()
+	{
+		$recordID = $this->input->post('recordID');
+
+		$this->db->select('d.idtbl_grndetail, d.qty, d.tbl_product_idtbl_product, p.product_name, p.product_code, g.batchno');
+		$this->db->from('tbl_grndetail d');
+		$this->db->join('tbl_product p', 'p.idtbl_product = d.tbl_product_idtbl_product', 'left');
+		$this->db->join('tbl_grn g', 'g.idtbl_grn = d.tbl_grn_idtbl_grn', 'left');
+		$this->db->where('d.tbl_grn_idtbl_grn', $recordID);
+		$this->db->where('d.status', 1);
+		$details = $this->db->get()->result();
+
+		$this->db->select('barcode, qty, tbl_grndetail_idtbl_grndetail');
+		$this->db->from('tbl_product_barcode');
+		$this->db->where('tbl_grn_idtbl_grn', $recordID);
+		$this->db->where('status', 1);
+		$this->db->order_by('idtbl_product_barcode', 'ASC');
+		$rows = $this->db->get()->result();
+
+		$map = array();
+		foreach ($rows as $r) {
+			$map[$r->tbl_grndetail_idtbl_grndetail][] = array(
+				'barcode' => $r->barcode,
+				'qty'     => $r->qty
+			);
+		}
+
+		foreach ($details as $d) {
+			$d->barcodes = isset($map[$d->idtbl_grndetail]) ? $map[$d->idtbl_grndetail] : array();
+		}
+
+		$this->output->set_content_type('application/json')
+			->set_output(json_encode(array('details' => $details)));
+	}
+
+	public function Goodreceivebarcodeinsert()
+	{
+		$this->db->trans_begin();
+
+		$userID    = $_SESSION['userid'];
+		$companyID = $_SESSION['company_id'];
+		$branchID  = $_SESSION['branch_id'];
+		$now       = date('Y-m-d H:i:s');
+
+		$grnID     = $this->input->post('grnID');
+		$tableData = $this->input->post('tableData');
+		if (is_string($tableData)) {
+			$tableData = json_decode($tableData, true);
+		}
+
+		$error = '';
+		$count = 0;
+
+		$this->db->select('idtbl_grn, approvestatus');
+		$this->db->from('tbl_grn');
+		$this->db->where('idtbl_grn', $grnID);
+		$this->db->where('status', 1);
+		$grn = $this->db->get()->row();
+
+		if (!$grn) {
+			$error = 'GRN not found';
+		} elseif ($grn->approvestatus == 2) {
+			$error = 'Cannot add barcodes to a rejected GRN';
+		} elseif (empty($tableData) || !is_array($tableData)) {
+			$error = 'No barcodes to save';
+		}
+
+		if ($error == '') {
+			foreach ($tableData as $row) {
+				$detailID = $row['detailid'];
+				$batchno  = isset($row['batchno']) ? trim($row['batchno']) : '';
+				$barcodes = isset($row['barcodes']) ? $row['barcodes'] : array();
+
+				$this->db->select('idtbl_grndetail, qty, tbl_product_idtbl_product');
+				$this->db->from('tbl_grndetail');
+				$this->db->where('idtbl_grndetail', $detailID);
+				$this->db->where('tbl_grn_idtbl_grn', $grnID);
+				$this->db->where('status', 1);
+				$detail = $this->db->get()->row();
+
+				if (!$detail) { $error = 'Invalid GRN detail'; break; }
+
+				// merge same barcode inside the request and total the qty
+				$merged = array();
+				$newTotal = 0;
+				foreach ($barcodes as $b) {
+					$code = isset($b['barcode']) ? trim($b['barcode']) : '';
+					$qty  = isset($b['qty']) ? $b['qty'] : '';
+					if ($code === '') { continue; }
+					if (!is_numeric($qty) || floatval($qty) <= 0 || floor($qty) != $qty) {
+						$error = 'Invalid qty for barcode: ' . htmlspecialchars($code);
+						break 2;
+					}
+					$merged[$code] = (isset($merged[$code]) ? $merged[$code] : 0) + floatval($qty);
+					$newTotal += floatval($qty);
+				}
+
+				// do not exceed the GRN qty
+				$this->db->select_sum('qty');
+				$this->db->where('tbl_grndetail_idtbl_grndetail', $detailID);
+				$this->db->where('status', 1);
+				$sum = $this->db->get('tbl_product_barcode')->row();
+				$existing = $sum && $sum->qty ? floatval($sum->qty) : 0;
+
+				if ($existing + $newTotal > floatval($detail->qty)) {
+					$error = 'Barcode qty exceeds the GRN qty';
+					break;
+				}
+
+				foreach ($merged as $code => $qty) {
+					$this->db->where('tbl_grndetail_idtbl_grndetail', $detailID);
+					$this->db->where('barcode', $code);
+					$this->db->where('status', 1);
+					$old = $this->db->get('tbl_product_barcode')->row();
+
+					if ($old) {
+						$this->db->where('idtbl_product_barcode', $old->idtbl_product_barcode);
+						$this->db->update('tbl_product_barcode', array(
+							'qty'            => $old->qty + $qty,
+							'updateuser'     => $userID,
+							'updatedatetime' => $now
+						));
+					} else {
+						$this->db->insert('tbl_product_barcode', array(
+							'barcode'                       => $code,
+							'qty'                           => $qty,
+							'batchno'                       => $batchno,
+							'tbl_grn_idtbl_grn'             => $grnID,
+							'tbl_grndetail_idtbl_grndetail' => $detailID,
+							'tbl_product_idtbl_product'     => $detail->tbl_product_idtbl_product,
+							'status'                        => 1,
+							'insertdatetime'                => $now,
+							'tbl_user_idtbl_user'           => $userID,
+							'tbl_company_idtbl_company'     => $companyID,
+							'tbl_company_branch_idtbl_company_branch' => $branchID
+						));
+					}
+					$count++;
+				}
+			}
+		}
+
+		if ($error == '' && $this->db->trans_status() === TRUE) {
+			$this->db->trans_commit();
+			$actionObj = new stdClass();
+			$actionObj->icon = 'fas fa-save';
+			$actionObj->title = '';
+			$actionObj->message = $count . ' Barcode(s) Added Successfully';
+			$actionObj->url = '';
+			$actionObj->target = '_blank';
+			$actionObj->type = 'success';
+			echo json_encode(array('status' => 1, 'action' => json_encode($actionObj)));
+		} else {
+			$this->db->trans_rollback();
+			$actionObj = new stdClass();
+			$actionObj->icon = 'fas fa-exclamation-triangle';
+			$actionObj->title = '';
+			$actionObj->message = ($error != '') ? $error : 'Record Error';
+			$actionObj->url = '';
+			$actionObj->target = '_blank';
+			$actionObj->type = 'danger';
+			echo json_encode(array('status' => 2, 'action' => json_encode($actionObj)));
+		}
+	}
 }

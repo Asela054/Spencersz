@@ -31,6 +31,10 @@ class Stocktransfer extends CI_Controller {
         $this->load->model('Stocktransferinfo');
         $result=$this->Stocktransferinfo->Getserials();
     }
+    public function Fifoignoreverify(){
+        $this->load->model('Stocktransferinfo');
+        $result=$this->Stocktransferinfo->Fifoignoreverify();
+    }
     public function Stocktransferinsert(){
         $this->load->model('Stocktransferinfo');
         $result=$this->Stocktransferinfo->Stocktransferinsert();

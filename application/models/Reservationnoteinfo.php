@@ -120,7 +120,7 @@ class Reservationnoteinfo extends CI_Model{
 
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Advance Receipt ' . $this->h($r->reservation_no) . '</title><style>'
             . '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
-            . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; line-height: ' . $this->lineHeight . 'pt; color: #000; }'
+            . 'body { font-family: "Courier", monospace; font-size: ' . $this->fontSize . 'pt; line-height: ' . $this->lineHeight . 'pt; color: #000; }'
             . '</style></head><body>' . $body . '</body></html>';
     }
 

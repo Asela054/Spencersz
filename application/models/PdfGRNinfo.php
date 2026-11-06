@@ -405,7 +405,7 @@ class PdfGRNinfo extends CI_Model {
 
     private function grn_doc($title, $body){
         $css = '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
-             . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; '
+             . 'body { font-family: "Courier", monospace; font-size: ' . $this->fontSize . 'pt; '
              . 'line-height: ' . $this->lineHeight . 'pt; color: #000; }';
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
             . $css . '</style></head><body>' . $body . '</body></html>';
@@ -433,7 +433,7 @@ class PdfGRNinfo extends CI_Model {
     private function lq_css(){
         return '
 @page { size: A4 portrait; margin: 8mm; }
-body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10px; color: #000; margin: 0; line-height: 1.3; }
+body { font-family: "Courier", monospace; font-size: 10px; color: #000; margin: 0; line-height: 1.3; }
 table { border-collapse: collapse; width: 100%; }
 .title { border-top: 2px solid #000; border-bottom: 2px solid #000; text-align: center; font-size: 20px; font-weight: bold; letter-spacing: 3px; padding: 5px 0; }
 .co { text-align: center; padding: 8px 0; line-height: 1.45; }

@@ -5,7 +5,10 @@ class Stocktransferinfo extends CI_Model{
 
     const SERIAL_INSTOCK=1;
     const SERIAL_TRANSIT=6;
-    const MOVE_TRANSFER=6;   // tbl_serial_movement.movement_type
+    const MOVE_TRANSFER=6; 
+    const FIFO_PERMISSION='stocktransfer-approve';
+    const FIFO_GUARD='web-erp';
+    const FIFO_TOKEN_MINUTES=15;
 
     public function Getbootdata(){
         $obj=new stdClass();
@@ -114,6 +117,47 @@ class Stocktransferinfo extends CI_Model{
                                 ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($pid, $from));
         echo json_encode($respond->result());
     }
+        /* Verifies the approver's username/password + permission, and returns a one-time token */
+    public function Fifoignoreverify(){
+        $userID=(int)$_SESSION['userid'];
+        $username=trim($this->input->post('username'));
+        $password=(string)$this->input->post('password');
+        $reason=trim($this->input->post('reason'));
+
+        if($username==='' || $password===''){ return $this->respond(false, 'Enter the username and password.'); }
+        if($reason===''){ return $this->respond(false, 'Enter the reason for ignoring FIFO.'); }
+
+        $u=$this->db->query("SELECT idtbl_user, name, password FROM tbl_user WHERE username = ? AND status = 1", array($username))->row();
+        if(!$u || !password_verify($password, $u->password)){
+            return $this->respond(false, 'Invalid username or password.');
+        }
+
+        $perm=$this->db->query("SELECT 1
+                                FROM tbl_user_has_tbl_roles ur
+                                JOIN tbl_roles r ON r.idtbl_roles = ur.tbl_roles_idtbl_roles AND r.status = 1
+                                JOIN tbl_roles_has_tbl_permissions rp ON rp.tbl_roles_idtbl_roles = r.idtbl_roles
+                                JOIN tbl_permissions p ON p.idtbl_permissions = rp.tbl_permissions_idtbl_permissions
+                                WHERE ur.tbl_user_idtbl_user = ? AND p.permission = ? AND p.guard_name = ?
+                                LIMIT 1", array((int)$u->idtbl_user, self::FIFO_PERMISSION, self::FIFO_GUARD))->row();
+        if(!$perm){
+            return $this->respond(false, 'This user does not have permission to approve ignoring FIFO.');
+        }
+
+        $token=bin2hex(random_bytes(16));
+        $_SESSION['fifo_override']=array(
+            'token'=> $token,
+            'approved_by'=> (int)$u->idtbl_user,
+            'requested_by'=> $userID,
+            'reason'=> $reason,
+            'expires'=> time()+(self::FIFO_TOKEN_MINUTES*60),
+        );
+
+        $obj=new stdClass();
+        $obj->ok=true;
+        $obj->token=$token;
+        $obj->approver=$u->name;
+        echo json_encode($obj);
+    }
     public function Stocktransferinsert(){
         $userID=(int)$_SESSION['userid'];
         $ub=$this->Userbranch();
@@ -126,6 +170,7 @@ class Stocktransferinfo extends CI_Model{
         $contact=trim($this->input->post('contact'));
         $remark=trim($this->input->post('remark'));
         $items=json_decode($this->input->post('items'), true);
+        $fifotoken=trim((string)$this->input->post('fifotoken'));
 
         $insertdatetime=date('Y-m-d H:i:s');
 
@@ -134,6 +179,12 @@ class Stocktransferinfo extends CI_Model{
         if($date=='' || $vehicle=='' || $driver==''){ return $this->respond(false, 'Enter the date, vehicle number and driver.'); }
         if(empty($items)){ return $this->respond(false, 'Add at least one item to the transfer.'); }
         if($ub>0 && $ub!=$from){ return $this->respond(false, 'You can only create transfers from your own location.'); }
+        $override=null;
+        if($fifotoken!==''){
+            $override=$this->fifooverride($fifotoken);
+            if(!$override){ return $this->respond(false, 'FIFO approval has expired. Request the approval again.'); }
+        }
+        $bypassed=array();
 
         $fb=$this->branchrow($from);
         $tb=$this->branchrow($to);
@@ -192,8 +243,15 @@ class Stocktransferinfo extends CI_Model{
                                       AND tbl_product_serial_idtbl_product_serial IN ($ph) LIMIT 1", $ids)->row();
             if($locked){ return $this->fail('One or more serial numbers are already in another open transfer.'); }
 
-            $fifo=$this->fifocheck($productID, $from, $ids);          // <-- new
-            if($fifo!==true){ return $this->fail($fifo); }            // <-- new
+            $fifonote='';
+            $fifo=$this->fifocheck($productID, $from, $ids, $fifonote);
+            if($fifo!==true){
+                if($override){ $bypassed[]=array('pid'=>$productID, 'msg'=>$fifonote); }  
+                else { return $this->fail($fifo); }
+            }
+            elseif($override && !empty($it['ignored'])){
+                $bypassed[]=array('pid'=>$productID, 'msg'=>'FIFO ignored with approval.');
+            }
 
             $data=array(
                 'tbl_stock_transfer_idtbl_stock_transfer'=> $transferID,
@@ -240,8 +298,24 @@ class Stocktransferinfo extends CI_Model{
 
         $this->track($transferID, 1, $from, $userID, 'Transfer created');
 
+        foreach($bypassed as $b){
+            $data=array(
+                'doc_type'=> 'TRANSFER',
+                'doc_id'=> $transferID,
+                'tbl_product_idtbl_product'=> $b['pid'],
+                'approved_by'=> $override['approved_by'],
+                'reason'=> $override['reason'],
+                'remark'=> $b['msg'],
+                'status'=> 1,
+                'insertdatetime'=> $insertdatetime,
+                'tbl_user_idtbl_user'=> $userID,
+            );
+            $this->db->insert('tbl_fifo_ignore_log', $data);
+        }
+
         if($this->db->trans_status()===FALSE){ return $this->fail('Could not save the transfer.'); }
         $this->db->trans_commit();
+        if($override){ unset($_SESSION['fifo_override']); }
 
         $obj=new stdClass();
         $obj->ok=true;
@@ -457,8 +531,16 @@ class Stocktransferinfo extends CI_Model{
 
     /* ---------------------------------------------------------- common functions */
 
-    /* FIFO: a serial from a newer GRN cannot be sent while serials of an older GRN are still free */
-    private function fifocheck($productID, $from, $ids){
+    private function fifooverride($token){
+        $o=isset($_SESSION['fifo_override']) ? $_SESSION['fifo_override'] : null;
+        if(!$o || $token==='' || !hash_equals($o['token'], $token)) { return null; }
+        if($o['expires']<time() || (int)$o['requested_by']!==(int)$_SESSION['userid']){ return null; }
+        return $o;
+    }
+
+    /* FIFO: a serial from a newer GRN cannot be sent while serials of an older GRN are still free.
+       Returns true, or the error text. $note receives the audit remark (used when FIFO is ignored with approval). */
+    private function fifocheck($productID, $from, $ids, &$note=null){
         $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
                                 FROM tbl_product_serial ps
                                 JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
@@ -475,12 +557,25 @@ class Stocktransferinfo extends CI_Model{
             $ranks[(int)$r->id]=$rank;
             if(in_array((int)$r->id, $ids)){ $maxSel=max($maxSel, $rank); }
         }
+
+        // older serial numbers that were skipped, counted per batch
+        $skipped=array();
         foreach($rows as $r){
-            if($ranks[(int)$r->id] < $maxSel && !in_array((int)$r->id, $ids)){
-                return 'FIFO: batch '.$names[$maxSel].' cannot be selected because older stock from '.$names[$ranks[(int)$r->id]].' is still available. Transfer the older serial numbers first.';
+            $rk=$ranks[(int)$r->id];
+            if($rk < $maxSel && !in_array((int)$r->id, $ids)){
+                $skipped[$rk]=isset($skipped[$rk]) ? $skipped[$rk]+1 : 1;
             }
         }
-        return true;
+        if(!count($skipped)){ return true; }
+
+        ksort($skipped);
+        $parts=array();
+        foreach($skipped as $rk => $n){ $parts[]=$names[$rk].' - '.$n.' serial number(s)'; }
+
+        $note='FIFO ignored with approval: batch '.$names[$maxSel].' was transferred while older stock was still available ('.implode('; ', $parts).').';
+
+        $first=key($skipped);
+        return 'FIFO: batch '.$names[$maxSel].' cannot be selected because older stock from '.$names[$first].' is still available. Transfer the older serial numbers first.';
     }
 
     /* the logged-in branch comes from the session ($_SESSION['branch_id']).
