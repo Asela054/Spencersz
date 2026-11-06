@@ -3,6 +3,9 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 
 class Invoiceinfo extends CI_Model{
+    private $printOffX = 0;   // shift the printing right (+) / left (-), in points
+    private $printOffY = 0;   // shift the printing down (+) / up (-), in points
+
     public function SubmitNewCustomer(){
         try{
             $this->db->trans_begin();
@@ -628,18 +631,18 @@ class Invoiceinfo extends CI_Model{
         }
 
         // Load Header & Footer images as Base64
-        $headerFile = FCPATH . 'images/header.png';
-        $headerImg  = is_file($headerFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($headerFile)) : '';
+        // $headerFile = FCPATH . 'images/header.png';
+        // $headerImg  = is_file($headerFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($headerFile)) : '';
 
-        $footerFile = FCPATH . 'images/footer.png';
-        $footerImg  = is_file($footerFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($footerFile)) : '';
+        // $footerFile = FCPATH . 'images/footer.png';
+        // $footerImg  = is_file($footerFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($footerFile)) : '';
 
         $data = [
             'inv'       => $inv,
             'items'     => $items,
             'customer'  => $customer,
-            'headerImg' => $headerImg,
-            'footerImg' => $footerImg,
+            // 'headerImg' => $headerImg,
+            // 'footerImg' => $footerImg,
             'title'     => ($inv->invoice_type === 'Corporate Quotation') ? 'QUOTATION' : (($inv->invoice_type === 'Retail Invoice') ? 'INVOICE' : 'TAX INVOICE'),
             'rate'      => 1 + ((float)$inv->vat_rate / 100),
             'supply'    => round($inv->net_total - $inv->vatamount, 2),
@@ -652,6 +655,9 @@ class Invoiceinfo extends CI_Model{
                 'tel'     => '+94 11 000 0000',
                 'place'   => 'Wattala',
             ],
+        'offX'          => ($this->input->get('x') !== null) ? max(-40, min(40, (float)$this->input->get('x'))) : $this->printOffX,
+        'offY'          => ($this->input->get('y') !== null) ? max(-40, min(40, (float)$this->input->get('y'))) : $this->printOffY,
+        'guide'         => (bool)$this->input->get('guide'),
         ];
 
         $html = $this->load->view('invoice_pdf', $data, TRUE);
@@ -661,7 +667,8 @@ class Invoiceinfo extends CI_Model{
         $this->pdf->getOptions()->set('isRemoteEnabled', false);
 
         $this->pdf->loadHtml($html);
-        $this->pdf->setPaper('A4', 'portrait');
+        // $this->pdf->setPaper('A4', 'portrait');
+        $this->pdf->setPaper(array(0, 0, 684, 792), 'portrait');   // 9.5 x 11 inch continuous paper
         $this->pdf->render();
 
         if (ob_get_length()) ob_end_clean();

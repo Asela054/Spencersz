@@ -1,195 +1,201 @@
 <?php
+/* =====================================================================
+   Pre-printed form, 9.5 x 11 inch continuous paper, Epson LQ-310.
+   Only the DATA is printed here: the boxes, headings and logo are already on the paper.
+   Positions come from the artwork (1382 x 1600 px = 684 x 792 pt).
+   ===================================================================== */
 $fm = function ($n) { return number_format((float)$n, 2); };
 $e  = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
-$kv = function ($label, $value, $h = 0) use ($e) {
-    return '<tr><td class="lbl">' . $label . '</td><td class="sep">:</td>'
-         . '<td class="val"' . ($h ? ' style="height:' . $h . 'px"' : '') . '>' . $e($value) . '</td></tr>';
-};
+
 $discountEx = round($inv->discount / $rate, 2);
 $grossEx    = round($supply + $discountEx, 2);
+
+$S     = 0.495;     // pt per px of the artwork
+$MONO  = 5.418;     // width of one character (pt): DejaVu Sans Mono, 9pt
+$LH    = 12;        // height of one item line (pt)
+$offX  = isset($offX) ? (float)$offX : 0;
+$offY  = isset($offY) ? (float)$offY : 0;
+$guide = !empty($guide);
+
+$py = function ($px) use ($S) { return $px * $S; };                      // artwork px -> pt (no offset)
+$N  = function ($x1, $x2) use ($S, $MONO) {                              // characters that fit between x1 and x2
+    return max(1, (int)floor((($x2 - $x1 - 10) * $S - 2) / $MONO));
+};
+$put = function ($x1, $x2, $y, $h, $text, $align = 'left', $css = '') use ($S, $offX, $offY, $e) {
+    $l = round(($x1 + 5) * $S + $offX, 2);
+    $w = round(($x2 - $x1 - 10) * $S, 2);
+    return '<div class="t" style="left:' . $l . 'pt; top:' . round($y + $offY, 2) . 'pt; width:' . $w . 'pt; height:' . $h
+         . 'pt; line-height:' . $h . 'pt; text-align:' . $align . ';' . $css . '">' . $e($text) . '</div>';
+};
+$clip = function ($s, $n) {
+    $s = (string)$s;
+    return (mb_strlen($s) > $n) ? mb_substr($s, 0, $n - 1) . '.' : $s;
+};
+$wrap = function ($s, $n) {
+    $s = trim(preg_replace('/\s+/', ' ', (string)$s));
+    $out = [];
+    while (mb_strlen($s) > $n) {
+        $cut = mb_strrpos(mb_substr($s, 0, $n + 1), ' ');
+        if ($cut === false || $cut < 1) { $cut = $n; }
+        $out[] = rtrim(mb_substr($s, 0, $cut));
+        $s = ltrim(mb_substr($s, $cut));
+    }
+    $out[] = $s;
+    return $out;
+};
+
+// ----- column positions (px of the artwork) -----
+$colCode = [109, 247]; $colModel = [247, 362]; $colDesc = [362, 816];
+$colQty  = [816, 911]; $colUnit  = [911, 1058]; $colTot  = [1058, 1273];
+
+$descN  = $N($colDesc[0], $colDesc[1]);
+$codeN  = $N($colCode[0], $colCode[1]);
+$bodyTop = $py(466) + 3;       // first item line (pt)
+$bodyBot = $py(1342);          // bottom of the table body (pt)
+
+// ----- item lines: one block per item (an item is never split between two sheets) -----
+$blocks = [];
+foreach ($items as $it) {
+    $dl = $wrap($it->product_name, $descN);
+    $ex = [];
+    if ($it->serialno)         { $ex[] = 'S/N: ' . $it->serialno; }
+    if ($it->warranty_months)  { $ex[] = 'Warranty: ' . (int)$it->warranty_months . ' months'; }
+    if ($ex) {
+        $joined = implode(' | ', $ex);
+        $dl = array_merge($dl, (mb_strlen($joined) <= $descN) ? [$joined] : $ex);
+    }
+    $b = [];
+    foreach ($dl as $k => $txt) {
+        $b[] = ($k === 0)
+            ? [$clip($it->product_code, $codeN), '', $txt, (string)(int)$it->qty, $fm($it->unitprice / $rate), $fm($it->line_total / $rate)]
+            : ['', '', $txt, '', '', ''];
+    }
+    $blocks[] = $b;
+}
+
+// ----- totals block (printed at the bottom of the table body of the LAST sheet) -----
+$tot = [];
+$tot[] = ['Unit Price and Total are excluding VAT', '', false];
+if ($discountEx > 0) {
+    $tot[] = ['Sub Total (excluding VAT)', $fm($grossEx), false];
+    $tot[] = ['Less: Discount (excluding VAT)', $fm($discountEx), false];
+}
+$tot[] = ['Total Value of Supply', $fm($supply), false];
+$tot[] = ['VAT Amount @ ' . (float)$inv->vat_rate . '%', $fm($inv->vatamount), false];
+$tot[] = ['TOTAL INCLUDING VAT', $fm($inv->net_total), true];
+$nTot   = count($tot);
+$totTop = $bodyBot - 4 - $nTot * $LH;
+
+// ----- split the lines into sheets -----
+$capMid  = 33;                                                   // lines on a sheet that is followed by another sheet
+$capLast = (int)floor(($totTop - $bodyTop - 6) / $LH);           // lines on the last sheet (the totals need room)
+$pages = []; $cur = []; $used = 0;
+foreach ($blocks as $b) {
+    $n = count($b);
+    if ($used > 0 && $used + $n > $capMid) { $pages[] = $cur; $cur = []; $used = 0; }
+    foreach ($b as $ln) { $cur[] = $ln; }
+    $used += $n;
+}
+$pages[] = $cur;
+if ($used > $capLast) { $pages[] = []; }                         // no room for the totals: they go on their own sheet
+$totalPages = count($pages);
+
+// ----- header boxes -----
+$label = function ($l) { return str_pad($l, 17) . ': '; };
+$vN    = $N(109, 686) - 19;                                      // characters left for the value
+
+$addr = trim(trim($customer ? $customer->address_line1 : '') . ' ' . trim($customer ? $customer->address_line2 : '') . ' ' . trim($customer ? $customer->city : ''));
+$aw   = $wrap($addr, $vN);
+
+$leftLines = [
+    $label("Purchaser's TIN")  . $clip($customer ? $customer->vat_no : '', $vN),
+    $label("Purchaser's Name") . $clip($inv->customer_name, $vN),
+    $label('Address')          . (isset($aw[0]) ? $aw[0] : ''),
+    str_repeat(' ', 19)        . (isset($aw[1]) ? $aw[1] : ''),
+    $label('Telephone No.')    . $clip($customer ? $customer->telephone_no : '', $vN),
+];
+
+$rightLines = [
+    $label('Date of Invoice')  . date('d-m-Y', strtotime($inv->invoice_date)),
+    $label('Date of Supply')   . date('d-m-Y', strtotime($inv->invoice_date)),
+    $label('Place of Supply')  . $clip($company['place'], $vN),
+    $label("Supplier's TIN")   . $clip($company['tin'], $vN),
+    $label('Reference')        . $clip(trim((string)$inv->remark), $vN),
+    ($title === 'QUOTATION')
+        ? $label('Valid until') . date('d-m-Y', strtotime($inv->invoice_date . ' +14 days'))
+        : $label('Mode of Payment') . $clip(str_replace('  |  ', ', ', $modes), $vN),
+];
+
+$wordsLines = $wrap('Amount in words: ' . $words, $N(109, 1273));
+
+// ----- alignment guide (only with ?guide=1): the outline of the pre-printed form, NOT shifted by x / y -----
+$rects = [[1083,113,1273,158], [1083,165,1273,210], [1083,217,1273,262], [536,207,847,252], [109,269,686,413],
+          [696,269,1273,413], [109,421,1273,461], [109,466,1273,1342], [109,1351,1273,1403]];
+$vlines = [247, 362, 816, 911, 1058];
 ?>
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-    /* LQ-310 (dot matrix, A4): black only, no images, no fills.
-       Increase margin-top if you print on pre-printed letterhead stationery. */
-    @page {
-        margin-top: 30px;
-        margin-bottom: 50px;
-        margin-left: 30px;
-        margin-right: 30px;
-    }
-
-    /* Repeating text footer on every page */
-    .page-footer {
-        position: fixed;
-        bottom: -38px;
-        left: 0;
-        right: 0;
-        height: 20px;
-        text-align: center;
-        font-size: 9px;
-        border-top: 1px solid #000;
-        padding-top: 3px;
-    }
-    body {
-        margin: 0;
-        font-family: 'DejaVu Sans', sans-serif;
-        font-size: 10px;
-        color: #000;
-        background: #fff;
-    }
-
-    table { border-collapse: collapse; }
-    .mb { margin-bottom: 6px; }
-    .box { border: 1px solid #000; padding: 4px 8px; vertical-align: top; }
-    .gap { width: 2%; }
-    .lbl { font-weight: bold; width: 34%; padding: 2px 0; }
-    .sep { width: 4%; font-weight: bold; }
-    .val { padding: 2px 0; }
-    .items td, .items th { border: 1px solid #000; padding: 3px 5px; }
-    .items th { font-size: 10px; font-weight: bold; }
-    .items tr { page-break-inside: avoid; }
-    .num { text-align: right; }
-    .ctr { text-align: center; }
+    @page { margin: 0; }
+    html, body { margin: 0; padding: 0; height: auto; font-family: 'Courier', monospace; font-size: 9pt; color: #000;  }
+    .sheet { position: relative; width: 684pt; height: 780pt; overflow: hidden; }
+    .t { position: absolute; white-space: pre; overflow: hidden; font-size: 9pt; }
+    .g { position: absolute; border: 0.5pt solid #888; }
 </style>
 </head>
 <body>
+<?php foreach ($pages as $pi => $lines): $isLast = ($pi === $totalPages - 1); ?>
+<div class="sheet" style="<?= $pi > 0 ? 'page-break-before: always;' : '' ?>">
 
-    <!-- Repeating Footer (every page) -->
-    <div class="page-footer">&copy; Bartack by Erav Technology - 071 657 8718 / 070 330 0061 - 65</div>
+    <?php if ($guide): ?>
+        <?php foreach ($rects as $r): ?>
+        <div class="g" style="left:<?= round($r[0]*$S, 2) ?>pt; top:<?= round($r[1]*$S, 2) ?>pt; width:<?= round(($r[2]-$r[0])*$S, 2) ?>pt; height:<?= round(($r[3]-$r[1])*$S, 2) ?>pt;"></div>
+        <?php endforeach; ?>
+        <?php foreach ($vlines as $vx): ?>
+        <div class="g" style="left:<?= round($vx*$S, 2) ?>pt; top:<?= round(421*$S, 2) ?>pt; width:0; height:<?= round((1342-421)*$S, 2) ?>pt; border-width:0 0 0 0.5pt;"></div>
+        <?php endforeach; ?>
+    <?php endif; ?>
 
-    <div class="wrap">
+    <!-- title, invoice no, page no -->
+    <?= $put(536, 847, $py(207), $py(252) - $py(207), $title, 'center', 'font-size:13pt; font-weight:bold;') ?>
+    <?= $put(1083, 1273, $py(113), $py(158) - $py(113), $inv->invoice_no, 'center', 'font-size:8.5pt; font-weight:bold;') ?>
+    <?= $put(1083, 1273, $py(165), $py(210) - $py(165), ($pi + 1) . ' / ' . $totalPages, 'center') ?>
 
-        <!-- Title -->
-        <table width="100%" class="mb">
-            <tr>
-                <td style="text-align:center;">
-                    <div style="font-size:18px; font-weight:bold; padding:3px 0; border-top:2px solid #000; border-bottom:2px solid #000; letter-spacing:2px;"><?= $title ?></div>
-                </td>
-            </tr>
-        </table>
+    <!-- purchaser box and details box -->
+    <?php foreach ($leftLines as $i => $txt): ?>
+        <?= $put(109, 686, $py(269) + 3 + $i * 11, 11, $txt) ?>
+    <?php endforeach; ?>
+    <?php foreach ($rightLines as $i => $txt): ?>
+        <?= $put(696, 1273, $py(269) + 3 + $i * 11, 11, $txt) ?>
+    <?php endforeach; ?>
 
-        <!-- Company (text only, replaces header image) -->
-        <table width="100%" class="mb">
-            <tr>
-                <td style="text-align:center;">
-                    <div style="font-size:13px; font-weight:bold;"><?= $e($company['name']) ?></div>
-                    <div><?= $e($company['address']) ?></div>
-                    <div>Tel: <?= $e($company['tel']) ?></div>
-                </td>
-            </tr>
-        </table>
+    <!-- item lines -->
+    <?php foreach ($lines as $i => $ln): $y = $bodyTop + $i * $LH; ?>
+        <?php if ($ln[0] !== ''): ?><?= $put($colCode[0],  $colCode[1],  $y, $LH, $ln[0]) ?><?php endif; ?>
+        <?php if ($ln[2] !== ''): ?><?= $put($colDesc[0],  $colDesc[1],  $y, $LH, $ln[2]) ?><?php endif; ?>
+        <?php if ($ln[3] !== ''): ?><?= $put($colQty[0],   $colQty[1],   $y, $LH, $ln[3], 'center') ?><?php endif; ?>
+        <?php if ($ln[4] !== ''): ?><?= $put($colUnit[0],  $colUnit[1],  $y, $LH, $ln[4], 'right') ?><?php endif; ?>
+        <?php if ($ln[5] !== ''): ?><?= $put($colTot[0],   $colTot[1],   $y, $LH, $ln[5], 'right') ?><?php endif; ?>
+    <?php endforeach; ?>
 
-        <!-- Date / Invoice no -->
-        <table width="100%" class="mb">
-            <tr>
-                <td class="box" style="width:49%;"><table width="100%"><?= $kv('Date of invoice', date('d-m-Y', strtotime($inv->invoice_date))) ?></table></td>
-                <td class="gap"></td>
-                <td class="box" style="width:49%;"><table width="100%"><?= $kv('Invoice No.', $inv->invoice_no) ?></table></td>
-            </tr>
-        </table>
+    <?php if ($isLast): ?>
+        <!-- totals -->
+        <?php foreach ($tot as $i => $r): $y = $totTop + $i * $LH; $css = $r[2] ? 'font-weight:bold;' : ''; ?>
+            <?= $put(362, 1058, $y, $LH, $r[0], 'right', $css) ?>
+            <?php if ($r[1] !== ''): ?><?= $put(1058, 1273, $y, $LH, $r[1], 'right', $css) ?><?php endif; ?>
+        <?php endforeach; ?>
 
-        <!-- Supplier / Purchaser -->
-        <table width="100%" class="mb">
-            <tr>
-                <td class="box" style="width:49%;">
-                    <table width="100%">
-                        <?= $kv("Supplier's TIN", $company['tin']) ?>
-                        <?= $kv("Supplier's Name", $company['name']) ?>
-                        <?= $kv('Address', $company['address'], 34) ?>
-                        <?= $kv('Telephone No.', $company['tel']) ?>
-                    </table>
-                </td>
-                <td class="gap"></td>
-                <td class="box" style="width:49%;">
-                    <table width="100%">
-                        <?= $kv("Purchaser's TIN", $customer ? $customer->vat_no : '') ?>
-                        <?= $kv("Purchaser's Name", $inv->customer_name) ?>
-                        <?= $kv('Address', $customer ? $customer->address_line1.' '.$customer->address_line2.' '.$customer->city : '', 34) ?>
-                        <?= $kv('Telephone No.', $customer ? $customer->telephone_no : '') ?>
-                    </table>
-                </td>
-            </tr>
-        </table>
+        <!-- amount in words (the single box under the table) -->
+        <?php for ($k = 0; $k < 2; $k++): ?>
+            <?php if (isset($wordsLines[$k])): ?><?= $put(109, 1273, $py(1351) + 1 + $k * 12, 12, $wordsLines[$k]) ?><?php endif; ?>
+        <?php endfor; ?>
+    <?php else: ?>
+        <?= $put(362, 1273, $bodyTop + $capMid * $LH, $LH, 'Continued on the next sheet ...', 'right') ?>
+    <?php endif; ?>
 
-        <!-- Supply -->
-        <table width="100%" class="mb">
-            <tr>
-                <td class="box" style="width:49%;"><table width="100%"><?= $kv('Date of Supply', date('d-m-Y', strtotime($inv->invoice_date))) ?></table></td>
-                <td class="gap"></td>
-                <td class="box" style="width:49%;"><table width="100%"><?= $kv('Place of Supply', $company['place']) ?></table></td>
-            </tr>
-        </table>
-
-        <table width="100%" class="mb">
-            <tr><td class="box"><table width="100%"><?= $kv('Reference', $inv->remark) ?></table></td></tr>
-        </table>
-
-        <!-- Items -->
-        <table width="100%" class="items mb">
-            <tr>
-                <th style="width:11%;">Item<br>Code</th>
-                <th style="width:41%;">Description of Goods</th>
-                <th style="width:10%;">Quantity</th>
-                <th style="width:17%;">Unit Price</th>
-                <th style="width:21%;">Amount<br>Excluding VAT<br>(Rs.)</th>
-            </tr>
-            <?php $n = 0; foreach ($items as $it): $n++; ?>
-            <tr>
-                <td class="ctr"><?= $e($it->product_code) ?></td>
-                <td>
-                    <?= $e($it->product_name) ?>
-                    <?php if ($it->serialno): ?><br><span style="font-size:9px;">S/N: <?= $e($it->serialno) ?></span><?php endif; ?>
-                    <?php if ($it->warranty_months): ?><span style="font-size:9px;"> | Warranty: <?= (int)$it->warranty_months ?> months</span><?php endif; ?>
-                </td>
-                <td class="ctr"><?= (int)$it->qty ?></td>
-                <td class="num"><?= $fm($it->unitprice / $rate) ?></td>
-                <td class="num"><?= $fm($it->line_total / $rate) ?></td>
-            </tr>
-            <?php endforeach; ?>
-            <?php for (; $n < 7; $n++): ?>
-            <tr><td style="height:15px;">&nbsp;</td><td></td><td></td><td></td><td></td></tr>
-            <?php endfor; ?>
-
-            <?php if ($discountEx > 0): ?>
-            <tr><td colspan="4">Sub Total (excluding VAT)</td><td class="num"><?= $fm($grossEx) ?></td></tr>
-            <tr><td colspan="4">Less: Discount (excluding VAT)</td><td class="num"><?= $fm($discountEx) ?></td></tr>
-            <?php endif; ?>
-            <tr><td colspan="4">Total Value of Supply</td><td class="num"><?= $fm($supply) ?></td></tr>
-            <tr><td colspan="4">VAT Amount (Total Value of Supply @ <?= (float)$inv->vat_rate ?>%)</td><td class="num"><?= $fm($inv->vatamount) ?></td></tr>
-            <tr><td colspan="4" style="font-weight:bold; font-size:11px;">Total Amount / consideration including VAT</td>
-                <td class="num" style="font-weight:bold; font-size:11px;"><?= $fm($inv->net_total) ?></td></tr>
-        </table>
-
-        <!-- Words / payment -->
-        <table width="100%" class="items mb">
-            <tr><td style="width:22%; font-weight:bold;">Total Amount in words</td><td style="width:2%; font-weight:bold;">:</td><td><?= $e($words) ?></td></tr>
-            <?php if ($title === 'QUOTATION'): ?>
-            <tr><td style="font-weight:bold;">Validity</td><td style="font-weight:bold;">:</td>
-                <td>This quotation is valid for 14 days (until <?= date('d-m-Y', strtotime($inv->invoice_date . ' +14 days')) ?>)</td></tr>
-            <?php else: ?>
-            <tr><td style="font-weight:bold;">Mode of Payment</td><td style="font-weight:bold;">:</td><td><?= $e($modes) ?></td></tr>
-            <?php endif; ?>
-        </table>
-
-        <!-- Signatures -->
-        <table width="100%">
-            <tr>
-                <td class="box" style="width:49%; height:75px;">
-                    <div style="font-weight:bold;">Customer Acknowledgment</div>
-                    <div style="margin-top:38px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
-                </td>
-                <td class="gap"></td>
-                <td class="box" style="width:49%; height:75px;">
-                    <div style="font-weight:bold;">Security Check Signature</div>
-                    <div style="margin-top:38px; border-top:1px solid #000; text-align:center; font-size:9px; padding-top:2px;">Signature</div>
-                </td>
-            </tr>
-        </table>
-
-    </div>
+</div>
+<?php endforeach; ?>
 </body>
 </html>
