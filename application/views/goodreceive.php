@@ -495,6 +495,42 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
+<div class="modal fade" id="barcodemodal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-qrcode mr-2"></i>Add Product Barcodes -
+                    <span id="barcodegrnno"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="barcodegrnid">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm" id="tablebarcode">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Batch Number</th>
+                                <th class="text-center">GRN Qty</th>
+                                <th class="text-center">Added</th>
+                                <th class="text-center">Remaining</th>
+                                <th width="42%">Scan / Enter Barcode &amp; Qty</th>
+                                <th>Already Added</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnsavebarcode" class="btn btn-primary btn-sm">
+                    <i class="fas fa-save"></i>&nbsp;Save Barcodes</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 
 <script>
@@ -650,6 +686,14 @@ $(document).ready(function() {
                             'id="' + full['idtbl_grn'] + '" ' +
                             'grn_no="' + full['grn_no'] + '">' +
                             '<i class="fas fa-barcode"></i>' +
+                            '</button>';
+
+                        button += '<button data-toggle="tooltip" data-placement="bottom" ' +
+                            'title="Add Product Barcodes" ' +
+                            'class="btn btn-info btn-sm btnBarcode mr-1" ' +
+                            'id="' + full['idtbl_grn'] + '" ' +
+                            'grn_no="' + full['grn_no'] + '">' +
+                            '<i class="fas fa-qrcode"></i>' +
                             '</button>';
                     }
 
@@ -1269,6 +1313,229 @@ $(document).ready(function() {
         });
     });
     // =======================================================================
+
+    // ===================== PRODUCT BARCODES (barcode + qty) =====================
+    var barcodePending = {};   // barcodePending[detailid] = [ {barcode:'X', qty:3}, ... ]
+
+    function pendingBarcodeSum(detailid) {
+        var s = 0;
+        $.each(barcodePending[detailid] || [], function (i, b) { s += b.qty; });
+        return s;
+    }
+
+    function renderBarcodeList(detailid) {
+        var $row = $('#barcoderow_' + detailid);
+        var base = parseInt($row.data('remaining')) || 0;
+        var list = barcodePending[detailid] || [];
+        var left = base - pendingBarcodeSum(detailid);
+
+        var html = '';
+        $.each(list, function (i, b) {
+            html += '<span class="badge badge-info mr-1 mb-1 p-2">' + escapeHtml(b.barcode) +
+                ' &times; ' + b.qty +
+                ' <a href="#" class="text-white ml-1 barcode-remove" data-detailid="' + detailid +
+                '" data-index="' + i + '">&times;</a></span>';
+        });
+
+        $row.find('.barcode-list').html(html);
+        $row.find('.barcode-remaining').text(left);
+        $row.find('.barcode-count').text(base === 0 ? 'All qty has barcodes' : (base - left) + ' of ' + base + ' ready to save');
+        $row.find('.barcode-text, .barcode-qty, .btnaddbarcode').prop('disabled', left <= 0);
+        $row.find('.barcode-qty').val(left > 0 ? 1 : '');
+    }
+
+    function addBarcode(detailid) {
+        var $row = $('#barcoderow_' + detailid);
+        var $input = $row.find('.barcode-text');
+        var $qty = $row.find('.barcode-qty');
+        var $msg = $row.find('.barcode-msg');
+        var code = $.trim($input.val());
+        var qtyStr = $.trim($qty.val());
+        var base = parseInt($row.data('remaining')) || 0;
+
+        $msg.text('');
+        if (code === '') { return; }
+
+        if (qtyStr === '') { qtyStr = '1'; }
+        var qty = Number(qtyStr);
+        if (isNaN(qty) || qty <= 0 || Math.floor(qty) !== qty) {
+            $msg.text('Enter a valid whole qty');
+            $qty.focus().select();
+            return;
+        }
+
+        barcodePending[detailid] = barcodePending[detailid] || [];
+        var left = base - pendingBarcodeSum(detailid);
+        if (qty > left) {
+            $msg.text('Only ' + left + ' qty remaining');
+            $qty.focus().select();
+            return;
+        }
+
+        // same barcode again -> add to its qty
+        var found = false;
+        $.each(barcodePending[detailid], function (i, b) {
+            if (b.barcode.toLowerCase() === code.toLowerCase()) { b.qty += qty; found = true; return false; }
+        });
+        if (!found) { barcodePending[detailid].push({ barcode: code, qty: qty }); }
+
+        $input.val('');
+        renderBarcodeList(detailid);
+        $input.focus();
+    }
+
+    $('#dataTable tbody').on('click', '.btnBarcode', function () {
+        var id = $(this).attr('id');
+        $('#barcodegrnid').val(id);
+        $('#barcodegrnno').text($(this).attr('grn_no'));
+        barcodePending = {};
+
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            data: { recordID: id },
+            url: '<?php echo base_url() ?>Goodreceive/Getgrnbarcodes',
+            success: function (obj) {
+                var tbody = $('#tablebarcode tbody').empty();
+
+                $.each(obj.details, function (i, item) {
+                    var detailid = item.idtbl_grndetail;
+                    var qty = Math.floor(parseFloat(item.qty)) || 0;
+                    var added = 0, existing = '';
+
+                    $.each(item.barcodes, function (j, b) {
+                        added += parseFloat(b.qty);
+                        existing += '<span class="badge badge-secondary mr-1 mb-1">' + escapeHtml(b.barcode) +
+                            ' &times; ' + parseFloat(b.qty) + '</span>';
+                    });
+
+                    var remaining = Math.max(qty - added, 0);
+                    var dis = (remaining == 0) ? 'disabled' : '';
+                    var productName = item.product_name + (item.product_code ? ' / ' + item.product_code : '');
+
+                    var row = '<tr id="barcoderow_' + detailid + '" data-remaining="' + remaining + '" ' +
+                        'data-batchno="' + escapeHtml(item.batchno || '') + '">';
+                    row += '<td>' + escapeHtml(productName) + '</td>';
+                    row += '<td>' + escapeHtml(item.batchno || '') + '</td>';
+                    row += '<td class="text-center">' + qty + '</td>';
+                    row += '<td class="text-center">' + added + '</td>';
+                    row += '<td class="text-center font-weight-bold barcode-remaining">' + remaining + '</td>';
+                    row += '<td>' +
+                        '<div class="input-group input-group-sm">' +
+                        '<input type="text" class="form-control barcode-text" data-detailid="' + detailid + '" ' +
+                        'placeholder="Scan or type barcode, then Enter" autocomplete="off" ' + dis + '>' +
+                        '<input type="number" min="1" step="1" value="1" class="form-control barcode-qty text-right" ' +
+                        'data-detailid="' + detailid + '" style="max-width: 100px;" placeholder="Qty" ' + dis + '>' +
+                        '<div class="input-group-append">' +
+                        '<button type="button" class="btn btn-warning btnaddbarcode" data-detailid="' + detailid + '" ' + dis + '>' +
+                        '<i class="fas fa-plus"></i> Add</button></div></div>' +
+                        '<small class="text-danger barcode-msg"></small>' +
+                        '<div class="barcode-list mt-2"></div>' +
+                        '<small class="text-muted barcode-count"></small>' +
+                        '</td>';
+                    row += '<td>' + existing + '</td>';
+                    row += '</tr>';
+
+                    tbody.append(row);
+                    renderBarcodeList(detailid);
+                });
+
+                $('#barcodemodal').off('shown.bs.modal').on('shown.bs.modal', function () {
+                    $('#tablebarcode .barcode-text:enabled').first().focus();
+                });
+                $('#barcodemodal').modal('show');
+            }
+        });
+    });
+
+    // Scanner Enter -> add with the qty in the box (default 1)
+    $(document).on('keydown', '.barcode-text', function (e) {
+        if (e.which === 13) { e.preventDefault(); addBarcode($(this).data('detailid')); }
+    });
+    $(document).on('keydown', '.barcode-qty', function (e) {
+        if (e.which === 13) { e.preventDefault(); addBarcode($(this).data('detailid')); }
+    });
+    $(document).on('click', '.btnaddbarcode', function () {
+        addBarcode($(this).data('detailid'));
+    });
+    $(document).on('click', '.barcode-remove', function (e) {
+        e.preventDefault();
+        var detailid = $(this).data('detailid');
+        barcodePending[detailid].splice(parseInt($(this).data('index')), 1);
+        renderBarcodeList(detailid);
+        $('#barcoderow_' + detailid).find('.barcode-text').focus();
+    });
+
+    $('#btnsavebarcode').click(function () {
+        // add anything typed but not yet added
+        $('#tablebarcode .barcode-text').each(function () {
+            if ($.trim($(this).val()) !== '') { addBarcode($(this).data('detailid')); }
+        });
+
+        var leftover = false;
+        $('#tablebarcode .barcode-text').each(function () {
+            if ($.trim($(this).val()) !== '') { leftover = true; }
+        });
+        if (leftover) {
+            Swal.fire({ icon: 'warning', title: 'Check the barcodes', text: 'One or more barcodes could not be added. Fix the red message first.' });
+            return;
+        }
+
+        var jsonObj = [];
+        $.each(barcodePending, function (detailid, list) {
+            if (list.length > 0) {
+                jsonObj.push({
+                    detailid: detailid,
+                    batchno: $('#barcoderow_' + detailid).attr('data-batchno') || '',
+                    barcodes: list
+                });
+            }
+        });
+
+        if (jsonObj.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'Nothing to save', text: 'Please add at least one barcode.' });
+            return;
+        }
+
+        Swal.fire({
+            title: '',
+            html: '<div class="div-spinner"><div class="custom-loader"></div></div>',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            backdrop: "rgba(255, 255, 255, 0.5)",
+            customClass: { popup: "fullscreen-swal" },
+            didOpen: () => {
+                document.body.style.overflow = "hidden";
+                $.ajax({
+                    type: "POST",
+                    data: {
+                        grnID: $('#barcodegrnid').val(),
+                        tableData: JSON.stringify(jsonObj)
+                    },
+                    url: '<?php echo base_url() ?>Goodreceive/Goodreceivebarcodeinsert',
+                    success: function (result) {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+                        var obj = JSON.parse(result);
+                        var act = JSON.parse(obj.action);
+
+                        if (obj.status == 1) {
+                            $('#barcodemodal').modal('hide');
+                            Swal.fire({ icon: 'success', title: act.message, showConfirmButton: false, timer: 2500 });
+                        } else {
+                            Swal.fire({ icon: 'error', title: 'Could not save', html: act.message });
+                        }
+                    },
+                    error: function () {
+                        Swal.close();
+                        document.body.style.overflow = 'auto';
+                        Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again later.' });
+                    }
+                });
+            }
+        });
+    });
+    // ============================================================================
 
     $(document).on('input', '.edit-unitprice', function () {
         var row = $(this).closest('tr');

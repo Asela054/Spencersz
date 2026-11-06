@@ -227,7 +227,7 @@ class PorderPrintinfo extends CI_Model{
 
     private function lq_doc($title, $body){
         $css = '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
-             . 'body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: ' . $this->fontSize . 'pt; '
+             . 'body { font-family: "Courier", monospace; font-size: ' . $this->fontSize . 'pt; '
              . 'line-height: ' . $this->lineHeight . 'pt; color: #000; }';
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
             . $css . '</style></head><body>' . $body . '</body></html>';
