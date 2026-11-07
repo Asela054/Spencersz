@@ -6,6 +6,10 @@ class Invoiceinfo extends CI_Model{
     private $printOffX = 0;   // shift the printing right (+) / left (-), in points
     private $printOffY = 0;   // shift the printing down (+) / up (-), in points
 
+    const FIFO_PERMISSION = 'invoice-approve'; 
+    const FIFO_GUARD      = 'web-erp';
+    const FIFO_TOKEN_MINUTES = 15;
+
     public function SubmitNewCustomer(){
         try{
             $this->db->trans_begin();
@@ -227,6 +231,9 @@ class Invoiceinfo extends CI_Model{
                 throw new RuntimeException('Invalid invoice data');
             }
 
+            $fifoTokens = (isset($inv['fifoTokens']) && is_array($inv['fifoTokens'])) ? $inv['fifoTokens'] : [];
+            $bypassed   = [];
+
             $userid=$_SESSION['userid'];
             $company_id=$_SESSION['company_id'];
             $branch_id=$_SESSION['branch_id'];
@@ -307,9 +314,22 @@ class Invoiceinfo extends CI_Model{
                         $byProduct[$l['tbl_product_idtbl_product']][] = (int)$l['tbl_product_serial_idtbl_product_serial'];
                     }
                 }
+                // foreach ($byProduct as $pid => $ids) {
+                //     $fifo = $this->fifocheck((int)$pid, $branch_id, $ids);
+                //     if ($fifo !== true) throw new RuntimeException($fifo);
+                // }
                 foreach ($byProduct as $pid => $ids) {
-                    $fifo = $this->fifocheck((int)$pid, $branch_id, $ids);
-                    if ($fifo !== true) throw new RuntimeException($fifo);
+                    $note = '';
+                    $fifo = $this->fifocheck((int)$pid, $branch_id, $ids, $note);
+                    if ($fifo === true) continue;
+
+                    $token = isset($fifoTokens[$pid]) ? (string)$fifoTokens[$pid] : '';
+                    if ($token === '') throw new RuntimeException($fifo);
+
+                    $ov = $this->fifooverride($token, (int)$pid);
+                    if (!$ov) throw new RuntimeException('FIFO approval has expired. Request the approval again.');
+
+                    $bypassed[] = ['pid' => (int)$pid, 'msg' => $note, 'ov' => $ov, 'token' => $token];
                 }
             }
 
@@ -431,6 +451,20 @@ class Invoiceinfo extends CI_Model{
             ]);
             $invoice_id = $this->db->insert_id();
             if (!$invoice_id) throw new Exception('Invoice insert failed');
+
+            foreach ($bypassed as $b) {
+                $this->db->insert('tbl_fifo_ignore_log', [
+                    'doc_type'                  => 'INVOICE',
+                    'doc_id'                    => $invoice_id,
+                    'tbl_product_idtbl_product' => $b['pid'],
+                    'approved_by'               => $b['ov']['approved_by'],
+                    'reason'                    => $b['ov']['reason'],
+                    'remark'                    => $b['msg'],
+                    'status'                    => 1,
+                    'insertdatetime'            => $now,
+                    'tbl_user_idtbl_user'       => $userid,
+                ]);
+            }
 
             // ----- hold invoice -----
             $hold_id = !empty($inv['holdId']) ? (int)$inv['holdId'] : 0;
@@ -554,6 +588,7 @@ class Invoiceinfo extends CI_Model{
 
             $this->db->trans_commit();
             $inTrans = false;
+            foreach ($bypassed as $b) { unset($_SESSION['fifo_override'][$b['token']]); }
 
             return $this->_jsonResponse(1, 'fas fa-check-circle', 'Invoice saved', 'success', ['invoice_no' => $invoice_no, 'invoice_id' => $invoice_id]);
 
@@ -767,6 +802,52 @@ class Invoiceinfo extends CI_Model{
                                             'updateuser' => $this->session->userdata('userid')]);   // CHANGE
         return $this->_jsonResponse(1, 'fas fa-trash', 'Held bill deleted', 'success');
     }
+    // called by the POS page when a serial is chosen
+    public function Fifocheckserial()
+    {
+        $branch_id = $_SESSION['branch_id'];
+        $pid = (int)$this->input->post('product_id');
+        $ids = array_map('intval', (array)$this->input->post('serial_ids'));
+
+        $r = $this->fifocheck($pid, $branch_id, $ids);
+        echo json_encode($r === true ? ['status' => 1] : ['status' => 0, 'message' => $r]);
+    }
+    /* Approver's username/password + permission check. Token is bound to ONE product. */
+    public function Fifoignoreverify(){
+        $userID   = (int)$_SESSION['userid'];
+        $pid      = (int)$this->input->post('product_id');
+        $username = trim($this->input->post('username'));
+        $password = (string)$this->input->post('password');
+        $reason   = trim($this->input->post('reason'));
+
+        if(!$pid){ return $this->_fifoJson(false, 'Product not selected.'); }
+        if($username==='' || $password===''){ return $this->_fifoJson(false, 'Enter the username and password.'); }
+        if($reason===''){ return $this->_fifoJson(false, 'Enter the reason for ignoring FIFO.'); }
+
+        $u=$this->db->query("SELECT idtbl_user, name, password FROM tbl_user WHERE username = ? AND status = 1", array($username))->row();
+        if(!$u || !password_verify($password, $u->password)){ return $this->_fifoJson(false, 'Invalid username or password.'); }
+
+        $perm=$this->db->query("SELECT 1
+                                FROM tbl_user_has_tbl_roles ur
+                                JOIN tbl_roles r ON r.idtbl_roles = ur.tbl_roles_idtbl_roles AND r.status = 1
+                                JOIN tbl_roles_has_tbl_permissions rp ON rp.tbl_roles_idtbl_roles = r.idtbl_roles
+                                JOIN tbl_permissions p ON p.idtbl_permissions = rp.tbl_permissions_idtbl_permissions
+                                WHERE ur.tbl_user_idtbl_user = ? AND p.permission = ? AND p.guard_name = ?
+                                LIMIT 1", array((int)$u->idtbl_user, self::FIFO_PERMISSION, self::FIFO_GUARD))->row();
+        if(!$perm){ return $this->_fifoJson(false, 'This user does not have permission to approve ignoring FIFO.'); }
+
+        $token=bin2hex(random_bytes(16));
+        if(!isset($_SESSION['fifo_override']) || !is_array($_SESSION['fifo_override'])){ $_SESSION['fifo_override']=array(); }
+        foreach($_SESSION['fifo_override'] as $k => $o){ if($o['expires']<time()){ unset($_SESSION['fifo_override'][$k]); } }
+        $_SESSION['fifo_override'][$token]=array(
+            'product_id'   => $pid,
+            'approved_by'  => (int)$u->idtbl_user,
+            'requested_by' => $userID,
+            'reason'       => $reason,
+            'expires'      => time()+(self::FIFO_TOKEN_MINUTES*60),
+        );
+        echo json_encode(array('ok'=>true, 'token'=>$token, 'approver'=>$u->name));
+    }
 
     // ── Private helper ────────────────────────────────────────────────────────────
     private function _jsonResponse($status, $icon, $message, $type, $extra = []) {
@@ -816,7 +897,31 @@ class Invoiceinfo extends CI_Model{
         return trim($out);
     }
     /* FIFO: a serial from a newer GRN cannot be sold while serials of an older GRN are still free */
-    private function fifocheck($productID, $from, $ids){
+    // private function fifocheck($productID, $from, $ids){
+    //     $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
+    //                             FROM tbl_product_serial ps
+    //                             JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
+    //                             WHERE ps.tbl_product_idtbl_product = ? AND ps.stock_status = 1 AND ps.status = 1
+    //                             AND ps.tbl_company_branch_idtbl_company_branch = ?
+    //                             AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
+    //                                             WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
+    //                             ".$this->transferable()."
+    //                             ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($productID, $from))->result();
+
+    //     $rank=-1; $last=null; $ranks=array(); $names=array(); $maxSel=-1;
+    //     foreach($rows as $r){
+    //         if($r->grn!==$last){ $rank++; $last=$r->grn; $names[$rank]=$r->grn_no.' ('.$r->grndate.')'; }
+    //         $ranks[(int)$r->id]=$rank;
+    //         if(in_array((int)$r->id, $ids)){ $maxSel=max($maxSel, $rank); }
+    //     }
+    //     foreach($rows as $r){
+    //         if($ranks[(int)$r->id] < $maxSel && !in_array((int)$r->id, $ids)){
+    //             return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$ranks[(int)$r->id]].' is still available. Sell the older serial numbers first.';
+    //         }
+    //     }
+    //     return true;
+    // }
+    private function fifocheck($productID, $from, $ids, &$note = null){
         $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.grndate
                                 FROM tbl_product_serial ps
                                 JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
@@ -833,30 +938,37 @@ class Invoiceinfo extends CI_Model{
             $ranks[(int)$r->id]=$rank;
             if(in_array((int)$r->id, $ids)){ $maxSel=max($maxSel, $rank); }
         }
+
+        $skipped=array();
         foreach($rows as $r){
-            if($ranks[(int)$r->id] < $maxSel && !in_array((int)$r->id, $ids)){
-                return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$ranks[(int)$r->id]].' is still available. Sell the older serial numbers first.';
-            }
+            $rk=$ranks[(int)$r->id];
+            if($rk < $maxSel && !in_array((int)$r->id, $ids)){ $skipped[$rk]=isset($skipped[$rk]) ? $skipped[$rk]+1 : 1; }
         }
-        return true;
+        if(!count($skipped)){ return true; }
+
+        ksort($skipped);
+        $parts=array();
+        foreach($skipped as $rk => $n){ $parts[]=$names[$rk].' - '.$n.' serial number(s)'; }
+        $note='FIFO ignored with approval: batch '.$names[$maxSel].' was sold while older stock was still available ('.implode('; ', $parts).').';
+
+        $first=key($skipped);
+        return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$first].' is still available. Sell the older serial numbers first.';
     }
-
-    // called by the POS page when a serial is chosen
-    public function Fifocheckserial()
-    {
-        $branch_id = $_SESSION['branch_id'];
-        $pid = (int)$this->input->post('product_id');
-        $ids = array_map('intval', (array)$this->input->post('serial_ids'));
-
-        $r = $this->fifocheck($pid, $branch_id, $ids);
-        echo json_encode($r === true ? ['status' => 1] : ['status' => 0, 'message' => $r]);
-    }
-
     /* only these serial statuses can be transferred:
        1 = in stock, 5 = returned by customer, 6 = display item
        everything else (2 sold, 3 returned to supplier, 4 damaged, 7 defective) is excluded.
        Uses tbl_product_serial only, no tbl_serial_movement lookup. */
     private function transferable(){
         return " AND ps.stock_status IN (1, 5, 6) ";
+    }
+    private function fifooverride($token, $pid){
+        $o = isset($_SESSION['fifo_override'][$token]) ? $_SESSION['fifo_override'][$token] : null;
+        if(!$o) return null;
+        if($o['expires'] < time() || (int)$o['requested_by'] !== (int)$_SESSION['userid'] || (int)$o['product_id'] !== (int)$pid) return null;
+        return $o;
+    }
+
+    private function _fifoJson($ok, $msg){
+        echo json_encode(array('ok'=>$ok, 'msg'=>$msg));
     }
 }

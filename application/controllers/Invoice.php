@@ -95,4 +95,47 @@ class Invoice extends CI_Controller {
             echo json_encode(['status' => 0, 'message' => is_string($result) ? $result : 'FIFO check failed']);
         }
     }
+    public function Fifoignoreverify(){
+        $this->Invoiceinfo->Fifoignoreverify();
+    }
+    // public function generateVouchers() {
+    //     $currentDateTime = date('Y-m-d H:i:s');
+    //     $batchData = [];
+    //     $chunkSize = 500; // Insert in chunks of 500 to optimize performance
+
+    //     // Optional: Wrap in a transaction
+    //     $this->db->trans_start();
+
+    //     for ($i = 1; $i <= 2500; $i++) {
+    //         $batchData[] = [
+    //             'voucher_code'          => (string) $i,
+    //             'voucher_value'         => 500.00,
+    //             'balance'               => 500.00,
+    //             'issue_date'            => '2026-11-01',
+    //             'expiry_date'           => '2026-12-31',
+    //             'status'                => 1,
+    //             'insertdatetime'        => $currentDateTime,
+    //             'tbl_user_idtbl_user'   => 1
+    //         ];
+
+    //         // Once the chunk size is reached, perform a batch insert and clear the array
+    //         if (count($batchData) === $chunkSize) {
+    //             $this->db->insert_batch('tbl_gift_voucher', $batchData);
+    //             $batchData = [];
+    //         }
+    //     }
+
+    //     // Insert any remaining records that didn't fill the last chunk
+    //     if (!empty($batchData)) {
+    //         $this->db->insert_batch('tbl_gift_voucher', $batchData);
+    //     }
+
+    //     $this->db->trans_complete();
+
+    //     if ($this->db->trans_status() === FALSE) {
+    //         echo "Failed to generate vouchers.";
+    //     } else {
+    //         echo "2500 vouchers successfully generated!";
+    //     }
+    // }
 }
