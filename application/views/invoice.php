@@ -941,7 +941,39 @@ include "include/topnavbar.php";
             </div>
             <div class="modal-body" id="fifobody"></div>
             <div class="modal-footer">
+                <button type="button" id="btnfifoignore" class="btn btn-outline-danger btn-sm px-3 mr-auto"><i class="fas fa-unlock-alt mr-1"></i>Ignore FIFO</button>
                 <button type="button" class="btn btn-danger btn-sm px-4" data-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- MODAL 5: FIFO AUTH -->
+<div class="modal fade" id="fifoauthmodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-shield mr-2 text-danger"></i>Approve ignoring FIFO</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Product: <b id="fa_product"></b><br>A user with FIFO approval permission must enter their username and password.</p>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Username*</label>
+                    <input type="text" id="fa_user" class="form-control form-control-sm" autocomplete="off">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Password*</label>
+                    <input type="password" id="fa_pass" class="form-control form-control-sm" autocomplete="new-password">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="small font-weight-bold">Reason*</label>
+                    <input type="text" id="fa_reason" class="form-control form-control-sm" maxlength="255">
+                </div>
+                <div id="fa_msg" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btnfifoapprove" class="btn btn-danger btn-sm px-4"><i class="fas fa-check mr-1"></i>Approve</button>
             </div>
         </div>
     </div>
@@ -1556,6 +1588,11 @@ include "include/topnavbar.php";
             fulfillment: document.querySelector('input[name="fulfillmentRadio"]:checked').value,
             discount: parseFloat(document.getElementById("discountInput").value) || 0,
             items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty })),
+            fifoTokens: (function () {
+                const t = {};
+                cart.forEach(c => { if (c.fifoIgnored && fifoApprovals[c.id]) t[c.id] = fifoApprovals[c.id].token; });
+                return t;
+            })(),
             payments: collectPayments(),
             holdId: activeHoldId,
             quotationId: activeQuotationId
@@ -1576,6 +1613,7 @@ include "include/topnavbar.php";
                     activeHoldId = null; 
                     activeQuotationId = null; 
                     refreshHoldCount();
+                    fifoApprovals = {};
                     cart = [];
                     renderCartTable();
                     resetPayments();
@@ -1587,6 +1625,7 @@ include "include/topnavbar.php";
                     $('#receiptPreviewModal').modal('hide');
                     showInvoicePdf(savedId);
                 } else {
+                    if (JSON.stringify(res).indexOf('FIFO approval') !== -1) clearFifoApprovals();
                     action(res.action);
                 }
                 btn.disabled = false;
@@ -1733,6 +1772,20 @@ include "include/topnavbar.php";
         return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
+    let fifoApprovals = {};     // productId -> { token, approver }
+    let fifoPending   = null;   // { prod, s } waiting for approval
+    let fifoGoAuth    = false;
+
+    // approved only while this product still has a FIFO-ignored line in the cart
+    function isFifoApproved(pid) {
+        return !!fifoApprovals[pid] && cart.some(c => c.id == pid && c.fifoIgnored);
+    }
+
+    function clearFifoApprovals() {
+        fifoApprovals = {};
+        cart.forEach(c => c.fifoIgnored = false);
+    }
+
     // Batch (GRN) ranking for the selected product. Same logic as the server fifocheck().
     function fifoInfo(prod) {
         const rankOf = {}, batches = [];
@@ -1769,9 +1822,10 @@ include "include/topnavbar.php";
             const ex = list.find(s => s.serialno.toLowerCase() === q);
             if (ex) {
                 const r = f.rankOf[ex.idtbl_product_serial];
-                if (r > f.oldest) {
+                if (r > f.oldest && !isFifoApproved(pendingProduct.id)) { 
                     const ob = f.batches[f.oldest];
                     const note = document.createElement("div");
+                    const blocked = r > f.oldest && !isFifoApproved(pendingProduct.id);
                     note.className = "fifo-note";
                     note.innerHTML = `<i class="fas fa-exclamation-triangle mr-1"></i>This serial is from batch <b>${escH(f.batches[r].label)}</b>.
                         Older stock still available: <b>${escH(ob.label)}</b> (${ob.free}). Sell the older serials first.`;
@@ -1868,19 +1922,30 @@ include "include/topnavbar.php";
     }
 
     // FIFO check (client side, same as stock transfer), then add
+    // function addSerialToCart(prod, s) {
+    //     const f = fifoInfo(prod);
+    //     const r = f.rankOf[s.idtbl_product_serial];
+
+    //     // older batch still has free serials -> not allowed
+    //     if (r > f.oldest) {
+    //         showFifoModal(prod, s);
+    //         return;
+    //     }
+    //     pushSerialToCart(prod, s);
+    // }
     function addSerialToCart(prod, s) {
         const f = fifoInfo(prod);
         const r = f.rankOf[s.idtbl_product_serial];
 
-        // older batch still has free serials -> not allowed
         if (r > f.oldest) {
+            if (isFifoApproved(prod.id)) { pushSerialToCart(prod, s, true); return; }   // this product already approved
             showFifoModal(prod, s);
             return;
         }
-        pushSerialToCart(prod, s);
+        pushSerialToCart(prod, s, false);
     }
 
-    function pushSerialToCart(prod, s) {
+    function pushSerialToCart(prod, s, ignored) {
         if (cart.some(c => c.serialId == s.idtbl_product_serial)) return;   // a double Enter must not add it twice
 
         const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price;
@@ -1895,6 +1960,7 @@ include "include/topnavbar.php";
             qty: 1,
             serialId: s.idtbl_product_serial,
             serialno: s.serialno,
+            fifoIgnored: !!ignored,
             costprice: parseFloat(s.costunitprice) || 0,
             imei: "S/N: " + s.serialno
         });
@@ -1909,6 +1975,25 @@ include "include/topnavbar.php";
         document.getElementById("barcodeInput").focus();
     }
 
+    // function showFifoModal(prod, s) {
+    //     const f = fifoInfo(prod);
+    //     const r = f.rankOf[s.idtbl_product_serial];
+    //     let list = '';
+    //     f.batches.forEach((b, i) => {
+    //         if (i < r && b.free > 0) {
+    //             list += '<li>Batch ' + escH(b.label) + ' - <b>' + b.free + '</b> serial number(s) still in stock</li>';
+    //         }
+    //     });
+
+    //     $('#fifobody').html(
+    //         '<p>You cannot sell batch <b>' + escH(f.batches[r].label) + '</b> because older serial numbers of this product are still in stock:</p>' +
+    //         '<ul>' + list + '</ul><p class="mb-0">Sell the older serial numbers first.</p>'
+    //     );
+    //     $('#fifomodal').one('hidden.bs.modal', function () {
+    //         $('#imeiInput').val('').focus();
+    //         showSerialList('');
+    //     }).modal('show');
+    // }
     function showFifoModal(prod, s) {
         const f = fifoInfo(prod);
         const r = f.rankOf[s.idtbl_product_serial];
@@ -1919,15 +2004,69 @@ include "include/topnavbar.php";
             }
         });
 
+        fifoPending = { prod: prod, s: s };
+        fifoGoAuth = false;
+
         $('#fifobody').html(
             '<p>You cannot sell batch <b>' + escH(f.batches[r].label) + '</b> because older serial numbers of this product are still in stock:</p>' +
-            '<ul>' + list + '</ul><p class="mb-0">Sell the older serial numbers first.</p>'
+            '<ul>' + list + '</ul><p class="mb-0">Sell the older serial numbers first, or ask an authorized person to ignore FIFO for this product.</p>'
         );
         $('#fifomodal').one('hidden.bs.modal', function () {
-            $('#imeiInput').val('').focus();
-            showSerialList('');
+            if (fifoGoAuth) {
+                fifoGoAuth = false;
+                $('#fa_user, #fa_pass, #fa_reason').val('');
+                $('#fa_msg').text('');
+                $('#fa_product').text(fifoPending ? fifoPending.prod.name : '');
+                $('#fifoauthmodal').modal('show');
+            } else {
+                fifoPending = null;
+                $('#imeiInput').val('').focus();
+                showSerialList('');
+            }
         }).modal('show');
     }
+
+    $('#btnfifoignore').on('click', function () {
+        fifoGoAuth = true;
+        $('#fifomodal').modal('hide');
+    });
+
+    // approval modal closed without approving
+    $('#fifoauthmodal').on('hidden.bs.modal', function () {
+        if (fifoPending) {
+            fifoPending = null;
+            $('#imeiInput').val('').focus();
+            showSerialList('');
+        }
+    });
+
+    $('#btnfifoapprove').on('click', function () {
+        const u = $.trim($('#fa_user').val()), p = $('#fa_pass').val(), r = $.trim($('#fa_reason').val());
+        if (!fifoPending) return;
+        if (!u || !p || !r) { $('#fa_msg').text('Enter the username, password and reason.'); return; }
+
+        const pending = fifoPending;
+        $('#btnfifoapprove').prop('disabled', true);
+        $.ajax({
+            url: '<?php echo base_url(); ?>Invoice/Fifoignoreverify',
+            type: 'POST', dataType: 'json',
+            data: { product_id: pending.prod.id, username: u, password: p, reason: r },
+            success: function (res) {
+                $('#btnfifoapprove').prop('disabled', false);
+                $('#fa_pass').val('');
+                if (!res.ok) { $('#fa_msg').text(res.msg); return; }
+
+                fifoApprovals[pending.prod.id] = { token: res.token, approver: res.approver };
+                fifoPending = null;
+                $('#fifoauthmodal').modal('hide');
+                pushSerialToCart(pending.prod, pending.s, true);   // add the serial the cashier originally chose
+            },
+            error: function () {
+                $('#btnfifoapprove').prop('disabled', false);
+                $('#fa_msg').text('Server error. Please try again.');
+            }
+        });
+    });
 
     // Only for products WITHOUT serials
     function addItemToCart(prod) {
