@@ -248,6 +248,7 @@ include "include/topnavbar.php";
                     "render": function(data, type, full) {
                         var button='';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Edit" class="btn btn-primary btn-sm btnEdit mr-1 ';if(editcheck!=1){button+='d-none';}button+='" id="'+full['idtbl_product']+'"><i class="fas fa-pen"></i></button>';
+                        button+='<button data-toggle="tooltip" data-placement="bottom" title="Print Barcode" class="btn btn-secondary btn-sm btnBarcode mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-barcode"></i></button>';
                         if(full['status']==1){
                             button+='<a href="<?php echo base_url() ?>Product/Productstatus/'+full['idtbl_product']+'/2"  data-toggle="tooltip" data-placement="bottom" title="Active" onclick="return deactive_confirm()" target="_self" class="btn btn-success btn-sm mr-1 ';if(statuscheck!=1){button+='d-none';}button+='"><i class="fas fa-check"></i></a>';
                         }else{
@@ -294,6 +295,12 @@ include "include/topnavbar.php";
                         $('#submitBtn').html('<i class="far fa-save"></i>&nbsp;Update');
                     }
                 });
+            }
+        });
+        $('#tblproduct tbody').on('click', '.btnBarcode', function() {
+            var qty = parseInt(prompt("How many labels to print?", "1"));
+            if (qty > 0) {
+                window.open('<?php echo base_url() ?>Product/Barcodeprint/' + $(this).data('id') + '/' + qty, '_blank');
             }
         });
     });
