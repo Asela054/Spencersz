@@ -2,6 +2,86 @@
 include "include/header.php";  
 include "include/topnavbar.php"; 
 ?>
+<style>
+    .warranty-card{
+        border:1px solid #e3e6ef;
+        border-radius:10px;
+        background:#fff;
+        box-shadow:0 2px 8px rgba(30,40,80,.06);
+        overflow:hidden;
+    }
+    .warranty-card-header{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        padding:10px 14px;
+        background:#f6f7fb;
+        border-bottom:1px solid #e3e6ef;
+    }
+    .warranty-title{
+        font-size:.85rem;
+        font-weight:700;
+        color:#2d3250;
+        letter-spacing:.2px;
+    }
+    .warranty-title i{ color:#c0102f; }
+    .warranty-count{
+        background:#e9ecf5;
+        color:#4a5170;
+        font-weight:600;
+        padding:5px 10px;
+    }
+    .warranty-card-body{ padding:14px; }
+    .warranty-label{
+        display:block;
+        font-size:.75rem;
+        font-weight:700;
+        color:#5b6280;
+        text-transform:uppercase;
+        letter-spacing:.4px;
+        margin-bottom:6px;
+    }
+    .warranty-card .input-group-text{
+        font-size:.75rem;
+        background:#f6f7fb;
+        color:#5b6280;
+    }
+    .btn-add-warranty{
+        font-size:.75rem;
+        padding:2px 10px;
+        border-radius:20px;
+    }
+    .warranty-empty{
+        text-align:center;
+        padding:12px 10px;
+        border:1px dashed #cfd4e4;
+        border-radius:8px;
+        background:#fafbfd;
+        font-size:.78rem;
+        color:#8a90a8;
+    }
+    .warranty-empty span{ font-size:.72rem; margin-top:2px; }
+    .warranty-row{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:8px;
+        margin-bottom:8px;
+        border:1px solid #e3e6ef;
+        border-radius:8px;
+        background:#fafbfd;
+    }
+    .warranty-row .w-name{ flex:1; }
+    .warranty-row .w-months-group{ width:130px; flex:none; }
+    .warranty-row .btnRemoveWarranty{
+        flex:none;
+        width:30px;
+        height:30px;
+        padding:0;
+        border-radius:50%;
+        line-height:1;
+    }
+</style>
 <div id="layoutSidenav">
 
 <div id="layoutSidenav_nav">
@@ -24,7 +104,7 @@ include "include/topnavbar.php";
                     <div class="card-body p-0 p-2">
                         <div class="row">
                             <div class="col-4">
-                                <form action="<?php echo base_url() ?>Product/Productinsertupdate" method="post" autocomplete="off">
+                                <form action="<?php echo base_url() ?>Product/Productinsertupdate" method="post" autocomplete="off" id="productForm">
                                     <div class="row">
                                         <div class="col-6">
                                     <div class="form-group mb-1">
@@ -100,27 +180,83 @@ include "include/topnavbar.php";
                                     </div>
                                         </div>
                                     </div>
+
+                                    <!-- ================= DISCOUNT ================= -->
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount %</label>
+                                                <input type="number" class="form-control form-control-sm" name="discount_percent" id="discount_percent" step="0.01" min="0" max="100" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount Start</label>
+                                                <input type="date" class="form-control form-control-sm" name="discount_start" id="discount_start">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount End</label>
+                                                <input type="date" class="form-control form-control-sm" name="discount_end" id="discount_end">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- =========================================== -->
+
                                     <div class="row">
                                         <div class="col-6">
-                                    <div class="form-group mb-1">
-                                        <label class="small font-weight-bold">Re-order Level</label>
-                                        <input type="number" class="form-control form-control-sm" name="reorder_level" id="reorder_level" min="0" value="0">
-                                    </div>
+                                            <div class="form-group mb-2">
+                                                <label class="small font-weight-bold">Re-order Level</label>
+                                                <input type="number" class="form-control form-control-sm" name="reorder_level" id="reorder_level" min="0" value="0">
+                                            </div>
                                         </div>
                                         <div class="col-6">
-                                    <div class="form-group mb-1">
-                                        <label class="small font-weight-bold">Warranty (Months)</label>
-                                        <input type="number" class="form-control form-control-sm" name="warranty_months" id="warranty_months" min="0" value="0">
-                                    </div>
+                                            <div class="form-group mb-2">
+                                                <label class="small font-weight-bold">Serial Number Tracking*</label>
+                                                <select class="form-control form-control-sm" name="has_serial" id="has_serial" required>
+                                                    <option value="0">No</option>
+                                                    <option value="1" selected>Yes</option>
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="form-group mb-1">
-                                        <label class="small font-weight-bold">Serial Number Tracking*</label>
-                                        <select class="form-control form-control-sm" name="has_serial" id="has_serial" required>
-                                            <option value="0">No</option>
-                                            <option value="1" selected>Yes</option>
-                                        </select>
+
+                                    <!-- ================= WARRANTY ================= -->
+                                    <div class="warranty-card mt-3 mb-3">
+                                        <div class="warranty-card-header">
+                                            <span class="warranty-title"><i class="fas fa-shield-alt"></i>&nbsp;Warranty Details</span>
+                                            <span class="badge badge-pill warranty-count" id="warrantyCount">0 extra</span>
+                                        </div>
+
+                                        <div class="warranty-card-body">
+                                            <!-- Main warranty -->
+                                            <label class="warranty-label">Main Warranty (whole product)</label>
+                                            <div class="input-group input-group-sm mb-3">
+                                                <input type="number" class="form-control" name="warranty_months" id="warranty_months" min="0" value="0">
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text">Months</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Additional warranties -->
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="warranty-label mb-0">Additional Part Warranties</label>
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-add-warranty" id="btnAddWarranty">
+                                                    <i class="fas fa-plus"></i>&nbsp;Add Part
+                                                </button>
+                                            </div>
+
+                                            <div id="warrantyEmpty" class="warranty-empty">
+                                                <i class="fas fa-info-circle"></i>&nbsp;No part warranties added.
+                                                <span class="d-block">Example: Compressor – 60 months</span>
+                                            </div>
+
+                                            <div id="warrantyRows"></div>
+                                        </div>
                                     </div>
+                                    <!-- =========================================== -->
+
                                     <div class="form-group mb-1">
                                         <label class="small font-weight-bold">Description</label>
                                         <textarea class="form-control form-control-sm" name="description" id="description" rows="2"></textarea>
@@ -171,6 +307,76 @@ include "include/topnavbar.php";
         var deletecheck='<?php echo $deletecheck; ?>';
         $('#tbl_category_idtbl_category, #tbl_brand_idtbl_brand, #tbl_unit_idtbl_unit').select2({width: '100%'});
 
+        // ---------- Discount validation ----------
+        // When a discount % is entered, both dates are required and the end date cannot be before the start date.
+        function checkDiscountDates(){
+            var percent = parseFloat($('#discount_percent').val()) || 0;
+            var start = $('#discount_start').val();
+            var end = $('#discount_end').val();
+
+            if(percent < 0 || percent > 100){
+                alert('Discount % must be between 0 and 100.');
+                return false;
+            }
+            if(percent > 0){
+                if(start === '' || end === ''){
+                    alert('Please select the discount start date and end date.');
+                    return false;
+                }
+                if(end < start){
+                    alert('Discount end date cannot be before the start date.');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        $('#productForm').on('submit', function(){
+            return checkDiscountDates();
+        });
+
+        // ---------- Additional warranty rows ----------
+        function refreshWarrantyUI(){
+            var count = $('#warrantyRows .warranty-row').length;
+            $('#warrantyEmpty').toggle(count === 0);
+            $('#warrantyCount').text(count + ' extra');
+        }
+
+        function addWarrantyRow(name, months){
+            var $row = $(
+                '<div class="warranty-row">' +
+                    '<input type="text" class="form-control form-control-sm w-name" name="warranty_name[]" placeholder="Part name (e.g. Compressor)">' +
+                    '<div class="input-group input-group-sm w-months-group">' +
+                        '<input type="number" class="form-control w-months" name="warranty_part_months[]" placeholder="0" min="1">' +
+                        '<div class="input-group-append"><span class="input-group-text">Months</span></div>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-outline-danger btn-sm btnRemoveWarranty" title="Remove"><i class="fas fa-times"></i></button>' +
+                '</div>'
+            );
+            $row.find('.w-name').val(name || '');
+            $row.find('.w-months').val(months || '');
+            $('#warrantyRows').append($row);
+            refreshWarrantyUI();
+        }
+
+        function resetWarranties(){
+            $('#warrantyRows').empty();
+            refreshWarrantyUI();
+        }
+
+        $('#btnAddWarranty').on('click', function(){
+            addWarrantyRow();
+            $('#warrantyRows .warranty-row:last .w-name').focus();
+        });
+
+        $('#warrantyRows').on('click', '.btnRemoveWarranty', function(){
+            $(this).closest('.warranty-row').remove();
+            refreshWarrantyUI();
+        });
+
+        refreshWarrantyUI();
+
+        // ---------- Product table ----------
         $('#tblproduct').DataTable({
             "destroy": true,
             "processing": true,
@@ -195,13 +401,11 @@ include "include/topnavbar.php";
                             .css( 'font-size', 'inherit' );
                     }, 
                 },
-                // 'copy', 'csv', 'excel', 'pdf', 'print'
             ],
             
             ajax: {
                 url: "<?php echo base_url() ?>scripts/productlist.php",
-                type: "POST", // you can use GET
-                // data: function(d) {}
+                type: "POST",
             },
             "order": [[ 0, "desc" ]],
             "columns": [
@@ -211,30 +415,14 @@ include "include/topnavbar.php";
                         return meta.settings._iRecordsDisplay - meta.row;
                     }
                 },
-                {
-                    "data": "product_code"
-                },
-                {
-                    "data": "barcode"
-                },
-                {
-                    "data": "product_name"
-                },
-                {
-                    "data": "model_no"
-                },
-                {
-                    "data": "category"
-                },
-                {
-                    "data": "brand"
-                },
-                {
-                    "data": "cost_price"
-                },
-                {
-                    "data": "selling_price"
-                },
+                { "data": "product_code" },
+                { "data": "barcode" },
+                { "data": "product_name" },
+                { "data": "model_no" },
+                { "data": "category" },
+                { "data": "brand" },
+                { "data": "cost_price" },
+                { "data": "selling_price" },
                 {
                     "data": null,
                     "render": function(data, type, full) {
@@ -264,6 +452,7 @@ include "include/topnavbar.php";
                 $('[data-toggle="tooltip"]').tooltip();
             }
         });
+
         $('#tblproduct tbody').on('click', '.btnEdit', function() {
             var r = confirm("Are you sure, You want to Edit this ? ");
             if (r == true) {
@@ -274,7 +463,7 @@ include "include/topnavbar.php";
                         recordID: id
                     },
                     url: '<?php echo base_url() ?>Product/Productedit',
-                    success: function(result) { //alert(result);
+                    success: function(result) {
                         var obj = JSON.parse(result);
                         $('#recordID').val(obj.id);
                         $('#product_code').val(obj.product_code); 
@@ -287,9 +476,20 @@ include "include/topnavbar.php";
                         $('#tbl_unit_idtbl_unit').val(obj.tbl_unit_idtbl_unit).trigger('change'); 
                         $('#cost_price').val(obj.cost_price); 
                         $('#selling_price').val(obj.selling_price); 
+                        $('#discount_percent').val(obj.discount_percent); 
+                        $('#discount_start').val(obj.discount_start); 
+                        $('#discount_end').val(obj.discount_end); 
                         $('#reorder_level').val(obj.reorder_level); 
                         $('#has_serial').val(obj.has_serial); 
                         $('#warranty_months').val(obj.warranty_months); 
+
+                        // load additional warranties
+                        resetWarranties();
+                        if(obj.warranties && obj.warranties.length){
+                            $.each(obj.warranties, function(i, w){
+                                addWarrantyRow(w.warranty_name, w.warranty_months);
+                            });
+                        }
                          
                         $('#recordOption').val('2');
                         $('#submitBtn').html('<i class="far fa-save"></i>&nbsp;Update');
