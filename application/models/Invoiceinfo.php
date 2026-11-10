@@ -10,6 +10,13 @@ class Invoiceinfo extends CI_Model{
     const FIFO_GUARD      = 'web-erp';
     const FIFO_TOKEN_MINUTES = 15;
 
+    public function Getemployeelist(){
+        $this->db->select('idtbl_employee, emp_no, full_name');
+        $this->db->from('tbl_employee');
+        $this->db->where('status', 1);
+        $this->db->order_by('full_name');
+        return $this->db->get()->result();
+    }
     public function SubmitNewCustomer(){
         try{
             $this->db->trans_begin();
@@ -96,61 +103,119 @@ class Invoiceinfo extends CI_Model{
 
         echo json_encode($response);
     }
+    // public function Getproductdetails(){
+    //     $productbarcordname = trim((string)$this->input->post('productbarcordname'));
+
+    //     // $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months');
+    //     $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months, discount_percent, discount_start, discount_end');
+    //     $this->db->from('tbl_product');
+    //     $this->db->where('status', 1);
+    //     $this->db->group_start();
+    //         $this->db->where('product_code', $productbarcordname);
+    //         $this->db->or_like('product_name', $productbarcordname);
+    //     $this->db->group_end();
+    //     $respond = $this->db->get();
+
+    //     if ($respond->num_rows() > 0) {
+    //         foreach ($respond->result() as $row) {
+    //             $productList[] = array(
+    //                 'idtbl_product' => $row->idtbl_product,
+    //                 'product_code' => $row->product_code,
+    //                 'product_name' => $row->product_name,
+    //                 'model_no' => $row->model_no,
+    //                 'description' => $row->description,
+    //                 'cost_price' => $row->cost_price,
+    //                 'selling_price' => $row->selling_price,
+    //                 'warranty_months' => $row->warranty_months,
+    //                 'discount_percent' => $this->activediscount($row)
+    //             );
+
+    //             // $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
+    //             // $this->db->from('tbl_product_serial');
+    //             // $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
+    //             // $this->db->where('status', 1);
+    //             // $this->db->where_in('stock_status', array(1, 5, 6));
+
+    //             $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
+    //             $this->db->from('tbl_product_serial ps');
+    //             $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
+    //             $this->db->where('ps.tbl_product_idtbl_product', $row->idtbl_product);
+    //             $this->db->where('ps.status', 1);
+    //             $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
+    //             $this->db->where_in('ps.stock_status', array(1, 5, 6));
+    //             $this->db->order_by('g.grndate');
+    //             $this->db->order_by('g.idtbl_grn');
+    //             $this->db->order_by('ps.idtbl_product_serial');
+
+    //             $serialRespond = $this->db->get();
+    //             $productList[count($productList) - 1]['serials'] = $serialRespond->result();
+    //         }
+    //         echo json_encode(array(
+    //             'status' => 1,
+    //             'products' => $productList
+    //         ));
+    //     } else {
+    //         echo json_encode(array(
+    //             'status' => 0,
+    //             'message' => 'Product not found'
+    //         ));
+    //     }
+    // }
     public function Getproductdetails(){
         $productbarcordname = trim((string)$this->input->post('productbarcordname'));
 
-        $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months');
+        $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months, discount_percent, discount_start, discount_end');
         $this->db->from('tbl_product');
         $this->db->where('status', 1);
         $this->db->group_start();
             $this->db->where('product_code', $productbarcordname);
             $this->db->or_like('product_name', $productbarcordname);
         $this->db->group_end();
-        $respond = $this->db->get();
+        $products = $this->db->get()->result();
 
-        if ($respond->num_rows() > 0) {
-            foreach ($respond->result() as $row) {
-                $productList[] = array(
-                    'idtbl_product' => $row->idtbl_product,
-                    'product_code' => $row->product_code,
-                    'product_name' => $row->product_name,
-                    'model_no' => $row->model_no,
-                    'description' => $row->description,
-                    'cost_price' => $row->cost_price,
-                    'selling_price' => $row->selling_price,
-                    'warranty_months' => $row->warranty_months
-                );
-
-                // $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
-                // $this->db->from('tbl_product_serial');
-                // $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
-                // $this->db->where('status', 1);
-                // $this->db->where_in('stock_status', array(1, 5, 6));
-
-                $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
-                $this->db->from('tbl_product_serial ps');
-                $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
-                $this->db->where('ps.tbl_product_idtbl_product', $row->idtbl_product);
-                $this->db->where('ps.status', 1);
-                $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
-                $this->db->where_in('ps.stock_status', array(1, 5, 6));
-                $this->db->order_by('g.grndate');
-                $this->db->order_by('g.idtbl_grn');
-                $this->db->order_by('ps.idtbl_product_serial');
-
-                $serialRespond = $this->db->get();
-                $productList[count($productList) - 1]['serials'] = $serialRespond->result();
-            }
-            echo json_encode(array(
-                'status' => 1,
-                'products' => $productList
-            ));
-        } else {
-            echo json_encode(array(
-                'status' => 0,
-                'message' => 'Product not found'
-            ));
+        if (empty($products)) {
+            echo json_encode(array('status' => 0, 'message' => 'Product not found'));
+            return;
         }
+
+        // ONE query for the serials of all these products (was: one query per product)
+        $ids = array();
+        foreach ($products as $row) { $ids[] = (int)$row->idtbl_product; }
+
+        $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
+        $this->db->from('tbl_product_serial ps');
+        $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
+        $this->db->where_in('ps.tbl_product_idtbl_product', $ids);
+        $this->db->where('ps.status', 1);
+        $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
+        $this->db->where_in('ps.stock_status', array(1, 5, 6));
+        $this->db->order_by('g.grndate');
+        $this->db->order_by('g.idtbl_grn');
+        $this->db->order_by('ps.idtbl_product_serial');
+        $serialRows = $this->db->get()->result();
+
+        $serialsByProduct = array();
+        foreach ($serialRows as $s) {
+            $serialsByProduct[(int)$s->tbl_product_idtbl_product][] = $s;   // keeps the GRN (FIFO) order
+        }
+
+        $productList = array();
+        foreach ($products as $row) {
+            $productList[] = array(
+                'idtbl_product' => $row->idtbl_product,
+                'product_code' => $row->product_code,
+                'product_name' => $row->product_name,
+                'model_no' => $row->model_no,
+                'description' => $row->description,
+                'cost_price' => $row->cost_price,
+                'selling_price' => $row->selling_price,
+                'warranty_months' => $row->warranty_months,
+                'discount_percent' => $this->activediscount($row),
+                'serials' => isset($serialsByProduct[(int)$row->idtbl_product]) ? $serialsByProduct[(int)$row->idtbl_product] : array()
+            );
+        }
+
+        echo json_encode(array('status' => 1, 'products' => $productList));
     }
     public function CheckGiftVoucher(){
         $code = strtoupper(trim((string)$this->input->post('vouchercode')));
@@ -244,15 +309,21 @@ class Invoiceinfo extends CI_Model{
             $invoiceType = $inv['invoiceType'];
             $isQuote     = ($invoiceType === 'Corporate Quotation');
             $customer_id = !empty($inv['customerId']) ? (int)$inv['customerId'] : null;
+            $sales_rep_id = !empty($inv['salesRepId']) ? (int)$inv['salesRepId'] : null;
             $discount    = max(0, round((float)$inv['discount'], 2));
 
+            $this->db->trans_begin();
+            $inTrans = true;
+
             // =============== 1. ITEMS (prices and stock come from the DB) ===============
-            $lines = []; $gross = 0; $reserved = [];
+            $lines = []; $gross = 0; $reserved = []; $usedSerial = [];
             foreach ($inv['items'] as $it) {
                 $p = $this->db->where('idtbl_product', (int)$it['id'])->get('tbl_product')->row();
                 if (!$p) throw new RuntimeException('Product not found');
-
+                
                 $serial = null; $qty = max(1, (int)$it['qty']); $stockPrice = 0;
+
+                $sn = isset($it['serialNo']) ? trim((string)$it['serialNo']) : '';
 
                 if (!empty($it['serialId'])) {
                     $serial = $this->db->where('idtbl_product_serial', (int)$it['serialId'])
@@ -262,6 +333,10 @@ class Invoiceinfo extends CI_Model{
                                     ->get('tbl_product_serial')->row();
                                     
                     if (!$serial) throw new RuntimeException($p->product_name . ': serial not available');
+                    $qty = 1;
+                } elseif ($sn !== '') {
+                    // TEMPORARY: serial typed by the cashier
+                    $serial = $this->_manual_serial($p, $sn, (float)$p->selling_price, $isQuote, $branch_id, $company_id, $userid, $now);
                     $qty = 1;
                 } else {
                     $batches = $this->db->select('idtbl_stock, qty, saleprice')
@@ -281,9 +356,20 @@ class Invoiceinfo extends CI_Model{
                     $stockPrice = $batches ? (float)$batches[0]->saleprice : 0;
                 }
 
+                // the same serial cannot be on two lines
+                if ($serial && $serial->idtbl_product_serial) {
+                    if (isset($usedSerial[$serial->idtbl_product_serial])) throw new RuntimeException('Serial added twice: ' . $serial->serialno);
+                    $usedSerial[$serial->idtbl_product_serial] = true;
+                }
+
                 if ($serial && (float)$serial->saleprice > 0) $price = (float)$serial->saleprice;
                 elseif ($stockPrice > 0)                      $price = $stockPrice;
-                else                                          $price = (float)$p->sellingprice;   // CHANGE (fallback only)
+                else                                          $price = (float)$p->selling_price;   // CHANGE (fallback only)
+
+                // product discount (the browser price is never trusted, it is calculated here)
+                $listPrice = $price;
+                $discPct   = $this->activediscount($p);
+                if ($discPct > 0) $price = round($listPrice * (1 - $discPct / 100), 2);
 
                 $total = round($price * $qty, 2);
                 $gross += $total;
@@ -295,11 +381,15 @@ class Invoiceinfo extends CI_Model{
                     'warranty_months' => $p->warranty_months,     // CHANGE
                     'qty'             => $qty,
                     'unitprice'       => $price,
+                    'list_price'      => $listPrice,
+                    'discount_percent'=> $discPct,
+                    'discount_amount' => round(($listPrice - $price) * $qty, 2),
                     'costunitprice'   => $serial ? (float)$serial->costunitprice : 0,
                     'line_total'      => $total,
                     'tbl_product_idtbl_product'               => $p->idtbl_product,
                     'tbl_product_serial_idtbl_product_serial' => $serial ? $serial->idtbl_product_serial : null,
                     '_grndetail'      => $serial ? $serial->tbl_grndetail_idtbl_grndetail : null,   // removed before insert
+                    '_manual'         => ($sn !== ''),   // removed before insert
                 ];
             }
 
@@ -310,7 +400,7 @@ class Invoiceinfo extends CI_Model{
             if (!$isQuote) {
                 $byProduct = [];
                 foreach ($lines as $l) {
-                    if ($l['tbl_product_serial_idtbl_product_serial']) {
+                    if ($l['tbl_product_serial_idtbl_product_serial'] && empty($l['_manual'])) {
                         $byProduct[$l['tbl_product_idtbl_product']][] = (int)$l['tbl_product_serial_idtbl_product_serial'];
                     }
                 }
@@ -411,8 +501,6 @@ class Invoiceinfo extends CI_Model{
             }
 
             // =============== 4. SAVE (all or nothing) ===============
-            $this->db->trans_begin();
-            $inTrans = true;
 
             $branch = $this->db->select('code')->where('idtbl_company_branch', $branch_id)
                    ->get('tbl_company_branch')->row();
@@ -447,7 +535,7 @@ class Invoiceinfo extends CI_Model{
                 'payment_status' => $payStatus, 'status' => 1,
                 'insertdatetime' => $now, 'updateuser' => $userid, 'updatedatetime' => $now,
                 'tbl_user_idtbl_user' => $userid, 'tbl_customer_idtbl_customer' => $customer_id,
-                'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id,
+                'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id, 'salesrepid' => $sales_rep_id
             ]);
             $invoice_id = $this->db->insert_id();
             if (!$invoice_id) throw new Exception('Invoice insert failed');
@@ -482,7 +570,7 @@ class Invoiceinfo extends CI_Model{
             foreach ($lines as $l) {
                 $sid       = $l['tbl_product_serial_idtbl_product_serial'];
                 $grnDetail = $l['_grndetail'];
-                unset($l['_grndetail']);
+                unset($l['_grndetail'], $l['_manual']);
 
                 // non-serial: take stock first, the real cost comes from the batches used
                 if (!$isQuote && !$sid) {
@@ -954,6 +1042,17 @@ class Invoiceinfo extends CI_Model{
         $first=key($skipped);
         return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$first].' is still available. Sell the older serial numbers first.';
     }
+    /* discount % that is valid TODAY for this product row (0 = no discount) */
+    private function activediscount($p){
+        $d=(float)$p->discount_percent;
+        if($d<=0 || $d>=100){ return 0.0; }
+
+        $today=date('Y-m-d');
+        if(!empty($p->discount_start) && $p->discount_start>$today){ return 0.0; }
+        if(!empty($p->discount_end) && $p->discount_end<$today){ return 0.0; }
+
+        return round($d, 2);
+    }
     /* only these serial statuses can be transferred:
        1 = in stock, 5 = returned by customer, 6 = display item
        everything else (2 sold, 3 returned to supplier, 4 damaged, 7 defective) is excluded.
@@ -970,5 +1069,65 @@ class Invoiceinfo extends CI_Model{
 
     private function _fifoJson($ok, $msg){
         echo json_encode(array('ok'=>$ok, 'msg'=>$msg));
+    }
+    // TEMPORARY: a serial typed by the cashier at the invoice. It is registered the same way Goodreceiveserialinsert() does it
+    // (tbl_product_serial + tbl_serial_movement), under the oldest approved GRN line of this product that still has room.
+    private function _manual_serial($p, $serialno, $price, $isQuote, $branch_id, $company_id, $userid, $now)
+    {
+        if ($serialno === '' || mb_strlen($serialno) > 100) throw new RuntimeException('Invalid serial number');
+
+        $ex = $this->db->where('serialno', $serialno)->where('status', 1)->get('tbl_product_serial')->row();
+        if ($ex) {
+            // already in the system: only free stock of this product in this branch can be sold
+            if ((int)$ex->tbl_product_idtbl_product === (int)$p->idtbl_product && (int)$ex->stock_status === 1
+                && (int)$ex->tbl_company_branch_idtbl_company_branch === (int)$branch_id) {
+                return $ex;
+            }
+            throw new RuntimeException('Serial number ' . $serialno . ' already exists and is not available for sale');
+        }
+
+        if ($isQuote) {                                   // a quotation saves nothing
+            return (object)['idtbl_product_serial' => null, 'serialno' => $serialno, 'saleprice' => 0,
+                            'costunitprice' => 0, 'tbl_grndetail_idtbl_grndetail' => null];
+        }
+
+        // GRN information (tbl_grn + tbl_grndetail): oldest approved line with room for one more serial number
+        $d = $this->db->query(
+            "SELECT d.idtbl_grndetail, d.tbl_grn_idtbl_grn AS grn_id, d.costunitprice, g.grn_no, g.batchno
+            FROM tbl_grndetail d
+            JOIN tbl_grn g ON g.idtbl_grn = d.tbl_grn_idtbl_grn
+            WHERE d.tbl_product_idtbl_product = ? AND d.status = 1
+                AND g.status = 1 AND g.approvestatus = 1
+                AND g.tbl_company_idtbl_company = ? AND g.tbl_company_branch_idtbl_company_branch = ?
+                AND FLOOR(d.qty) > (SELECT COUNT(*) FROM tbl_product_serial ps
+                                    WHERE ps.tbl_grndetail_idtbl_grndetail = d.idtbl_grndetail AND ps.status = 1)
+            ORDER BY g.grndate, g.idtbl_grn, d.idtbl_grndetail
+            LIMIT 1 FOR UPDATE", [$p->idtbl_product, $company_id, $branch_id])->row();
+        if (!$d) {
+            throw new RuntimeException('No GRN stock is available for ' . $p->product_name
+                . ' (every received quantity already has a serial number). Please receive the stock first.');
+        }
+
+        $this->db->insert('tbl_product_serial', [
+            'serialno' => $serialno, 'batchno' => $d->batchno,
+            'tbl_grn_idtbl_grn' => $d->grn_id, 'tbl_grndetail_idtbl_grndetail' => $d->idtbl_grndetail,
+            'costunitprice' => $d->costunitprice, 'saleprice' => $price,
+            'tbl_product_idtbl_product' => $p->idtbl_product,
+            'stock_status' => 1, 'status' => 1,
+            'insertdatetime' => $now, 'tbl_user_idtbl_user' => $userid,
+            'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id,
+        ]);
+        $sid = $this->db->insert_id();
+        if (!$sid) throw new Exception('Serial insert failed');
+
+        $this->db->insert('tbl_serial_movement', [
+            'movement_type' => 1, 'from_status' => NULL, 'to_status' => 1,
+            'doc_type' => 'GRN', 'doc_id' => $d->grn_id, 'doc_detail_id' => $d->idtbl_grndetail,
+            'branch_id' => $branch_id, 'remark' => 'Serial added from ' . $d->grn_no . ' (entered at invoice)',
+            'insertdatetime' => $now, 'tbl_user_idtbl_user' => $userid,
+            'tbl_product_serial_idtbl_product_serial' => $sid,
+        ]);
+
+        return $this->db->where('idtbl_product_serial', $sid)->get('tbl_product_serial')->row();
     }
 }

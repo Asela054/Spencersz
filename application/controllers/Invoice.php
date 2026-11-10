@@ -11,6 +11,7 @@ class Invoice extends CI_Controller {
     }
     public function index(){
 		$result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
+		$result['employeelist']=$this->Invoiceinfo->Getemployeelist();
 		$this->load->view('invoice', $result);
 	}
     public function SubmitNewCustomer(){
