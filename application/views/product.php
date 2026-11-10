@@ -104,7 +104,7 @@ include "include/topnavbar.php";
                     <div class="card-body p-0 p-2">
                         <div class="row">
                             <div class="col-4">
-                                <form action="<?php echo base_url() ?>Product/Productinsertupdate" method="post" autocomplete="off">
+                                <form action="<?php echo base_url() ?>Product/Productinsertupdate" method="post" autocomplete="off" id="productForm">
                                     <div class="row">
                                         <div class="col-6">
                                     <div class="form-group mb-1">
@@ -180,6 +180,30 @@ include "include/topnavbar.php";
                                     </div>
                                         </div>
                                     </div>
+
+                                    <!-- ================= DISCOUNT ================= -->
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount %</label>
+                                                <input type="number" class="form-control form-control-sm" name="discount_percent" id="discount_percent" step="0.01" min="0" max="100" value="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount Start</label>
+                                                <input type="date" class="form-control form-control-sm" name="discount_start" id="discount_start">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="form-group mb-1">
+                                                <label class="small font-weight-bold">Discount End</label>
+                                                <input type="date" class="form-control form-control-sm" name="discount_end" id="discount_end">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- =========================================== -->
+
                                     <div class="row">
                                         <div class="col-6">
                                             <div class="form-group mb-2">
@@ -282,6 +306,34 @@ include "include/topnavbar.php";
         var statuscheck='<?php echo $statuscheck; ?>';
         var deletecheck='<?php echo $deletecheck; ?>';
         $('#tbl_category_idtbl_category, #tbl_brand_idtbl_brand, #tbl_unit_idtbl_unit').select2({width: '100%'});
+
+        // ---------- Discount validation ----------
+        // When a discount % is entered, both dates are required and the end date cannot be before the start date.
+        function checkDiscountDates(){
+            var percent = parseFloat($('#discount_percent').val()) || 0;
+            var start = $('#discount_start').val();
+            var end = $('#discount_end').val();
+
+            if(percent < 0 || percent > 100){
+                alert('Discount % must be between 0 and 100.');
+                return false;
+            }
+            if(percent > 0){
+                if(start === '' || end === ''){
+                    alert('Please select the discount start date and end date.');
+                    return false;
+                }
+                if(end < start){
+                    alert('Discount end date cannot be before the start date.');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        $('#productForm').on('submit', function(){
+            return checkDiscountDates();
+        });
 
         // ---------- Additional warranty rows ----------
         function refreshWarrantyUI(){
@@ -424,6 +476,9 @@ include "include/topnavbar.php";
                         $('#tbl_unit_idtbl_unit').val(obj.tbl_unit_idtbl_unit).trigger('change'); 
                         $('#cost_price').val(obj.cost_price); 
                         $('#selling_price').val(obj.selling_price); 
+                        $('#discount_percent').val(obj.discount_percent); 
+                        $('#discount_start').val(obj.discount_start); 
+                        $('#discount_end').val(obj.discount_end); 
                         $('#reorder_level').val(obj.reorder_level); 
                         $('#has_serial').val(obj.has_serial); 
                         $('#warranty_months').val(obj.warranty_months); 
