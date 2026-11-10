@@ -342,6 +342,27 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			</a>
 			<?php } ?>
 
+            <?php if(in_array("Employee", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Employee">
+                <div class="nav-link-icon"><i class="fas fa-users"></i></div>
+                <span>Employee Information</span>
+            </a>
+            <?php } ?>
+
+            <?php if(in_array("Dayend", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Dayend">
+                <div class="nav-link-icon"><i class="far fa-calendar-check"></i></div>
+                <span>Day End</span>
+            </a>
+            <?php } ?>
+
+            <?php if(in_array("Cashbalance", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Cashbalance">
+                <div class="nav-link-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                <span>Cash Balance</span>
+            </a>
+            <?php } ?>
+
 			<!-- Company Menu New Added -->
 			<?php if(in_array("Company", $permissionallowed) || in_array("Companybranch", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
