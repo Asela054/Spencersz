@@ -26,5 +26,23 @@ class Product extends CI_Controller {
 		$this->load->model('Productinfo');
         $result=$this->Productinfo->Productstatus($x, $y);
 	}
+	public function Barcodeprint($id, $qty = 1){
+		$qty = max(1, min((int)$qty, 500));
+
+		$this->db->select('product_code, barcode, product_name, selling_price');
+		$this->db->from('tbl_product');
+		$this->db->where('idtbl_product', $id);
+		$this->db->where('status !=', 3);
+		$product = $this->db->get()->row();
+
+		if(!$product){
+			show_404();
+		}
+
+		$data['product'] = $product;
+		$data['qty'] = $qty;
+		$data['value'] = !empty($product->barcode) ? $product->barcode : $product->product_code;
+		$this->load->view('barcodeprint', $data);
+	}
 	
 }
