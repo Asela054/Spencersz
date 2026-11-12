@@ -26,6 +26,10 @@ class Product extends CI_Controller {
         $this->load->model('Productinfo');
         $result=$this->Productinfo->Productstatus($x, $y);
     }
+    public function Getnextcode(){
+        $this->load->model('Productinfo');
+        $this->Productinfo->Getnextcode();
+    }
     public function Barcodeprint($id, $qty = 1){
         $qty = max(1, min((int)$qty, 500));
 

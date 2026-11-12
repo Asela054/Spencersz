@@ -1313,4 +1313,38 @@
 			echo json_encode(array('status' => 2, 'action' => json_encode($actionObj)));
 		}
 	}
+
+	// Products of a GRN with the barcode from tbl_product, for label printing
+	public function Getgrnprintbarcodes()
+	{
+		$recordID = $this->input->post('recordID');
+
+		$this->db->select('grn_no, batchno');
+		$this->db->from('tbl_grn');
+		$this->db->where('idtbl_grn', $recordID);
+		$this->db->where('status', 1);
+		$grn = $this->db->get()->row();
+
+		$this->db->select('p.idtbl_product, p.product_name, p.product_code, p.barcode, p.selling_price, SUM(d.qty) AS qty');
+		$this->db->from('tbl_grndetail d');
+		$this->db->join('tbl_product p', 'p.idtbl_product = d.tbl_product_idtbl_product', 'inner');
+		$this->db->where('d.tbl_grn_idtbl_grn', $recordID);
+		$this->db->where('d.status', 1);
+		$this->db->group_by('p.idtbl_product');
+		$this->db->order_by('p.product_name', 'ASC');
+		$rows = $this->db->get()->result();
+
+		foreach ($rows as $r) {
+			// fall back to product code when the product has no barcode
+			$r->barcode = trim((string)$r->barcode) !== '' ? trim($r->barcode) : trim($r->product_code);
+			$r->qty = (int)floor($r->qty);
+		}
+
+		$this->output->set_content_type('application/json')
+			->set_output(json_encode(array(
+				'grn_no'   => $grn ? $grn->grn_no : '',
+				'batchno'  => $grn ? $grn->batchno : '',
+				'products' => $rows
+			)));
+	}
 }
