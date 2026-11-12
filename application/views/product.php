@@ -108,14 +108,14 @@ include "include/topnavbar.php";
                                     <div class="row">
                                         <div class="col-6">
                                     <div class="form-group mb-1">
-                                        <label class="small font-weight-bold">Product Code*</label>
-                                        <input type="text" class="form-control form-control-sm" name="product_code" id="product_code" required>
+                                        <label class="small font-weight-bold">Product Code <span class="text-muted font-weight-normal">(auto)</span></label>
+                                        <input type="text" class="form-control form-control-sm bg-light" name="product_code" id="product_code" placeholder="Auto-generated" readonly tabindex="-1">
                                     </div>
                                         </div>
                                         <div class="col-6">
                                     <div class="form-group mb-1">
-                                        <label class="small font-weight-bold">Barcode</label>
-                                        <input type="text" class="form-control form-control-sm" name="barcode" id="barcode">
+                                        <label class="small font-weight-bold">Barcode <span class="text-muted font-weight-normal">(auto)</span></label>
+                                        <input type="text" class="form-control form-control-sm bg-light" name="barcode" id="barcode" placeholder="Auto-generated" readonly tabindex="-1">
                                     </div>
                                         </div>
                                     </div>
@@ -307,6 +307,28 @@ include "include/topnavbar.php";
         var deletecheck='<?php echo $deletecheck; ?>';
         $('#tbl_category_idtbl_category, #tbl_brand_idtbl_brand, #tbl_unit_idtbl_unit').select2({width: '100%'});
 
+        // ---------- Auto product code / barcode ----------
+        // Preview only: the server generates the final code again when the product is saved.
+        // When editing, the existing code is kept, so no preview is loaded.
+        function loadNextCode(){
+            if($('#recordOption').val() != '1'){ return; }
+            if($('#tbl_category_idtbl_category').val() == ''){
+                $('#product_code, #barcode').val('');
+                return;
+            }
+            $.ajax({
+                type: "POST",
+                url: '<?php echo base_url() ?>Product/Getnextcode',
+                data: { category: $('#tbl_category_idtbl_category').val() },
+                success: function(result){
+                    var obj = JSON.parse(result);
+                    $('#product_code').val(obj.code);
+                    $('#barcode').val(obj.code);
+                }
+            });
+        }
+        $('#tbl_category_idtbl_category').on('change', loadNextCode);
+
         // ---------- Discount validation ----------
         // When a discount % is entered, both dates are required and the end date cannot be before the start date.
         function checkDiscountDates(){
@@ -465,6 +487,8 @@ include "include/topnavbar.php";
                     url: '<?php echo base_url() ?>Product/Productedit',
                     success: function(result) {
                         var obj = JSON.parse(result);
+                        // set edit mode first, so changing the category below does not load a new code
+                        $('#recordOption').val('2');
                         $('#recordID').val(obj.id);
                         $('#product_code').val(obj.product_code); 
                         $('#barcode').val(obj.barcode); 

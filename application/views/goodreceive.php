@@ -531,6 +531,56 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
+<div class="modal fade" id="printbarcodemodal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-print mr-2"></i>Print Barcodes -
+                    <span id="printbarcodegrnno"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2 small">
+                    <div>
+                        <div class="custom-control custom-checkbox custom-control-inline">
+                            <input type="checkbox" class="custom-control-input" id="pbshowname" checked>
+                            <label class="custom-control-label" for="pbshowname">Show product name</label>
+                        </div>
+                        <div class="custom-control custom-checkbox custom-control-inline">
+                            <input type="checkbox" class="custom-control-input" id="pbshowprice" checked>
+                            <label class="custom-control-label" for="pbshowprice">Show price</label>
+                        </div>
+                    </div>
+                    <div class="text-muted">Label size: 34mm &times; 25mm</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-sm small" id="tableprintbarcode">
+                        <thead>
+                            <tr>
+                                <th width="30" class="text-center">
+                                    <input type="checkbox" id="pbcheckall" checked>
+                                </th>
+                                <th>Product</th>
+                                <th>Barcode</th>
+                                <th class="text-right">Price</th>
+                                <th class="text-center">GRN Qty</th>
+                                <th class="text-center" width="110">Print Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="mr-auto small font-weight-bold">Total labels: <span id="pbtotal">0</span></span>
+                <button type="button" id="btnprintbarcodes" class="btn btn-primary btn-sm">
+                    <i class="fas fa-print"></i>&nbsp;Print Barcodes</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 
 <script>
@@ -688,12 +738,21 @@ $(document).ready(function() {
                             '<i class="fas fa-barcode"></i>' +
                             '</button>';
 
+                        // Old "Add Product Barcodes" button - disabled, replaced by Print Barcode
+                        // button += '<button data-toggle="tooltip" data-placement="bottom" ' +
+                        //     'title="Add Product Barcodes" ' +
+                        //     'class="btn btn-info btn-sm btnBarcode mr-1" ' +
+                        //     'id="' + full['idtbl_grn'] + '" ' +
+                        //     'grn_no="' + full['grn_no'] + '">' +
+                        //     '<i class="fas fa-qrcode"></i>' +
+                        //     '</button>';
+
                         button += '<button data-toggle="tooltip" data-placement="bottom" ' +
-                            'title="Add Product Barcodes" ' +
-                            'class="btn btn-info btn-sm btnBarcode mr-1" ' +
+                            'title="Print Barcode" ' +
+                            'class="btn btn-info btn-sm btnPrintBarcode mr-1" ' +
                             'id="' + full['idtbl_grn'] + '" ' +
                             'grn_no="' + full['grn_no'] + '">' +
-                            '<i class="fas fa-qrcode"></i>' +
+                            '<i class="fas fa-print"></i>' +
                             '</button>';
                     }
 
@@ -1534,6 +1593,161 @@ $(document).ready(function() {
                 });
             }
         });
+    });
+    // ============================================================================
+
+    // ===================== PRINT BARCODE LABELS (34mm x 25mm) =====================
+    // Code 128 (set B) bar/space widths for values 0..106 (106 = stop)
+    var C128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+
+    // returns an SVG string of a Code 128B barcode, or '' if the text has unsupported characters
+    function code128Svg(text) {
+        var codes = [104], sum = 104;
+        for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            if (c < 32 || c > 126) { return ''; }
+            codes.push(c - 32);
+            sum += (c - 32) * (i + 1);
+        }
+        codes.push(sum % 103);
+        codes.push(106);
+
+        var quiet = 10, x = quiet, rects = '';
+        $.each(codes, function (i, v) {
+            var w = C128[v];
+            for (var j = 0; j < w.length; j++) {
+                var n = parseInt(w.charAt(j), 10);
+                if (j % 2 === 0) { rects += '<rect x="' + x + '" y="0" width="' + n + '" height="50"/>'; }
+                x += n;
+            }
+        });
+        var total = x + quiet;
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' 50" ' +
+            'preserveAspectRatio="none" shape-rendering="crispEdges">' + rects + '</svg>';
+    }
+
+    function updatePrintTotal() {
+        var t = 0;
+        $('#tableprintbarcode tbody tr').each(function () {
+            if ($(this).find('.pb-check').prop('checked')) {
+                t += parseInt($(this).find('.pb-qty').val(), 10) || 0;
+            }
+        });
+        $('#pbtotal').text(t);
+    }
+
+    $('#dataTable tbody').on('click', '.btnPrintBarcode', function () {
+        var id = $(this).attr('id');
+        $('#printbarcodegrnno').text($(this).attr('grn_no'));
+        $('#pbcheckall').prop('checked', true);
+
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            data: { recordID: id },
+            url: '<?php echo base_url() ?>Goodreceive/Getgrnprintbarcodes',
+            success: function (obj) {
+                var tbody = $('#tableprintbarcode tbody').empty();
+
+                if (!obj.products || obj.products.length === 0) {
+                    tbody.append('<tr><td colspan="6" class="text-center">No products found in this GRN</td></tr>');
+                }
+
+                $.each(obj.products, function (i, item) {
+                    var barcode = item.barcode || '';
+                    var ok = barcode !== '' && code128Svg(barcode) !== '';
+                    var name = item.product_name + (item.product_code ? ' / ' + item.product_code : '');
+
+                    var row = '<tr data-name="' + escapeHtml(item.product_name) + '" ' +
+                        'data-barcode="' + escapeHtml(barcode) + '" ' +
+                        'data-price="' + (parseFloat(item.selling_price) || 0) + '">';
+                    row += '<td class="text-center"><input type="checkbox" class="pb-check" ' + (ok ? 'checked' : 'disabled') + '></td>';
+                    row += '<td>' + escapeHtml(name) + '</td>';
+                    row += '<td>' + (ok ? escapeHtml(barcode) : '<span class="text-danger">No valid barcode</span>') + '</td>';
+                    row += '<td class="text-right">' + formatPrice(item.selling_price) + '</td>';
+                    row += '<td class="text-center">' + item.qty + '</td>';
+                    row += '<td><input type="number" min="0" step="1" class="form-control form-control-sm text-center pb-qty" ' +
+                        'value="' + (ok ? item.qty : 0) + '" ' + (ok ? '' : 'disabled') + '></td>';
+                    row += '</tr>';
+
+                    tbody.append(row);
+                });
+
+                updatePrintTotal();
+                $('#printbarcodemodal').modal('show');
+            }
+        });
+    });
+
+    $('#pbcheckall').on('change', function () {
+        $('#tableprintbarcode .pb-check:enabled').prop('checked', $(this).prop('checked'));
+        updatePrintTotal();
+    });
+    $(document).on('change', '#tableprintbarcode .pb-check', updatePrintTotal);
+    $(document).on('input', '#tableprintbarcode .pb-qty', updatePrintTotal);
+
+    $('#btnprintbarcodes').click(function () {
+        var showName = $('#pbshowname').prop('checked');
+        var showPrice = $('#pbshowprice').prop('checked');
+        var labels = '';
+        var count = 0;
+
+        $('#tableprintbarcode tbody tr').each(function () {
+            var $tr = $(this);
+            if (!$tr.find('.pb-check').prop('checked')) { return; }
+
+            var copies = parseInt($tr.find('.pb-qty').val(), 10) || 0;
+            if (copies <= 0) { return; }
+
+            var barcode = $tr.attr('data-barcode');
+            var svg = code128Svg(barcode);
+            if (svg === '') { return; }
+
+            var one = '<div class="label">' +
+                (showName ? '<div class="name">' + escapeHtml($tr.attr('data-name')) + '</div>' : '') +
+                '<div class="bars">' + svg + '</div>' +
+                '<div class="code">' + escapeHtml(barcode) + '</div>' +
+                (showPrice ? '<div class="price">Rs. ' + formatPrice($tr.attr('data-price')) + '</div>' : '') +
+                '</div>';
+
+            for (var i = 0; i < copies; i++) { labels += one; }
+            count += copies;
+        });
+
+        if (count === 0) {
+            Swal.fire({ icon: 'warning', title: 'Nothing to print', text: 'Select at least one product with a print qty.' });
+            return;
+        }
+
+        var css =
+            '@page { size: 34mm 25mm; margin: 0; }' +
+            'html, body { margin: 0; padding: 0; }' +
+            'body { font-family: Arial, Helvetica, sans-serif; color: #000; }' +
+            '.label { width: 34mm; height: 25mm; box-sizing: border-box; padding: 1mm 1.5mm; overflow: hidden;' +
+            '  display: flex; flex-direction: column; justify-content: center; align-items: center;' +
+            '  page-break-after: always; break-after: page; }' +
+            '.label:last-child { page-break-after: auto; break-after: auto; }' +
+            '.name { width: 100%; font-size: 6.5pt; font-weight: bold; text-align: center; line-height: 1.15;' +
+            '  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }' +
+            '.bars { width: 31mm; height: 11mm; margin-top: 0.5mm; }' +
+            '.bars svg { width: 100%; height: 100%; display: block; }' +
+            '.code { font-size: 7pt; letter-spacing: 0.5px; line-height: 1.2; }' +
+            '.price { font-size: 8pt; font-weight: bold; line-height: 1.2; }' +
+            '@media screen { body { background: #eee; padding: 10px; }' +
+            '  .label { background: #fff; margin: 0 0 4px 0; border: 1px dashed #999; } }';
+
+        var win = window.open('', '_blank');
+        if (!win) {
+            Swal.fire({ icon: 'warning', title: 'Pop-up blocked', text: 'Please allow pop-ups for this site to print barcodes.' });
+            return;
+        }
+        win.document.open();
+        win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Barcodes - ' +
+            escapeHtml($('#printbarcodegrnno').text()) + '</title><style>' + css + '</style></head><body>' +
+            labels + '</body></html>');
+        win.document.close();
+        win.focus();
+        setTimeout(function () { win.print(); }, 400);
     });
     // ============================================================================
 

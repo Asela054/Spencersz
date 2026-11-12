@@ -140,4 +140,8 @@ class Goodreceive extends CI_Controller {
 		$this->load->model('Goodreceiveinfo');
 		$result=$this->Goodreceiveinfo->Goodreceivebarcodeinsert();
 	}
+	public function Getgrnprintbarcodes(){
+		$this->load->model('Goodreceiveinfo');
+		$result=$this->Goodreceiveinfo->Getgrnprintbarcodes();
+	}
 }

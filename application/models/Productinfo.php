@@ -1,5 +1,76 @@
 <?php
 class Productinfo extends CI_Model{
+    public function Generateproductcode($categoryID, $lock = FALSE){
+        $prefix = $this->Getcategoryprefix($categoryID);
+        $sql = "SELECT MAX(CAST(SUBSTRING(`product_code`, ?) AS UNSIGNED)) AS maxno
+                FROM `tbl_product`
+                WHERE `product_code` LIKE ? AND `product_code` REGEXP ?".($lock ? " FOR UPDATE" : "");
+        $row = $this->db->query($sql, array(strlen($prefix) + 1, $prefix.'%', '^'.$prefix.'[0-9]+$'))->row();
+        $next = ($row && $row->maxno !== NULL) ? ((int)$row->maxno + 1) : 1;
+        return $prefix.str_pad($next, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function Getcategoryprefix($categoryID){
+        if(empty($categoryID)){ return 'GEN'; }
+
+        $row = $this->db->select('category')
+                        ->where('idtbl_category', $categoryID)
+                        ->get('tbl_category')->row();
+        if(!$row){ return 'GEN'; }
+
+        // 1) prefix already used by this category's products (most used one wins)
+        $used = $this->db->query("SELECT LEFT(`product_code`, 3) AS prefix, COUNT(*) AS n
+                                  FROM `tbl_product`
+                                  WHERE `tbl_category_idtbl_category` = ?
+                                  AND `product_code` REGEXP '^[A-Z]{3}[0-9]+$'
+                                  GROUP BY LEFT(`product_code`, 3)
+                                  ORDER BY n DESC, prefix ASC
+                                  LIMIT 1", array((int)$categoryID))->row();
+        if($used && !empty($used->prefix)){ return strtoupper($used->prefix); }
+
+        // 2) new category: build a new 3-letter prefix from the category name that no other category uses
+        $words  = preg_split('/[^A-Z0-9]+/', strtoupper($row->category), -1, PREG_SPLIT_NO_EMPTY);
+        $joined = implode('', $words);
+        $first  = ($joined !== '') ? $joined[0] : 'X';
+
+        $candidates = array();
+        if(strlen($joined) >= 3){ $candidates[] = substr($joined, 0, 3); }
+        if(count($words) >= 3){ $candidates[] = $words[0][0].$words[1][0].$words[2][0]; }
+        if(count($words) >= 2){
+            $candidates[] = $words[0][0].substr($words[1], 0, 2);
+            $candidates[] = substr($words[0], 0, 2).$words[1][0];
+        }
+        for($i = 1; $i < strlen($joined); $i++){
+            for($j = $i + 1; $j < strlen($joined); $j++){
+                $candidates[] = $first.$joined[$i].$joined[$j];
+            }
+        }
+        foreach(range('A', 'Z') as $a){ foreach(range('A', 'Z') as $b){ $candidates[] = $first.$a.$b; } }
+
+        foreach(array_unique($candidates) as $c){
+            if(strlen($c) != 3 || $c === 'GEN'){ continue; }
+            if(!ctype_alpha($c)){ continue; }
+            if($this->Prefixused($c, $categoryID)){ continue; }
+            return $c;
+        }
+        return 'GEN';
+    }
+
+    private function Prefixused($prefix, $categoryID){
+        // a prefix is taken if any product of another category (or with no category) uses it
+        $p =$this->db->query("SELECT COUNT(*) AS n FROM `tbl_product`
+                               WHERE `product_code` REGEXP ?
+                               AND (`tbl_category_idtbl_category` IS NULL OR `tbl_category_idtbl_category` <> ?)",
+                               array('^'.$prefix.'[0-9]+$', (int)$categoryID))->row();
+        return ($p && $p->n > 0);
+    }
+
+    /* AJAX preview for the form (the real code is generated again when saving) */
+    public function Getnextcode(){
+        $categoryID = $this->input->post('category');
+        echo json_encode(array('code' => $this->Generateproductcode($categoryID, FALSE)));
+    }
+    /* ============================================================== */
 
     /* Saves the extra warranties of a product.
        Old active rows are soft-deleted (status 3), then the submitted rows are inserted again. */
@@ -75,8 +146,8 @@ class Productinfo extends CI_Model{
 
         $userID=$_SESSION['userid'];
 
-        $product_code=$this->input->post('product_code');
-        $barcode=$this->input->post('barcode');
+        // product_code and barcode are NOT taken from the form any more:
+        // they are generated on insert and kept unchanged on update
         $product_name=$this->input->post('product_name');
         $model_no=$this->input->post('model_no');
         $description=$this->input->post('description');
@@ -114,6 +185,10 @@ class Productinfo extends CI_Model{
         $insertdatetime=date('Y-m-d H:i:s');
 
         if($recordOption==1){
+            // auto product code + barcode (same value), locked inside this transaction
+            $product_code = $this->Generateproductcode($tbl_category_idtbl_category, TRUE);
+            $barcode = $product_code;
+
             $data = array(
                 'product_code'=> $product_code,
                 'barcode'=> $barcode,
@@ -177,9 +252,8 @@ class Productinfo extends CI_Model{
             }
         }
         else{
+            // product_code and barcode stay as they are (printed labels keep working)
             $data = array(
-                'product_code'=> $product_code,
-                'barcode'=> $barcode,
                 'product_name'=> $product_name,
                 'model_no'=> $model_no,
                 'description'=> $description,
