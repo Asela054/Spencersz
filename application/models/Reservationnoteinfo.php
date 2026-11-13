@@ -58,7 +58,7 @@ class Reservationnoteinfo extends CI_Model{
     private $paperH = 396;     // 5.5in in pt
     private $artW   = 1600;    // artwork width in px
 
-    private $shiftX = 0;       // printer calibration in mm (+ moves right)
+    private $shiftX = -20;     // printer calibration in mm (+ moves right): the LQ-310 printed ~20 mm too far right
     private $shiftY = 0;       // printer calibration in mm (+ moves down)
     private $guide  = false;   // true = red outline around every field (alignment test)
 

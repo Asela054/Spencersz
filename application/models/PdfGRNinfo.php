@@ -12,7 +12,7 @@ class PdfGRNinfo extends CI_Model {
     private $paperH = 792;     // 11in in pt
     private $artW   = 1382;    // artwork width in px
 
-    private $shiftX = 0;       // printer calibration in mm (+ moves right)
+    private $shiftX = -18;     // printer calibration in mm (+ moves right): the LQ-310 printed ~18 mm too far right
     private $shiftY = 0;       // printer calibration in mm (+ moves down)
     private $guide  = false;   // true = red outline around every field (alignment test)
 
