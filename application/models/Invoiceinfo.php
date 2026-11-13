@@ -182,6 +182,8 @@ class Invoiceinfo extends CI_Model{
         $ids = array();
         foreach ($products as $row) { $ids[] = (int)$row->idtbl_product; }
 
+        $partsByProduct = $this->partwarranties($ids);
+
         $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
         $this->db->from('tbl_product_serial ps');
         $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
@@ -211,6 +213,7 @@ class Invoiceinfo extends CI_Model{
                 'selling_price' => $row->selling_price,
                 'warranty_months' => $row->warranty_months,
                 'discount_percent' => $this->activediscount($row),
+                'warranty_parts' => isset($partsByProduct[(int)$row->idtbl_product]) ? $partsByProduct[(int)$row->idtbl_product] : array(),
                 'serials' => isset($serialsByProduct[(int)$row->idtbl_product]) ? $serialsByProduct[(int)$row->idtbl_product] : array()
             );
         }
@@ -379,6 +382,7 @@ class Invoiceinfo extends CI_Model{
                     'product_name'    => $p->product_name,        // CHANGE
                     'serialno'        => $serial ? $serial->serialno : null,
                     'warranty_months' => $p->warranty_months,     // CHANGE
+                    'warranty_parts'  => $this->partsjson($p->idtbl_product),
                     'qty'             => $qty,
                     'unitprice'       => $price,
                     'list_price'      => $listPrice,
@@ -1129,5 +1133,26 @@ class Invoiceinfo extends CI_Model{
         ]);
 
         return $this->db->where('idtbl_product_serial', $sid)->get('tbl_product_serial')->row();
+    }
+    /* part warranties (tbl_product_warranty): [product_id => [ ['name'=>..., 'months'=>...], ... ]] */
+    private function partwarranties($ids){
+        $map = array();
+        if (empty($ids)) { return $map; }
+
+        $rows = $this->db->select('tbl_product_idtbl_product AS pid, warranty_name, warranty_months')
+                        ->from('tbl_product_warranty')
+                        ->where_in('tbl_product_idtbl_product', $ids)
+                        ->where('status', 1)
+                        ->order_by('idtbl_product_warranty')
+                        ->get()->result();
+        foreach ($rows as $r) {
+            $map[(int)$r->pid][] = array('name' => $r->warranty_name, 'months' => (int)$r->warranty_months);
+        }
+        return $map;
+    }
+    /* part warranties of one product as a JSON string (NULL when it has none) */
+    private function partsjson($pid){
+        $map = $this->partwarranties(array((int)$pid));
+        return !empty($map[(int)$pid]) ? json_encode($map[(int)$pid], JSON_UNESCAPED_UNICODE) : null;
     }
 }

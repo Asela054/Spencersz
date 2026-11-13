@@ -132,9 +132,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Purchaseorder", $permissionallowed)){ ?>
 					<a class="nav-link"
 						href="<?php echo base_url().'Purchaseorder'; ?>">Purchase Order</a>
-					<?php } if(in_array("ServicePurchaseOrder", $permissionallowed)){ ?>
-					<!-- <a class="nav-link"
-						href="<?php echo base_url().'ServicePurchaseOrder'; ?>">Service Purchase Order</a> -->
 					<?php } ?>
 				</nav>
 			</div>
@@ -181,9 +178,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Allstockview", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Allstockview'; ?>">All
 						Stock View</a>
-					<!-- <?php } if(in_array("IssueMaterials", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'IssueMaterials'; ?>">Issue
-						Materials</a> -->
 					<?php } ?>
 				</nav>
 			</div>
