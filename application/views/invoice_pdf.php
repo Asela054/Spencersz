@@ -51,9 +51,36 @@ $discountEx = round($inv->discount / $priceRate, 2);
 $grossEx    = round($supplyShown + $discountEx, 2);
 
 // items -> array, then pages
-$itemList = array();
-foreach ($items as $it) { $itemList[] = $it; }
-$pages = array_chunk($itemList, $rowsPerPage);
+// $itemList = array();
+// foreach ($items as $it) { $itemList[] = $it; }
+// $pages = array_chunk($itemList, $rowsPerPage);
+// if (empty($pages)) { $pages = array(array()); }
+// $totalPages = count($pages);
+// part warranties saved with the invoice line -> "Compressor 60 mths, Motor 24 mths"
+$partsOf = function ($it) {
+    $arr = !empty($it->warranty_parts) ? json_decode($it->warranty_parts, true) : array();
+    if (!is_array($arr)) { return ''; }
+    $t = array();
+    foreach ($arr as $w) {
+        if (!empty($w['name'])) { $t[] = $w['name'] . ' ' . (int)$w['months'] . ' months'; }
+    }
+    return implode(', ', $t);
+};
+
+// pages: a row with part warranties is taller (one extra 8pt line per ~50 characters)
+$lineH        = 19;                       // px of one extra 8pt line
+$charsPerLine = 50;                       // 8pt Courier characters per description line
+$bodyH        = $rowsPerPage * $rowH;     // height available for the rows (px)
+
+$pages = array(); $cur = array(); $used = 0;
+foreach ($items as $it) {
+    $ptxt = $partsOf($it);
+    $h = $rowH + ($ptxt !== '' ? (int)ceil((strlen($ptxt) + 7) / $charsPerLine) * $lineH : 0);
+    if (!empty($cur) && $used + $h > $bodyH) { $pages[] = $cur; $cur = array(); $used = 0; }
+    $cur[] = array('it' => $it, 'parts' => $ptxt, 'h' => $h);
+    $used += $h;
+}
+if (!empty($cur)) { $pages[] = $cur; }
 if (empty($pages)) { $pages = array(array()); }
 $totalPages = count($pages);
 
@@ -114,8 +141,30 @@ $invDate = date('d-m-Y', strtotime($inv->invoice_date));
     echo $at(265, 523, 1000, 24, $e($inv->remark));
 
     // ---------- items grid ----------
-    foreach ($lines as $i => $it) {
-        $y = $rowTop + $i * $rowH;
+    // foreach ($lines as $i => $it) {
+    //     $y = $rowTop + $i * $rowH;
+
+    //     $desc = $e($it->product_name);
+    //     $extra = array();
+    //     if ($it->serialno) { $extra[] = 'S/N: ' . $e($it->serialno); }
+    //     if ($it->warranty_months) { $extra[] = 'Warranty: ' . (int)$it->warranty_months . ' months'; }
+    //     if (!empty($extra)) {
+    //         $desc .= '<div style="font-size:8pt;line-height:9pt;margin:0;padding:0;">' . implode(' | ', $extra) . '</div>';
+    //     }
+
+    //     echo $at(104, $y, 93, $rowH, $e($it->product_code), 'center');                 // Item Code
+    //     echo $at(207, $y, 515, $rowH + 6, $desc);                                       // Description of Goods
+    //     echo $at(730, $y, 97, $rowH, (int)$it->qty, 'center');                          // Quantity
+    //     if ($showPrices) {
+    //         echo $at(827, $y, 208, $rowH, $fm($it->unitprice / $priceRate), 'right');   // Unit Price
+    //         echo $at(1045, $y, 225, $rowH, $fm($it->line_total / $priceRate), 'right'); // Amount Excluding VAT
+    //     }
+    // }
+    // ---------- items grid ----------
+    $y = $rowTop;
+    foreach ($lines as $row) {
+        $it = $row['it'];
+        $h  = $row['h'];
 
         $desc = $e($it->product_name);
         $extra = array();
@@ -124,14 +173,18 @@ $invDate = date('d-m-Y', strtotime($inv->invoice_date));
         if (!empty($extra)) {
             $desc .= '<div style="font-size:8pt;line-height:9pt;margin:0;padding:0;">' . implode(' | ', $extra) . '</div>';
         }
-
-        echo $at(104, $y, 93, $rowH, $e($it->product_code), 'center');                 // Item Code
-        echo $at(207, $y, 515, $rowH + 6, $desc);                                       // Description of Goods
-        echo $at(730, $y, 97, $rowH, (int)$it->qty, 'center');                          // Quantity
-        if ($showPrices) {
-            echo $at(827, $y, 208, $rowH, $fm($it->unitprice / $priceRate), 'right');   // Unit Price
-            echo $at(1045, $y, 225, $rowH, $fm($it->line_total / $priceRate), 'right'); // Amount Excluding VAT
+        if ($row['parts'] !== '') {
+            $desc .= '<div style="font-size:8pt;line-height:9pt;margin:0;padding:0;">Parts: ' . $e($row['parts']) . '</div>';
         }
+
+        echo $at(104, $y, 93, $h, $e($it->product_code), 'center');                    // Item Code
+        echo $at(207, $y, 515, $h + 6, $desc);                                          // Description of Goods
+        echo $at(730, $y, 97, $h, (int)$it->qty, 'center');                             // Quantity
+        if ($showPrices) {
+            echo $at(827, $y, 208, $h, $fm($it->unitprice / $priceRate), 'right');      // Unit Price
+            echo $at(1045, $y, 225, $h, $fm($it->line_total / $priceRate), 'right');    // Amount Excluding VAT
+        }
+        $y += $h;
     }
 
         // ---------- totals (rows pre-printed on the form) / continued ----------

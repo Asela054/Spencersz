@@ -1094,6 +1094,13 @@ include "include/topnavbar.php";
     function discPrice(base, pct) {
         return Math.round(base * (1 - (pct || 0) / 100) * 100) / 100;
     }
+    // "Compressor: 60 Months" lines for the part warranties of a product
+    function warrantyPartsHtml(parts) {
+        if (!parts || !parts.length) return '';
+        return parts.map(w =>
+            '<div class="text-muted" style="font-size:0.65rem;">' + escH(w.name) + ': <b>' + w.months + ' Months</b></div>'
+        ).join('');
+    }
     // unit price for a serial: its own sale price if it has one, otherwise the product list price, then the discount
     function serialPrice(prod, s) {
         const base = (s && parseFloat(s.saleprice) > 0) ? parseFloat(s.saleprice) : prod.listPrice;
@@ -1138,6 +1145,7 @@ include "include/topnavbar.php";
                             price: discPrice(listPrice, discount),      // effective price (used by non-serial lines)
                             warranty: product.warranty_months + ' Months',
                             warrantymonth: product.warranty_months,
+                            warrantyParts: product.warranty_parts || [],
                             serials: product.serials || []
                         });
                     });
@@ -1248,7 +1256,7 @@ include "include/topnavbar.php";
                 <div class="fw-bold text-dark">${item.name}</div>
                 <div class="text-warning-emphasis font-monospace" style="font-size: 0.72rem;"><i class="fas fa-microchip me-1"></i>${item.imei || "PENDING SCAN"}</div>
                 </td>
-                <td><span class="badge bg-success text-light" style="font-size: 0.65rem;">${item.warranty}</span></td>
+                <td><span class="badge bg-success text-light" style="font-size: 0.65rem;">${item.warranty}</span>${warrantyPartsHtml(pr ? pr.warrantyParts : [])}</td>
                 <td class="text-end font-monospace">
                     ${orig > 0 ? `<div class="text-muted" style="font-size:0.7rem;text-decoration:line-through;">${orig.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>` : ''}
                     ${item.price.toLocaleString('en-US', {minimumFractionDigits: 2})}
@@ -1458,7 +1466,7 @@ include "include/topnavbar.php";
             tr.innerHTML = `
                 <td class="fw-bold">${p.sku}</td>
                 <td>${p.name}</td>
-                <td><span class="badge bg-success text-white border">${p.warranty}</span></td>
+                <td><span class="badge bg-success text-white border">${p.warranty}</span>${warrantyPartsHtml(p.warrantyParts)}</td>
                 <td class="fw-bold font-monospace">LKR ${priceTag(p)}</td>
                 <td class="text-center">
                 <button class="btn btn-spencersz btn-sm" onclick="addItemFromCatalog('${p.sku}')"><i class="fas fa-plus"></i></button>
