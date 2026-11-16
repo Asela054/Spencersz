@@ -104,6 +104,53 @@ class Productinfo extends CI_Model{
         }
     }
 
+    /* ================= FREE ITEM SCHEME =================
+       A product can have several rules, e.g. buy 11 get 1 free, buy 22 get 2 free.
+       Each rule is one row in tbl_product_free_scheme. tbl_product.has_free_scheme is the on/off flag.
+       Old active rows are soft-deleted (status 3), then the submitted rows are inserted again,
+       the same way as the part warranties. Returns 1 when at least one valid rule was saved. */
+    private function Savefreeschemes($productID, $userID, $datetime){
+        $enabled = (int)$this->input->post('has_free_scheme') === 1;
+        $buys    = $this->input->post('scheme_buy_qty');
+        $frees   = $this->input->post('scheme_free_qty');
+
+        $this->db->where('tbl_product_idtbl_product', $productID);
+        $this->db->where('status', 1);
+        $this->db->update('tbl_product_free_scheme', array(
+            'status'=> '3',
+            'updateuser'=> $userID,
+            'updatedatetime'=> $datetime
+        ));
+
+        $saved = 0;
+        if($enabled && !empty($buys) && is_array($buys)){
+            $seen = array();
+            foreach($buys as $i => $buy){
+                $buy  = (int)$buy;
+                $free = isset($frees[$i]) ? (int)$frees[$i] : 0;
+                if($buy <= 0 || $free <= 0 || isset($seen[$buy])){ continue; }  // skip empty, invalid and duplicate buy qty
+                $seen[$buy] = true;
+
+                $this->db->insert('tbl_product_free_scheme', array(
+                    'buy_qty'=> $buy,
+                    'free_qty'=> $free,
+                    'status'=> '1',
+                    'insertdatetime'=> $datetime,
+                    'tbl_user_idtbl_user'=> $userID,
+                    'tbl_product_idtbl_product'=> $productID
+                ));
+                $saved++;
+            }
+        }
+
+        $hasScheme = ($saved > 0) ? 1 : 0;
+        $this->db->where('idtbl_product', $productID);
+        $this->db->update('tbl_product', array('has_free_scheme'=> $hasScheme));
+
+        return $hasScheme;
+    }
+    /* ==================================================== */
+
     /* Reads and checks the discount fields from the form.
        Returns an array with discount_percent, discount_start, discount_end and error (empty when valid).
        - percent must be between 0 and 100
@@ -206,6 +253,7 @@ class Productinfo extends CI_Model{
                 'reorder_level'=> $reorder_level,
                 'has_serial'=> $has_serial,
                 'warranty_months'=> $warranty_months,
+                'has_free_scheme'=> 0,   // set by Savefreeschemes below
                 'status'=> '1',
                 'insertdatetime'=> $insertdatetime,
                 'tbl_user_idtbl_user'=> $userID,
@@ -216,6 +264,9 @@ class Productinfo extends CI_Model{
 
             // extra warranties (compressor, motor ...)
             $this->Savewarranties($newProductID, $userID, $insertdatetime);
+
+            // free item scheme (buy 11 get 1 ...)
+            $this->Savefreeschemes($newProductID, $userID, $insertdatetime);
 
             $this->db->trans_complete();
 
@@ -278,6 +329,9 @@ class Productinfo extends CI_Model{
 
             // extra warranties (compressor, motor ...)
             $this->Savewarranties($recordID, $userID, $insertdatetime);
+
+            // free item scheme (buy 11 get 1 ...)
+            $this->Savefreeschemes($recordID, $userID, $insertdatetime);
 
             $this->db->trans_complete();
 
@@ -493,6 +547,15 @@ class Productinfo extends CI_Model{
         $this->db->where('status', 1);
         $this->db->order_by('idtbl_product_warranty', 'ASC');
         $obj->warranties=$this->db->get()->result();
+
+        // free item scheme
+        $obj->has_free_scheme=(int)$respond->row(0)->has_free_scheme;
+        $this->db->select('buy_qty, free_qty');
+        $this->db->from('tbl_product_free_scheme');
+        $this->db->where('tbl_product_idtbl_product', $recordID);
+        $this->db->where('status', 1);
+        $this->db->order_by('buy_qty', 'ASC');
+        $obj->schemes=$this->db->get()->result();
 
         echo json_encode($obj);
     }
