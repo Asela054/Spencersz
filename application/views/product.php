@@ -73,6 +73,19 @@ include "include/topnavbar.php";
     }
     .warranty-row .w-name{ flex:1; }
     .warranty-row .w-months-group{ width:130px; flex:none; }
+    .scheme-row{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:8px;
+        margin-bottom:8px;
+        border:1px solid #e3e6ef;
+        border-radius:8px;
+        background:#fafbfd;
+    }
+    .scheme-row .input-group{ flex:1; }
+    .scheme-row .s-plus{ flex:none; font-weight:700; color:#5b6280; }
+    .scheme-row .btnRemoveScheme,
     .warranty-row .btnRemoveWarranty{
         flex:none;
         width:30px;
@@ -257,6 +270,35 @@ include "include/topnavbar.php";
                                     </div>
                                     <!-- =========================================== -->
 
+                                    <!-- ================= FREE ITEM SCHEME ================= -->
+                                    <div class="warranty-card mb-3">
+                                        <div class="warranty-card-header">
+                                            <span class="warranty-title"><i class="fas fa-gift"></i>&nbsp;Free Item Scheme</span>
+                                            <div class="custom-control custom-switch">
+                                                <input type="checkbox" class="custom-control-input" id="has_free_scheme" name="has_free_scheme" value="1">
+                                                <label class="custom-control-label small font-weight-bold" for="has_free_scheme">Has free items</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="warranty-card-body" id="schemeBody" style="display:none;">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="warranty-label mb-0">Buy Qty &rarr; Free Qty</label>
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-add-warranty" id="btnAddScheme">
+                                                    <i class="fas fa-plus"></i>&nbsp;Add Rule
+                                                </button>
+                                            </div>
+
+                                            <div id="schemeEmpty" class="warranty-empty">
+                                                <i class="fas fa-info-circle"></i>&nbsp;No rules added.
+                                                <span class="d-block">Example: Buy 11 &rarr; 1 free, Buy 22 &rarr; 2 free</span>
+                                            </div>
+
+                                            <div id="schemeRows"></div>
+                                            <small class="text-muted d-block">In the GRN the free qty is worked out from the received qty (e.g. 12 received = 11 paid + 1 free) and can be changed there.</small>
+                                        </div>
+                                    </div>
+                                    <!-- ==================================================== -->
+
                                     <div class="form-group mb-1">
                                         <label class="small font-weight-bold">Description</label>
                                         <textarea class="form-control form-control-sm" name="description" id="description" rows="2"></textarea>
@@ -354,7 +396,7 @@ include "include/topnavbar.php";
         }
 
         $('#productForm').on('submit', function(){
-            return checkDiscountDates();
+            return checkDiscountDates() && checkSchemes();
         });
 
         // ---------- Additional warranty rows ----------
@@ -397,6 +439,91 @@ include "include/topnavbar.php";
         });
 
         refreshWarrantyUI();
+
+        // ---------- Free item scheme rows ----------
+        function refreshSchemeUI(){
+            var on = $('#has_free_scheme').is(':checked');
+            var count = $('#schemeRows .scheme-row').length;
+            $('#schemeBody').toggle(on);
+            $('#schemeEmpty').toggle(count === 0);
+        }
+
+        function addSchemeRow(buy, free){
+            var $row = $(
+                '<div class="scheme-row">' +
+                    '<div class="input-group input-group-sm">' +
+                        '<div class="input-group-prepend"><span class="input-group-text">Buy</span></div>' +
+                        '<input type="number" class="form-control s-buy" name="scheme_buy_qty[]" min="1" step="1" placeholder="11">' +
+                    '</div>' +
+                    '<span class="s-plus">&rarr;</span>' +
+                    '<div class="input-group input-group-sm">' +
+                        '<div class="input-group-prepend"><span class="input-group-text">Free</span></div>' +
+                        '<input type="number" class="form-control s-free" name="scheme_free_qty[]" min="1" step="1" placeholder="1">' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-outline-danger btn-sm btnRemoveScheme" title="Remove"><i class="fas fa-times"></i></button>' +
+                '</div>'
+            );
+            $row.find('.s-buy').val(buy || '');
+            $row.find('.s-free').val(free || '');
+            $('#schemeRows').append($row);
+            refreshSchemeUI();
+        }
+
+        function resetSchemes(){
+            $('#schemeRows').empty();
+            $('#has_free_scheme').prop('checked', false);
+            refreshSchemeUI();
+        }
+
+        $('#has_free_scheme').on('change', function(){
+            if($(this).is(':checked') && $('#schemeRows .scheme-row').length === 0){
+                addSchemeRow();
+            }
+            refreshSchemeUI();
+        });
+
+        $('#btnAddScheme').on('click', function(){
+            addSchemeRow();
+            $('#schemeRows .scheme-row:last .s-buy').focus();
+        });
+
+        $('#schemeRows').on('click', '.btnRemoveScheme', function(){
+            $(this).closest('.scheme-row').remove();
+            refreshSchemeUI();
+        });
+
+        // when the scheme is on, at least one complete rule is needed and buy qty cannot repeat
+        function checkSchemes(){
+            if(!$('#has_free_scheme').is(':checked')){ return true; }
+            var valid = 0, seen = {}, error = '';
+            $('#schemeRows .scheme-row').each(function(){
+                var buyStr = $.trim($(this).find('.s-buy').val());
+                var freeStr = $.trim($(this).find('.s-free').val());
+                if(buyStr === '' && freeStr === ''){ return; }   // empty row is ignored
+                var buy = Number(buyStr), free = Number(freeStr);
+                if(!(buy > 0) || !(free > 0) || Math.floor(buy) !== buy || Math.floor(free) !== free){
+                    error = 'Please enter both Buy qty and Free qty (whole numbers above 0) for each free item rule.';
+                    return false;
+                }
+                if(seen[buy]){
+                    error = 'Buy qty ' + buy + ' is added twice in the free item scheme.';
+                    return false;
+                }
+                seen[buy] = true;
+                valid++;
+            });
+            if(error !== ''){
+                alert(error);
+                return false;
+            }
+            if(valid === 0){
+                alert('Add at least one free item rule, or switch off "Has free items".');
+                return false;
+            }
+            return true;
+        }
+
+        refreshSchemeUI();
 
         // ---------- Product table ----------
         $('#tblproduct').DataTable({
@@ -514,7 +641,17 @@ include "include/topnavbar.php";
                                 addWarrantyRow(w.warranty_name, w.warranty_months);
                             });
                         }
-                         
+
+                        // load free item scheme
+                        resetSchemes();
+                        if(obj.schemes && obj.schemes.length){
+                            $.each(obj.schemes, function(i, s){
+                                addSchemeRow(parseFloat(s.buy_qty), parseFloat(s.free_qty));
+                            });
+                        }
+                        $('#has_free_scheme').prop('checked', obj.has_free_scheme == 1);
+                        refreshSchemeUI();
+
                         $('#recordOption').val('2');
                         $('#submitBtn').html('<i class="far fa-save"></i>&nbsp;Update');
                     }

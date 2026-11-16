@@ -51,6 +51,59 @@
 		return $this->db->get();
 	}
 
+	/* ================= FREE ITEM SCHEME =================
+	   Rules come from tbl_product_free_scheme (e.g. buy 11 get 1, buy 22 get 2).
+	   qty on tbl_grndetail = received qty (all units go to stock / serials),
+	   free_qty = free units, paid_qty = qty - free_qty, line total = paid_qty x unit price - discount. */
+
+	// active scheme rules of a product (empty array when the product has no scheme)
+	public function Getproductfreeschemes($productID) {
+		$this->db->select('p.has_free_scheme, s.buy_qty, s.free_qty');
+		$this->db->from('tbl_product p');
+		$this->db->join('tbl_product_free_scheme s', 's.tbl_product_idtbl_product = p.idtbl_product AND s.status = 1', 'inner');
+		$this->db->where('p.idtbl_product', $productID);
+		$this->db->where('p.has_free_scheme', 1);
+		$this->db->order_by('s.buy_qty', 'ASC');
+		$rows = $this->db->get()->result();
+
+		$schemes = array();
+		foreach ($rows as $r) {
+			if ($r->buy_qty > 0 && $r->free_qty > 0) {
+				$schemes[] = array('buy_qty' => (float)$r->buy_qty, 'free_qty' => (float)$r->free_qty);
+			}
+		}
+		return $schemes;
+	}
+
+	/* Free qty for a received qty.
+	   Pack size = buy + free (11 + 1 = 12). The biggest pack is applied first, then the remainder
+	   with the smaller ones. Received 12 -> 1 free, 24 -> 2 free, 15 -> 1 free (3 bought at normal price).
+	   The same calculation is in goodreceive.php (calcFreeQty) for the screen. */
+	public function Calculatefreeqty($schemes, $receivedQty) {
+		$tiers = array();
+		foreach ($schemes as $s) {
+			$tiers[] = array('pack' => $s['buy_qty'] + $s['free_qty'], 'free' => $s['free_qty']);
+		}
+		usort($tiers, function ($a, $b) { return ($b['pack'] > $a['pack']) ? 1 : (($b['pack'] < $a['pack']) ? -1 : 0); });
+
+		$remaining = floor($receivedQty);
+		$free = 0;
+		foreach ($tiers as $t) {
+			if ($t['pack'] <= 0) { continue; }
+			$packs = floor($remaining / $t['pack']);
+			$free += $packs * $t['free'];
+			$remaining -= $packs * $t['pack'];
+		}
+		return $free;
+	}
+
+	// effective cost per received unit: the free units spread the paid amount over all units
+	private function Effectivecost($unitprice, $qty, $paidqty) {
+		if ($qty <= 0 || $paidqty >= $qty) { return $unitprice; }
+		return round(($unitprice * $paidqty) / $qty, 4);
+	}
+	/* ==================================================== */
+
 	public function Getproductaccosupplier() {
 		$recordID=$this->input->post('recordID');
 
@@ -98,6 +151,82 @@
 
 		$updatedatetime=date('Y-m-d H:i:s');
 
+		// ---------- lines: received qty, free qty, paid qty and totals (worked out here, not trusted from the screen) ----------
+		$lines = array();
+		$linesum = 0;
+		$lineerror = '';
+
+		if (empty($tableData) || !is_array($tableData)) {
+			$lineerror = 'Please add at least one product';
+		} else {
+			foreach ($tableData as $rowtabledata) {
+				$materialID    = $rowtabledata['col_3'];
+				$unitprice     = floatval(str_replace(',', '', $rowtabledata['col_4']));
+				$qty           = floatval(str_replace(',', '', $rowtabledata['col_5']));
+				$unit_discount = floatval(str_replace(',', '', $rowtabledata['col_8']));
+				$comment       = $rowtabledata['col_2'];
+				$freeposted    = isset($rowtabledata['col_13']) ? trim($rowtabledata['col_13']) : '';
+
+				if ($qty <= 0) { $lineerror = 'Qty must be more than 0'; break; }
+
+				// free qty: the value from the screen (user can change it), otherwise from the product scheme
+				if ($freeposted === '') {
+					$freeqty = $this->Calculatefreeqty($this->Getproductfreeschemes($materialID), $qty);
+				} else {
+					if (!is_numeric($freeposted) || floatval($freeposted) < 0) { $lineerror = 'Invalid free qty'; break; }
+					$freeqty = floatval($freeposted);
+				}
+				if ($freeqty > $qty) { $lineerror = 'Free qty cannot be more than the received qty'; break; }
+
+				$paidqty = $qty - $freeqty;
+				$total   = round(($unitprice * $paidqty) - $unit_discount, 2);
+				$linesum += $total;
+
+				$lines[] = array(
+					'date'=> $grndate,
+					'qty'=> $qty,                 // received qty: all of it goes to stock / serials / barcodes
+					'free_qty'=> $freeqty,
+					'paid_qty'=> $paidqty,
+					'unitprice'=> $unitprice,
+					'costunitprice'=> $this->Effectivecost($unitprice, $qty, $paidqty),
+					'saleprice'=> 0,
+					'total'=> $total,
+					'comment'=> $comment,
+					'unit_discount'=> $unit_discount,
+					'status'=> '1',
+					'insertdatetime'=> $updatedatetime,
+					'tbl_user_idtbl_user'=> $userID,
+					'tbl_product_idtbl_product'=> $materialID
+				);
+			}
+		}
+
+		if ($lineerror != '') {
+			$this->db->trans_rollback();
+
+			$actionObj=new stdClass();
+			$actionObj->icon='fas fa-exclamation-triangle';
+			$actionObj->title='';
+			$actionObj->message=$lineerror;
+			$actionObj->url='';
+			$actionObj->target='_blank';
+			$actionObj->type='danger';
+
+			$obj=new stdClass();
+			$obj->status=0;
+			$obj->action=json_encode($actionObj);
+
+			echo json_encode($obj);
+			return;
+		}
+
+		// header totals from the lines (same formula as finaltotalcalculate() on the screen)
+		$discount  = floatval($discount);
+		$vat       = floatval($vat);
+		$subtotal  = round($linesum - $discount, 2);
+		$vatamount = ($vat_type == 1) ? round(($subtotal * $vat) / 100, 2) : 0;
+		$total     = round($subtotal + $vatamount, 2);
+
 		$data=array(
 			'batchno'=> $batchno,
 			'grndate'=> $grndate,
@@ -127,32 +256,8 @@
 
 		$grnID=$this->db->insert_id();
 
-			foreach($tableData as $rowtabledata) {
-				$product_name=$rowtabledata['col_1'];
-				$comment=$rowtabledata['col_2'];
-				$materialID=$rowtabledata['col_3'];
-				$unit=$rowtabledata['col_4'];
-				$qty=$rowtabledata['col_5'];
-				$uom=$rowtabledata['col_6'];
-				$packetprice=$rowtabledata['col_7'];
-				$unit_discount=$rowtabledata['col_8'];
-				$uomID=$rowtabledata['col_9'];
-				$nettotal=$rowtabledata['col_10'];
-				$porderdetailsid=$rowtabledata['col_11'];
-
-				$dataone=array('date'=> $grndate,
-					'qty'=> $qty,
-					'unitprice'=> $unit,
-					'costunitprice'=> $unit,
-					'total'=> $nettotal,
-					'comment'=> $comment,
-					'unit_discount'=> $unit_discount,
-					'status'=> '1',
-					'insertdatetime'=> $updatedatetime,
-					'tbl_user_idtbl_user'=> $userID,
-					'tbl_grn_idtbl_grn'=> $grnID,
-					'tbl_product_idtbl_product'=> $materialID);
-
+			foreach($lines as $dataone) {
+				$dataone['tbl_grn_idtbl_grn'] = $grnID;
 				$this->db->insert('tbl_grndetail', $dataone);
 			}
 
@@ -269,7 +374,7 @@
             <div class="col-6 small"><label class="small font-weight-bold text-dark mb-1">Date:</label> '.$responddetail->row(0)->grndate.'<br><label class="small font-weight-bold text-dark mb-1">GRN No:</label> '.$responddetail->row(0)->grn_no.'<br><label class="small font-weight-bold text-dark mb-1">Customer:</label> '.$respond->row(0)->suppliername.'</div>
             <div class="col-6 small"><label class="small font-weight-bold text-dark mb-1">Company:</label> '.$respond->row(0)->company.'<br><label class="small font-weight-bold text-dark mb-1">Branch:</label> '.$respond->row(0)->branch.'<br><label class="small font-weight-bold text-dark mb-1">Invoice No:</label> '.$respond->row(0)->invoicenum.'</div>
         </div>
-        <hr class="border-dark"> <table class="table table-striped table-bordered table-sm"> <thead> <tr> <th>Product</th> <th>Unit Price</th> <th class="text-center">Qty</th><th class="text-center">Uom</th> <th class="text-center">Discount</th> <th class="text-right">Total</th> </tr> </thead> <tbody>';
+        <hr class="border-dark"> <table class="table table-striped table-bordered table-sm"> <thead> <tr> <th>Product</th> <th>Unit Price</th> <th class="text-center">Qty</th> <th class="text-center">Free</th> <th class="text-center">Paid Qty</th><th class="text-center">Uom</th> <th class="text-center">Discount</th> <th class="text-right">Total</th> </tr> </thead> <tbody>';
 
 		foreach($responddetail->result() as $roworderinfo) {
 			$productInfo = $roworderinfo->product_name;
@@ -277,10 +382,16 @@
 				$productInfo .= ' / ' . $roworderinfo->product_code;
 			}
 
+			$freeqty = floatval($roworderinfo->free_qty);
+			$paidqty = floatval($roworderinfo->qty) - $freeqty;
+
+			// unitprice = invoice price per paid unit (costunitprice is the effective cost after free items)
 			$html .= '<tr>
 				<td>' . $productInfo . '</td>
-				<td>' . $roworderinfo->costunitprice . '</td>
-				<td class="text-center">' . $roworderinfo->qty . '</td>
+				<td>' . number_format($roworderinfo->unitprice, 2, '.', ',') . '</td>
+				<td class="text-center">' . floatval($roworderinfo->qty) . '</td>
+				<td class="text-center">' . ($freeqty > 0 ? '<span class="badge badge-success">Free ' . $freeqty . '</span>' : '-') . '</td>
+				<td class="text-center">' . $paidqty . '</td>
 				<td class="text-center">' . $roworderinfo->unit . '</td>
 				<td class="text-center">' . $roworderinfo->unit_discount . '</td>
 				<td class="text-right">' . number_format($roworderinfo->total, 2, '.', ',') . '</td>
@@ -400,7 +511,7 @@
 				$this->db->update('tbl_porder', $dataporder);
 			}
 
-			$this->db->select('tbl_grn.batchno, tbl_grn.tbl_company_idtbl_company, tbl_grn.tbl_company_branch_idtbl_company_branch, tbl_grn.tbl_location_idtbl_location, tbl_grn.tbl_supplier_idtbl_supplier, tbl_grn.grndate, tbl_grndetail.qty, tbl_grndetail.total, tbl_grndetail.unitprice, tbl_grndetail.tbl_product_idtbl_product, tbl_grn.tbl_porder_idtbl_porder');
+			$this->db->select('tbl_grn.batchno, tbl_grn.tbl_company_idtbl_company, tbl_grn.tbl_company_branch_idtbl_company_branch, tbl_grn.tbl_location_idtbl_location, tbl_grn.tbl_supplier_idtbl_supplier, tbl_grn.grndate, tbl_grndetail.qty, tbl_grndetail.total, tbl_grndetail.unitprice, tbl_grndetail.costunitprice, tbl_grndetail.tbl_product_idtbl_product, tbl_grn.tbl_porder_idtbl_porder');
 			$this->db->from('tbl_grn');
 			$this->db->join('tbl_grndetail', 'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn', 'left');
 			$this->db->where('tbl_grn.status', 1);
@@ -411,8 +522,9 @@
 				foreach ($respond->result() as $row) {
 					$batchno = $row->batchno;
 					$location = $row->tbl_location_idtbl_location;
-					$qty = $row->qty;
-					$unitprice = $row->unitprice;
+					$qty = $row->qty;   // full received qty (paid + free) goes to stock
+					// effective cost (free units lower the cost of each unit); old GRNs without it fall back to unit price
+					$unitprice = ($row->costunitprice > 0) ? $row->costunitprice : $row->unitprice;
 					$materialID = $row->tbl_product_idtbl_product;
 					$companyid = $row->tbl_company_idtbl_company;
 					$branchid = $row->tbl_company_branch_idtbl_company_branch;
@@ -672,6 +784,9 @@
 			$obj->detailsid = 0;
 		}
 
+		// free item scheme rules, used on the screen to work out the free qty
+		$obj->schemes = $this->Getproductfreeschemes($recordID);
+
 		echo json_encode($obj);
 	}
 
@@ -812,6 +927,8 @@
 		$this->db->select('
 			tbl_grndetail.idtbl_grndetail,
 			tbl_grndetail.qty,
+			tbl_grndetail.free_qty,
+			(tbl_grndetail.qty - tbl_grndetail.free_qty) AS paid_qty,
 			tbl_grndetail.unitprice,
 			tbl_grndetail.unit_discount,
 			tbl_grndetail.total,
@@ -819,7 +936,7 @@
 			tbl_product.product_name,
 			tbl_product.product_code,
 			tbl_unit.unit
-		');
+		', FALSE);   // FALSE: keep the (qty - free_qty) expression as it is
 		$this->db->from('tbl_grndetail');
 		$this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_grndetail.tbl_product_idtbl_product', 'left');
 		$this->db->join('tbl_unit', 'tbl_unit.idtbl_unit = tbl_product.tbl_unit_idtbl_unit', 'left');
@@ -852,16 +969,27 @@
 
 		if (!empty($tableData)) {
 			foreach ($tableData as $row) {
-				$detailID      = $row['detailid'];
-				$unitprice     = floatval($row['unitprice']);
-				$qty           = floatval($row['qty']);
-				$unit_discount = floatval($row['discount']);
+				$detailID  = $row['detailid'];
+				$unitprice = floatval($row['unitprice']);
 
-				$total = ($unitprice * $qty) - $unit_discount;
+				// qty, free qty and discount are read from the saved line, only the price is changed here
+				$this->db->select('qty, free_qty, unit_discount');
+				$this->db->from('tbl_grndetail');
+				$this->db->where('idtbl_grndetail', $detailID);
+				$this->db->where('tbl_grn_idtbl_grn', $grnID);
+				$saved = $this->db->get()->row();
+				if (!$saved) { continue; }
+
+				$qty           = floatval($saved->qty);
+				$paidqty       = $qty - floatval($saved->free_qty);
+				$unit_discount = floatval($saved->unit_discount);
+
+				$total = round(($unitprice * $paidqty) - $unit_discount, 2);
 
 				$datadetail = array(
 					'unitprice'      => $unitprice,
-					'costunitprice'  => $unitprice,
+					'paid_qty'       => $paidqty,
+					'costunitprice'  => $this->Effectivecost($unitprice, $qty, $paidqty),
 					'total'          => $total,
 					'updatedatetime' => $updatedatetime
 				);

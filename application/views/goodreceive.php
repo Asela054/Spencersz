@@ -155,6 +155,18 @@ include "include/topnavbar.php";
                                     <label class="small font-weight-bold text-danger" id="qtylabel"></label>
                                     <input type="text" id="newqty" name="newqty" class="form-control form-control-sm"
                                         required >
+                                    <small class="text-muted">Received qty (paid + free)</small>
+                                </div>
+                                <div class="col">
+                                    <label class="small font-weight-bold text-dark">Free Qty</label>
+                                    <input type="number" id="freeqty" name="freeqty" class="form-control form-control-sm"
+                                        min="0" step="1" value="0">
+                                    <small class="text-muted">Paid qty: <span id="paidqtylabel" class="font-weight-bold">0</span></small>
+                                </div>
+                            </div>
+                            <div class="form-row mb-1">
+                                <div class="col">
+                                    <div id="schemeinfo" class="small text-success font-weight-bold" style="display:none;"></div>
                                 </div>
                             </div>
 
@@ -221,14 +233,17 @@ include "include/topnavbar.php";
                                         <th>Product</th>
                                         <th>Comment</th>
                                         <th class="d-none">ProductID</th>
-                                        <th>Unitprice</th>
-                                        <th class="d-none">Saleprice</th>
+                                        <th class="text-center">Unitprice</th>
                                         <th class="text-center">Qty</th>
                                         <th class="text-center">Uom</th>
-                                        <th>Price</th>
+                                        <th class="text-center">Price</th>
+                                        <th class="text-center">Discount</th>
+                                        <th class="d-none">UomID</th>
                                         <th class="d-none">HideTotal</th>
-                                        <th class="text-right">Discount</th>
                                         <th class="text-right">Total</th>
+                                        <th class="d-none">PODetailID</th>
+                                        <th class="text-center">Free</th>
+                                        <th class="text-center">Paid Qty</th>
                                         <th class="text-right">Action</th>
                                     </tr>
                                 </thead>
@@ -413,6 +428,8 @@ include "include/topnavbar.php";
                             <tr>
                                 <th>Product</th>
                                 <th class="text-center">Qty</th>
+                                <th class="text-center">Free</th>
+                                <th class="text-center">Paid Qty</th>
                                 <th class="text-center">Uom</th>
                                 <th class="text-right" width="150">Unit Price</th>
                                 <th class="text-right">Discount</th>
@@ -1044,17 +1061,21 @@ $(document).ready(function() {
                         productName += ' / ' + item.product_code;
                     }
 
-                    var qtyDisplay = item.qty;
+                    var qtyDisplay = parseFloat(item.qty) || 0;
+                    var freeDisplay = parseFloat(item.free_qty) || 0;
+                    var paidQty = qtyDisplay - freeDisplay;   // only the paid units are charged
                     var uomDisplay = item.unit || '';
                     var discount = parseFloat(item.unit_discount) || 0;
-                    var rowTotal = (parseFloat(item.unitprice) * parseFloat(qtyDisplay)) - discount;
+                    var rowTotal = (parseFloat(item.unitprice) * paidQty) - discount;
 
                     var row = '<tr>';
                     row += '<td>' + productName + '</td>';
                     row += '<td class="text-center">' + qtyDisplay + '</td>';
+                    row += '<td class="text-center">' + (freeDisplay > 0 ? '<span class="badge badge-success">Free ' + freeDisplay + '</span>' : '-') + '</td>';
+                    row += '<td class="text-center">' + paidQty + '</td>';
                     row += '<td class="text-center">' + uomDisplay + '</td>';
                     row += '<td class="text-right"><input type="text" class="form-control form-control-sm text-right edit-unitprice" ' +
-                        'data-detailid="' + item.idtbl_grndetail + '" data-qty="' + item.qty +
+                        'data-detailid="' + item.idtbl_grndetail + '" data-qty="' + paidQty +
                         '" data-discount="' + discount + '" value="' + parseFloat(item.unitprice) + '"></td>';
                     row += '<td class="text-right">' + discount.toFixed(2) + '</td>';
                     row += '<td class="text-right row-total">' + rowTotal.toFixed(2) + '</td>';
@@ -1863,6 +1884,46 @@ $(document).ready(function() {
         });
     });
 
+    // ===================== FREE ITEM SCHEME =====================
+    // grnSchemes = [ {buy_qty: 11, free_qty: 1}, {buy_qty: 22, free_qty: 2} ] for the selected product
+    var grnSchemes = [];
+
+    // Pack size = buy + free (11 + 1 = 12). Biggest pack first, then the remainder with smaller ones.
+    // 12 received -> 1 free, 24 -> 2 free, 15 -> 1 free. Same logic as Calculatefreeqty() in Goodreceiveinfo.
+    function calcFreeQty(receivedQty, schemes) {
+        var tiers = [];
+        $.each(schemes || [], function (i, s) {
+            var buy = parseFloat(s.buy_qty) || 0, free = parseFloat(s.free_qty) || 0;
+            if (buy > 0 && free > 0) { tiers.push({ pack: buy + free, free: free }); }
+        });
+        tiers.sort(function (a, b) { return b.pack - a.pack; });
+
+        var remaining = Math.floor(receivedQty) || 0, freeTotal = 0;
+        $.each(tiers, function (i, t) {
+            var packs = Math.floor(remaining / t.pack);
+            freeTotal += packs * t.free;
+            remaining -= packs * t.pack;
+        });
+        return freeTotal;
+    }
+
+    function updatePaidLabel() {
+        var qty = parseFloat($('#newqty').val()) || 0;
+        var free = parseFloat($('#freeqty').val()) || 0;
+        $('#paidqtylabel').text(Math.max(qty - free, 0));
+    }
+
+    // fills the free qty from the scheme; the user can still change it to match the supplier invoice
+    function updateFreeQty() {
+        var qty = parseFloat($('#newqty').val()) || 0;
+        $('#freeqty').val(grnSchemes.length > 0 ? calcFreeQty(qty, grnSchemes) : 0);
+        updatePaidLabel();
+    }
+
+    $('#newqty').on('input', updateFreeQty);
+    $('#freeqty').on('input', updatePaidLabel);
+    // ============================================================
+
     $("#formsubmit").click(function() {
         if (!$("#createorderform")[0].checkValidity()) {
             $("#submitBtn").click();
@@ -1877,7 +1938,23 @@ $(document).ready(function() {
             var uom = $("#uom option:selected").text();
             var porderdetailsid = parseFloat($('#porderdetailsid').val());
 
-            var newtotal = (unitprice * newqty) - discount;
+            // free items: newqty = received qty, only the paid qty is charged
+            var freeqty = Number($.trim($('#freeqty').val()) || 0);
+            if (isNaN(newqty) || newqty <= 0) {
+                Swal.fire({ icon: 'warning', title: 'Invalid qty', text: 'Please enter the received qty.' });
+                return;
+            }
+            if (isNaN(freeqty) || freeqty < 0 || Math.floor(freeqty) !== freeqty) {
+                Swal.fire({ icon: 'warning', title: 'Invalid free qty', text: 'Free qty must be a whole number, 0 or more.' });
+                return;
+            }
+            if (freeqty > newqty) {
+                Swal.fire({ icon: 'warning', title: 'Invalid free qty', text: 'Free qty cannot be more than the received qty.' });
+                return;
+            }
+            var paidqty = newqty - freeqty;
+
+            var newtotal = (unitprice * paidqty) - discount;
             var newprice = 0;
 
             var total = parseFloat(newtotal);
@@ -1893,6 +1970,8 @@ $(document).ready(function() {
                 '</td><td class="total d-none">' + total + '</td><td class="text-right">' +
                 showtotal +
                 '</td><td name="inquerydetailsid" class="d-none">' + porderdetailsid +
+                '</td><td class="text-center">' + freeqty +
+                '</td><td class="text-center">' + paidqty +
                 '</td><td><button type="button" onclick= "productDelete(this);" id="btnDeleterow" class=" btn btn-danger btn-sm float-right"><i class="fas fa-trash-alt"></i></button></td> </tr>'
             );
 
@@ -1902,6 +1981,10 @@ $(document).ready(function() {
             $('#comment').val('');
             $('#unitdiscount').val('0');
             $('#newqty').val('');
+            grnSchemes = [];
+            $('#freeqty').val('0');
+            $('#paidqtylabel').text('0');
+            $('#schemeinfo').hide().text('');
             $('#qtylabel').text('0');
             $('#porder').prop('readonly', true).css('pointer-events', 'none');
 
@@ -2209,6 +2292,18 @@ $(document).ready(function() {
                     $('#uom').val(obj.uom || '');
                     $('#unitprice').val(obj.unitprice || '');
                     $('#porderdetailsid').val(obj.detailsid || '');
+
+                    // free item scheme of this product
+                    grnSchemes = obj.schemes || [];
+                    if (grnSchemes.length > 0) {
+                        var txt = $.map(grnSchemes, function (s) {
+                            return 'Buy ' + parseFloat(s.buy_qty) + ' get ' + parseFloat(s.free_qty) + ' free';
+                        }).join(', ');
+                        $('#schemeinfo').html('<i class="fas fa-gift mr-1"></i>Free item scheme: ' + escapeHtml(txt)).show();
+                    } else {
+                        $('#schemeinfo').hide().text('');
+                    }
+                    updateFreeQty();
 
                 } catch (e) {
                     console.error("Error parsing response:", e);
