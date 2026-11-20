@@ -2257,7 +2257,7 @@ $(document).ready(function() {
                         .idtbl_product +
                         '">';
                     html1 += obj[i].product_name + ' / ' + obj[i]
-                        .product_code;
+                        .model_no;
                     html1 += '</option>';
                 });
                 $('#product').empty().append(html1);

@@ -107,7 +107,7 @@
 	public function Getproductaccosupplier() {
 		$recordID=$this->input->post('recordID');
 
-		$this->db->select('`idtbl_product`, `product_code`, `product_name`');
+		$this->db->select('`idtbl_product`, `model_no`, `product_name`');
 		$this->db->from('tbl_product');
 		$this->db->where('status', 1);
 
@@ -736,7 +736,7 @@
 	public function Getproductaccoporder() {
 		$recordID=$this->input->post('recordID');
 
-		$this->db->select('`tbl_product`.`idtbl_product`, `tbl_product`.`product_code`, `tbl_product`.`product_name`');
+		$this->db->select('`tbl_product`.`idtbl_product`, `tbl_product`.`model_no`, `tbl_product`.`product_name`');
 		$this->db->from('tbl_porder_detail');
 		$this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_porder_detail.tbl_product_idtbl_product', 'left');
 		$this->db->where('tbl_product.status', 1);
