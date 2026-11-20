@@ -170,6 +170,9 @@ $invDate = date('d-m-Y', strtotime($inv->invoice_date));
         $extra = array();
         if ($it->serialno) { $extra[] = 'S/N: ' . $e($it->serialno); }
         if ($it->warranty_months) { $extra[] = 'Warranty: ' . (int)$it->warranty_months . ' months'; }
+        if (!empty($it->is_preorder) && (int)$it->delivery_status === 2) {
+            $extra[] = 'Delivery: ' . $e(date('d-m-Y', strtotime($it->delivery_date)));
+        }
         if (!empty($extra)) {
             $desc .= '<div style="font-size:8pt;line-height:9pt;margin:0;padding:0;">' . implode(' | ', $extra) . '</div>';
         }

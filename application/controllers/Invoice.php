@@ -32,6 +32,41 @@ class Invoice extends CI_Controller {
     public function Insertinvoice(){
        $result=$this->Invoiceinfo->Insertinvoice();
     }
+    public function Printbill($invoice_id = 0){
+        $branch_id = $_SESSION['branch_id'];
+        $inv = $this->db->where('idtbl_invoice', (int)$invoice_id)
+                        ->where('tbl_company_branch_idtbl_company_branch', $branch_id)
+                        ->get('tbl_invoice')->row();
+        if (!$inv) show_404();
+
+        $items = $this->db->where('tbl_invoice_idtbl_invoice', $inv->idtbl_invoice)->where('status', 1)
+                        ->order_by('idtbl_invoice_detail', 'ASC')->get('tbl_invoice_detail')->result();
+        $pays  = $this->db->where('tbl_invoice_idtbl_invoice', $inv->idtbl_invoice)->where('status', 1)
+                        ->get('tbl_invoice_payment')->result();
+        $customer = $inv->tbl_customer_idtbl_customer
+            ? $this->db->where('idtbl_customer', $inv->tbl_customer_idtbl_customer)->get('tbl_customer')->row()
+            : null;
+        $cashier = $this->db->select('name')->where('idtbl_user', $inv->tbl_user_idtbl_user)->get('tbl_user')->row();
+
+        $data = [
+            'inv'      => $inv,
+            'items'    => $items,
+            'pays'     => $pays,
+            'customer' => $customer,
+            'cashier'  => $cashier ? $cashier->name : '',
+            'title'    => ($inv->invoice_type === 'Corporate Quotation') ? 'QUOTATION' : (($inv->invoice_type === 'Retail Invoice') ? 'INVOICE' : 'TAX INVOICE'),
+            'rate'     => 1 + ((float)$inv->vat_rate / 100),
+            'supply'   => round($inv->net_total - $inv->vatamount, 2),
+            'company'  => [                       // same details as Printinvoice()
+                'tin'     => '000000000-7000',
+                'name'    => 'Spencersz Lanka (Pvt) Ltd',
+                'address' => '295, Negombo Road, Wattala',
+                'tel'     => '+94 11 000 0000',
+            ],
+        ];
+
+        $this->load->view('invoice_pos', $data);   // plain HTML, printed by the browser (no PDF)
+    }
     public function Printinvoice($x){
        $result=$this->Invoiceinfo->Printinvoice($x);
     }
@@ -98,6 +133,12 @@ class Invoice extends CI_Controller {
     }
     public function Fifoignoreverify(){
         $this->Invoiceinfo->Fifoignoreverify();
+    }
+    public function Discountverify(){
+        $this->Invoiceinfo->Discountverify();
+    }
+    public function Itemdiscountverify(){
+        $this->Invoiceinfo->Itemdiscountverify();
     }
     // public function generateVouchers() {
     //     $currentDateTime = date('Y-m-d H:i:s');
