@@ -30,6 +30,18 @@ class Product extends CI_Controller {
         $this->load->model('Productinfo');
         $this->Productinfo->Getnextcode();
     }
+    public function Getproductprice(){
+        $this->load->model('Productinfo');
+        $this->Productinfo->Getproductprice();
+    }
+    public function Productpriceupdate(){
+        $this->load->model('Productinfo');
+        $this->Productinfo->Productpriceupdate();
+    }
+    public function Getpricehistory(){
+        $this->load->model('Productinfo');
+        $this->Productinfo->Getpricehistory();
+    }
     public function Barcodeprint($id, $qty = 1){
         $qty = max(1, min((int)$qty, 500));
 

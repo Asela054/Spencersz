@@ -23,16 +23,23 @@ include "include/topnavbar.php";
             <div class="container-fluid mt-2 p-2">
                 <div class="sr-card p-3">
 
-                    <!-- Filter bar (no dropdowns) -->
+                    <!-- Filter bar -->
                     <div class="sr-filter">
                         <div class="row align-items-end">
-                            <div class="col-md-7 mb-2 mb-md-0">
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <label>Supplier</label>
+                                <select id="supplierFilter" class="form-control">
+                                    <option value="">All suppliers</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
                                 <label>Filter results</label>
                                 <input type="text" id="filterText" class="form-control"
                                     placeholder="Product, code, batch or warehouse">
                             </div>
                             <div class="col-md-5 text-md-right">
                                 <button type="button" id="btnSearch" class="btn sr-btn-main"><i class="fas fa-search mr-1"></i> Search</button>
+                                <button type="button" id="btnExcel" class="btn btn-light border"><i class="fas fa-file-excel text-success mr-1"></i> Export Excel</button>
                                 <button type="button" id="btnPdf" class="btn btn-light border"><i class="fas fa-file-pdf text-danger mr-1"></i> Export PDF</button>
                                 <button type="button" id="btnPrint" class="btn btn-light border"><i class="fas fa-print mr-1"></i> Print</button>
                             </div>
@@ -56,12 +63,12 @@ include "include/topnavbar.php";
 </div>
 
 <?php include "include/footerscripts.php"; ?>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 $(document).ready(function() {
 
     var allRows = [];
-    var viewRows = []; // currently displayed (filtered) rows, used by PDF/Print
-    
+    var viewRows = []; // currently displayed (filtered) rows, used by PDF/Print/Excel
 
     function money(n) {
         return (parseFloat(n) || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -78,6 +85,18 @@ $(document).ready(function() {
         data: {branch_id: '<?php echo (int)$_SESSION['branch_id']; ?>'},
         success: function(res) {
             allRows = res.data || [];
+
+            // Build the supplier dropdown from the loaded data
+            var seen = {}, opts = '';
+            allRows.forEach(function(r) {
+                var id = r.supplier_id || 'none';
+                if (!seen[id]) {
+                    seen[id] = true;
+                    opts += '<option value="' + esc(id) + '">' + esc(r.supplier_name || 'No supplier') + '</option>';
+                }
+            });
+            $('#supplierFilter').append(opts);
+
             render();
         },
         error: function(xhr) {
@@ -90,8 +109,10 @@ $(document).ready(function() {
 
     function render() {
         var q = $.trim($('#filterText').val()).toLowerCase();
+        var sup = $('#supplierFilter').val();
 
         viewRows = allRows.filter(function(r) {
+            if (sup && String(r.supplier_id || 'none') !== sup) return false;
             if (!q) return true;
             return [r.product_name, r.product_code, r.batchno, r.wh_name]
                 .join(' ').toLowerCase().indexOf(q) !== -1;
@@ -144,6 +165,38 @@ $(document).ready(function() {
 
     $('#btnSearch').on('click', render);
     $('#filterText').on('keyup', render);
+    $('#supplierFilter').on('change', render);
+
+    // Selected supplier label (used in report headings)
+    function supplierLabel() {
+        return $('#supplierFilter').val() ? $('#supplierFilter option:selected').text() : 'All suppliers';
+    }
+
+    // EXPORT EXCEL (SheetJS)
+    $('#btnExcel').on('click', function() {
+        if (typeof XLSX === 'undefined') { alert('Excel library is not loaded.'); return; }
+
+        var aoa = [
+            ['All Stock Information'],
+            ['Supplier: ' + supplierLabel()],
+            [],
+            ['#', 'Code', 'Product', 'Supplier', 'Batch no', 'Warehouse', 'Qty', 'UOM', 'Cost price', 'Sale price', 'Total']
+        ];
+        var tq = 0, tv = 0;
+        viewRows.forEach(function(r, i) {
+            var qty = parseFloat(r.qty) || 0, cost = parseFloat(r.costunitprice) || 0, sale = parseFloat(r.saleprice) || 0;
+            tq += qty; tv += qty * cost;
+            aoa.push([i + 1, r.product_code || '', r.product_name || '', r.supplier_name || '',
+                      r.batchno || '', r.wh_name || '', qty, r.unit || '', cost, sale, qty * cost]);
+        });
+        aoa.push(['', '', '', '', '', 'Grand total', tq, '', '', '', tv]);
+
+        var ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{wch:5},{wch:14},{wch:32},{wch:24},{wch:14},{wch:16},{wch:10},{wch:8},{wch:12},{wch:12},{wch:14}];
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'All Stock');
+        XLSX.writeFile(wb, 'All_Stock_Information.xlsx');
+    });
 
     // PRINT
     $('#btnPrint').on('click', function() {
@@ -154,7 +207,8 @@ $(document).ready(function() {
             'th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}' +
             '.r{text-align:right}tfoot td{font-weight:bold}' +
             '</style></head><body><h2>All Stock Information</h2>' +
-            '<div>Stock lines: ' + $('#sumLines').text() + ' | Total quantity: ' + $('#sumQty').text() +
+            '<div>Supplier: ' + esc(supplierLabel()) + ' | Stock lines: ' + $('#sumLines').text() +
+            ' | Total quantity: ' + $('#sumQty').text() +
             ' | Total value: ' + $('#sumValue').text() + '</div>' +
             '<table><thead><tr><th>#</th><th>Code</th><th>Product</th><th>Batch no</th><th>Warehouse</th>' +
             '<th class="r">Qty</th><th>UOM</th><th class="r">Cost price</th><th class="r">Sale price</th><th class="r">Total</th></tr></thead><tbody>';
@@ -197,7 +251,8 @@ $(document).ready(function() {
             defaultStyle: {fontSize: 8},
             content: [
                 {text: 'All Stock Information', fontSize: 14, bold: true, margin: [0, 0, 0, 4]},
-                {text: 'Stock lines: ' + $('#sumLines').text() + '   Total quantity: ' + $('#sumQty').text() +
+                {text: 'Supplier: ' + supplierLabel() + '   Stock lines: ' + $('#sumLines').text() +
+                       '   Total quantity: ' + $('#sumQty').text() +
                        '   Total value: ' + $('#sumValue').text(), margin: [0, 0, 0, 8]},
                 {table: {headerRows: 1, widths: ['auto', 'auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'], body: body},
                  layout: 'lightHorizontalLines'}

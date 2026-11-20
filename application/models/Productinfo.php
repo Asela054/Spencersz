@@ -72,6 +72,114 @@ class Productinfo extends CI_Model{
     }
     /* ============================================================== */
 
+    /* ================= SELLING PRICE UPDATE + HISTORY =================
+       Every selling price change writes one row to tbl_product_price_history
+       (old price, new price, remark, user, date), whether it is done from the
+       "Update Selling Price" button or from the main product form. */
+
+    // writes one history row: the price before and after the change
+    private function Logpricechange($productID, $oldPrice, $newPrice, $remark, $userID, $datetime){
+        $this->db->insert('tbl_product_price_history', array(
+            'old_selling_price'=> $oldPrice,
+            'new_selling_price'=> $newPrice,
+            'remark'=> ($remark !== '') ? $remark : NULL,
+            'status'=> '1',
+            'insertdatetime'=> $datetime,
+            'tbl_user_idtbl_user'=> $userID,
+            'tbl_product_idtbl_product'=> $productID
+        ));
+    }
+
+    private function Priceresponse($status, $message, $type){
+        $actionObj=new stdClass();
+        $actionObj->icon=($status == 1) ? 'fas fa-save' : 'fas fa-exclamation-triangle';
+        $actionObj->title='';
+        $actionObj->message=$message;
+        $actionObj->url='';
+        $actionObj->target='_blank';
+        $actionObj->type=$type;
+
+        echo json_encode(array('status'=> $status, 'action'=> json_encode($actionObj)));
+    }
+
+    // current price of a product, for the update modal
+    public function Getproductprice(){
+        $recordID=$this->input->post('recordID');
+
+        $this->db->select('idtbl_product, product_code, product_name, cost_price, selling_price');
+        $this->db->from('tbl_product');
+        $this->db->where('idtbl_product', $recordID);
+        $this->db->where('status !=', 3);
+        $row=$this->db->get()->row();
+
+        echo json_encode($row ? $row : new stdClass());
+    }
+
+    public function Productpriceupdate(){
+        $this->db->trans_begin();
+
+        $userID=$_SESSION['userid'];
+        $recordID=$this->input->post('recordID');
+        $newPrice=$this->input->post('new_selling_price');
+        $remark=trim((string)$this->input->post('remark'));
+        $datetime=date('Y-m-d H:i:s');
+
+        if($newPrice === NULL || $newPrice === '' || !is_numeric($newPrice) || (float)$newPrice < 0){
+            $this->db->trans_rollback();
+            $this->Priceresponse(0, 'Enter a valid selling price', 'danger');
+            return;
+        }
+        $newPrice=round((float)$newPrice, 2);
+
+        // lock the row so two users cannot change the same price at the same time
+        $product=$this->db->query("SELECT `idtbl_product`, `selling_price` FROM `tbl_product`
+                                   WHERE `idtbl_product`=? AND `status`<>3 FOR UPDATE", array($recordID))->row();
+        if(!$product){
+            $this->db->trans_rollback();
+            $this->Priceresponse(0, 'Product not found', 'danger');
+            return;
+        }
+
+        $oldPrice=round((float)$product->selling_price, 2);
+        if($oldPrice == $newPrice){
+            $this->db->trans_rollback();
+            $this->Priceresponse(0, 'New price is the same as the current price', 'warning');
+            return;
+        }
+
+        // previous price goes to the history table
+        $this->Logpricechange($recordID, $oldPrice, $newPrice, $remark, $userID, $datetime);
+
+        $this->db->where('idtbl_product', $recordID);
+        $this->db->update('tbl_product', array(
+            'selling_price'=> $newPrice,
+            'updatedatetime'=> $datetime,
+            'updateuser'=> $userID
+        ));
+
+        if($this->db->trans_status() === TRUE){
+            $this->db->trans_commit();
+            $this->Priceresponse(1, 'Selling Price Updated Successfully', 'success');
+        } else {
+            $this->db->trans_rollback();
+            $this->Priceresponse(0, 'Record Error', 'danger');
+        }
+    }
+
+    public function Getpricehistory(){
+        $recordID=$this->input->post('recordID');
+
+        $this->db->select('h.old_selling_price, h.new_selling_price, h.remark, h.insertdatetime, u.name AS username');
+        $this->db->from('tbl_product_price_history h');
+        $this->db->join('tbl_user u', 'u.idtbl_user = h.tbl_user_idtbl_user', 'left');
+        $this->db->where('h.tbl_product_idtbl_product', $recordID);
+        $this->db->where('h.status', 1);
+        $this->db->order_by('h.idtbl_product_price_history', 'DESC');
+
+        echo json_encode($this->db->get()->result());
+    }
+    /* ================================================================== */
+
     /* Saves the extra warranties of a product.
        Old active rows are soft-deleted (status 3), then the submitted rows are inserted again. */
     private function Savewarranties($productID, $userID, $datetime){
@@ -323,6 +431,12 @@ class Productinfo extends CI_Model{
                 'updatedatetime'=> $insertdatetime,
                 'updateuser'=> $userID,
             );
+
+            // selling price changed from the form: keep the old price in the history
+            $oldRow=$this->db->select('selling_price')->where('idtbl_product', $recordID)->get('tbl_product')->row();
+            if($oldRow && round((float)$oldRow->selling_price, 2) != round((float)$selling_price, 2)){
+                $this->Logpricechange($recordID, round((float)$oldRow->selling_price, 2), round((float)$selling_price, 2), 'Changed from product form', $userID, $insertdatetime);
+            }
 
             $this->db->where('idtbl_product', $recordID);
             $this->db->update('tbl_product', $data);

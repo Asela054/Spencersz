@@ -261,8 +261,18 @@ include "include/topnavbar.php";
                         <div class="row">
                             <div class="col-6">
                                 <label class="small font-weight-bold text-dark">Discount*</label>
-                                <input type="text" class="form-control form-control-sm" id="discount" value="0"
-                                    onkeyup="finaltotalcalculate();" required>
+                                <div class="input-group input-group-sm">
+                                    <div class="input-group-prepend">
+                                        <select class="form-control form-control-sm" id="discount_type" name="discount_type"
+                                            style="width:75px;" onchange="finaltotalcalculate();">
+                                            <option value="1">Rs.</option>
+                                            <option value="2">%</option>
+                                        </select>
+                                    </div>
+                                    <input type="text" class="form-control form-control-sm" id="discount" value="0"
+                                        onkeyup="finaltotalcalculate();" required>
+                                </div>
+                                <small class="text-muted">Discount amount: Rs. <span id="discountamountlabel" class="font-weight-bold">0.00</span></small>
                             </div>
                             <div class="col-6">
                                 <label class="small font-weight-bold text-dark">Sub Total </label>
@@ -622,6 +632,8 @@ $(document).ready(function() {
 });
 
 $(document).ready(function() {
+
+    $('#vat_type').on('change', finaltotalcalculate);
 
     $('#supplier').select2({
         dropdownParent: $('#staticBackdrop'),
@@ -2082,6 +2094,7 @@ $(document).ready(function() {
             var invoice = $('#invoice').val();
             var vat_type = $('#vat_type').val();
             var discount = $('#discount').val();
+            var discount_type = $('#discount_type').val();  
             var vat = $('#vat').val();
             var subtotal = $('#hiddenfulltotal').val();
             var branch_id = $('#f_branch_id').val();
@@ -2114,6 +2127,7 @@ $(document).ready(function() {
                         batchno: batchno,
                         supplier: supplier,
                         discount: discount,
+                        discount_type: discount_type,
                         vat: vat,
                         company_id: company_id,
                         branch_id: branch_id,
@@ -2257,7 +2271,7 @@ $(document).ready(function() {
                         .idtbl_product +
                         '">';
                     html1 += obj[i].product_name + ' / ' + obj[i]
-                        .product_code;
+                        .model_no;
                     html1 += '</option>';
                 });
                 $('#product').empty().append(html1);
@@ -2380,19 +2394,20 @@ function delete_confirm() {
 
 function finaltotalcalculate() {
     var vat = parseFloat($("#vat").val()) || 0;
-    var discount = parseFloat($("#discount").val()) || 0;
+    var discountInput = parseFloat($("#discount").val()) || 0;
+    var discountType = $("#discount_type").val();      // 1 = amount, 2 = percent
     var total = parseFloat($("#hidetotalorder").val()) || 0;
     var vatType = $("#vat_type").val();
 
-    if (isNaN(discount)) {
-        discount = 0;
-        $("#discount").val(0);
+    if (discountType === "2" && discountInput > 100) {
+        discountInput = 100;
+        $("#discount").val(100);
     }
 
-    if (isNaN(vat)) {
-        vat = 0;
-        $("#vat").val(0);
-    }
+    // discount always ends up as an amount
+    var discount = (discountType === "2") ? (total * discountInput) / 100 : discountInput;
+    discount = Math.round(discount * 100) / 100;
+    $('#discountamountlabel').text(addCommas(discount.toFixed(2)));
 
     var subTotal = total - discount;
     $('#hiddenfulltotal').val(subTotal.toFixed(2));
@@ -2400,11 +2415,11 @@ function finaltotalcalculate() {
     var vatAmount = 0;
     var finalTotal;
 
-    if (vatType === "1") { 
+    if (vatType === "1") {
         vatAmount = (subTotal * vat) / 100;
         $('#vatamount').val(vatAmount.toFixed(2));
         finalTotal = subTotal + vatAmount;
-    } else { 
+    } else {
         $('#vatamount').val("0.00");
         finalTotal = subTotal;
     }

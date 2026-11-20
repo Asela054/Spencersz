@@ -59,7 +59,7 @@
 	}
 
 	public function searchProducts($term) {
-		$this->db->select('tbl_product.idtbl_product AS id, tbl_product.product_code, tbl_product.product_name');
+		$this->db->select('tbl_product.idtbl_product AS id, tbl_product.model_no, tbl_product.product_name');
 		$this->db->from('tbl_product');
 		$this->db->where('tbl_product.status', 1);
 		if ($term !== '') {
@@ -76,7 +76,7 @@
 
 		$data = array();
 		foreach ($query->result() as $row) {
-			$data[] = array("id" => $row->id, "text" => $row->product_name.' ('.$row->product_code.')');
+			$data[] = array("id" => $row->id, "text" => $row->product_name.' ('.$row->model_no.')');
 		}
 		return $data;
 	}
