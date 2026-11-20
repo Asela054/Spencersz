@@ -35,12 +35,24 @@
 									</select>
 								</div>
 								<div class="grow">
+									<label for="supplier">Supplier</label>
+									<select class="form-control form-control-sm selecter2 px-0" name="supplier" id="supplier">
+										<option value="0" selected>All suppliers</option>
+										<?php foreach ($getsupplier->result() as $rowgetsupplier) { ?>
+										<option value="<?php echo $rowgetsupplier->idtbl_supplier ?>"><?php echo $rowgetsupplier->suppliername ?></option>
+										<?php } ?>
+									</select>
+								</div>
+								<div class="grow">
 									<label for="quicksearch">Filter results</label>
 									<input type="text" id="quicksearch" class="form-control form-control-sm" placeholder="Product, code, batch or warehouse" disabled>
 								</div>
 								<div class="sr-actions">
 									<button type="submit" id="submitBtnStock" class="btn btn-brand btn-sm px-4" <?php if($addcheck==0){echo 'disabled';} ?>>
 										<i class="fas fa-search mr-1"></i>Search
+									</button>
+									<button type="button" id="btnExcel" class="btn btn-ghost btn-sm px-3" onclick="exportToExcel()" disabled>
+										<i class="fas fa-file-excel mr-1 text-success"></i>Export Excel
 									</button>
 									<button type="button" id="btnPdf" class="btn btn-ghost btn-sm px-3" onclick="exportToPDF()" disabled>
 										<i class="fas fa-file-pdf mr-1 text-danger"></i>Export PDF
@@ -94,7 +106,7 @@ $(document).ready(function () {
         $.ajax({
             type: "POST",
             url: "<?php echo base_url(); ?>Report/stockReport",
-            data: { category: $("#category").val() },
+            data: { category: $("#category").val(), supplier: $("#supplier").val() },
             success: function (result) {
                 var dataArray = JSON.parse(result);
                 reportGroups = {};
@@ -138,11 +150,16 @@ $(document).ready(function () {
     $("#searchStock").submit();   // load all on open
 });
 
+function supplierLabel() {
+    var v = $('#supplier').val();
+    return (v && v !== '0') ? $('#supplier option:selected').text() : 'All suppliers';
+}
+
 function renderReport() {
     var names = Object.keys(reportGroups).sort();
     var hasData = names.length > 0;
 
-    $('#quicksearch, #btnPdf, #btnPrint').prop('disabled', !hasData);
+    $('#quicksearch, #btnExcel, #btnPdf, #btnPrint').prop('disabled', !hasData);
 
     if (!hasData) {
         $('#summary').empty();
@@ -210,6 +227,39 @@ function generateTable(type, items) {
     '</div>';
 }
 
+function exportToExcel() {
+    var names = Object.keys(reportGroups).sort();
+    if (!names.length) { return; }
+    if (typeof XLSX === 'undefined') { alert('Excel library is not loaded.'); return; }
+
+    var aoa = [
+        ['Stock Category Wise Report'],
+        ['Supplier: ' + supplierLabel()],
+        [],
+        ['Category', 'Product code', 'Product', 'Supplier', 'Batch no', 'Warehouse', 'Quantity', 'UOM', 'Cost price', 'Total']
+    ];
+    var tq = 0, tv = 0;
+
+    names.forEach(function (name) {
+        var gq = 0, gt = 0;
+        reportGroups[name].forEach(function (it) {
+            var q = parseFloat(it.qty) || 0, p = parseFloat(it.unitprice) || 0;
+            gq += q; gt += q * p;
+            aoa.push([name, it.product_code || '', it.product_name || '', it.supplier_name || '',
+                      it.batchno || '', it.wh_name || '', q, it.measure_type || '', p, q * p]);
+        });
+        aoa.push([name + ' total', '', '', '', '', '', gq, '', '', gt]);
+        tq += gq; tv += gt;
+    });
+    aoa.push(['Grand total', '', '', '', '', '', tq, '', '', tv]);
+
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:22},{wch:14},{wch:32},{wch:24},{wch:14},{wch:16},{wch:10},{wch:8},{wch:12},{wch:14}];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock by Category');
+    XLSX.writeFile(wb, 'stock_category_report.xlsx');
+}
+
 function exportToPDF() {
     var names = Object.keys(reportGroups).sort();
     if (!names.length) { return; }
@@ -222,7 +272,7 @@ function exportToPDF() {
     doc.text('Stock Category Wise Report', 40, 40);
     doc.setFontSize(9);
     doc.setTextColor(110);
-    doc.text('Generated: ' + new Date().toLocaleString(), 40, 56);
+    doc.text('Generated: ' + new Date().toLocaleString() + '   |   Supplier: ' + supplierLabel(), 40, 56);
     doc.text('Total stock value: Rs. ' + fmt(reportTotals.value), pageW - 40, 56, { align: 'right' });
     doc.setTextColor(0);
 
@@ -259,5 +309,6 @@ function exportToPDF() {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.24/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <?php include "include/footer.php"; ?>

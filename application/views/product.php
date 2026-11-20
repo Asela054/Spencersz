@@ -340,6 +340,79 @@ include "include/topnavbar.php";
 		<?php include "include/footerbar.php"; ?>
     </div>
 </div>
+<!-- Update selling price modal -->
+<div class="modal fade" id="pricemodal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-tags mr-2"></i>Update Selling Price</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="pricerecordid">
+                <div class="form-group mb-1">
+                    <label class="small font-weight-bold">Product</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="priceproduct" readonly>
+                </div>
+                <div class="form-row mb-1">
+                    <div class="col-6">
+                        <label class="small font-weight-bold">Cost Price</label>
+                        <input type="text" class="form-control form-control-sm bg-light text-right" id="pricecost" readonly>
+                    </div>
+                    <div class="col-6">
+                        <label class="small font-weight-bold">Current Selling</label>
+                        <input type="text" class="form-control form-control-sm bg-light text-right" id="priceold" readonly>
+                    </div>
+                </div>
+                <div class="form-group mb-1">
+                    <label class="small font-weight-bold">New Selling Price*</label>
+                    <input type="number" class="form-control form-control-sm text-right" id="pricenew" step="0.01" min="0">
+                </div>
+                <div class="form-group mb-1">
+                    <label class="small font-weight-bold">Remark</label>
+                    <textarea class="form-control form-control-sm" id="priceremark" rows="2" maxlength="255"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnsaveprice" class="btn btn-primary btn-sm px-4">
+                    <i class="far fa-save"></i>&nbsp;Update Price</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Price history modal -->
+<div class="modal fade" id="pricehistorymodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-history mr-2"></i>Selling Price History</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-sm small" id="tablepricehistory">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th class="text-right">Old Price</th>
+                                <th class="text-right">New Price</th>
+                                <th class="text-right">Change</th>
+                                <th>Remark</th>
+                                <th>Updated By</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 <script>
     $(document).ready(function() {
@@ -585,6 +658,8 @@ include "include/topnavbar.php";
                     "render": function(data, type, full) {
                         var button='';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Edit" class="btn btn-primary btn-sm btnEdit mr-1 ';if(editcheck!=1){button+='d-none';}button+='" id="'+full['idtbl_product']+'"><i class="fas fa-pen"></i></button>';
+                        button+='<button data-toggle="tooltip" data-placement="bottom" title="Update Selling Price" class="btn btn-info btn-sm btnPrice mr-1 ';if(editcheck!=1){button+='d-none';}button+='" data-id="'+full['idtbl_product']+'"><i class="fas fa-tags"></i></button>';
+                        button+='<button data-toggle="tooltip" data-placement="bottom" title="Price History" class="btn btn-dark btn-sm btnPriceHistory mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-history"></i></button>';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Print Barcode" class="btn btn-secondary btn-sm btnBarcode mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-barcode"></i></button>';
                         if(full['status']==1){
                             button+='<a href="<?php echo base_url() ?>Product/Productstatus/'+full['idtbl_product']+'/2"  data-toggle="tooltip" data-placement="bottom" title="Active" onclick="return deactive_confirm()" target="_self" class="btn btn-success btn-sm mr-1 ';if(statuscheck!=1){button+='d-none';}button+='"><i class="fas fa-check"></i></a>';
@@ -663,6 +738,109 @@ include "include/topnavbar.php";
             if (qty > 0) {
                 window.open('<?php echo base_url() ?>Product/Barcodeprint/' + $(this).data('id') + '/' + qty, '_blank');
             }
+        });
+
+                // ---------- Selling price update + history ----------
+        function fmtPrice(v){
+            return (parseFloat(v) || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        function escHtml(s){
+            return $('<div>').text(s == null ? '' : s).html();
+        }
+
+        $('#tblproduct tbody').on('click', '.btnPrice', function() {
+            var id = $(this).data('id');
+            $.ajax({
+                type: "POST",
+                data: { recordID: id },
+                url: '<?php echo base_url() ?>Product/Getproductprice',
+                success: function(result) {
+                    var obj = JSON.parse(result);
+                    if(!obj.idtbl_product){
+                        Swal.fire({ icon: 'error', title: 'Product not found' });
+                        return;
+                    }
+                    $('#pricerecordid').val(obj.idtbl_product);
+                    $('#priceproduct').val(obj.product_code + ' / ' + obj.product_name);
+                    $('#pricecost').val(fmtPrice(obj.cost_price));
+                    $('#priceold').val(fmtPrice(obj.selling_price));
+                    $('#pricenew').val(parseFloat(obj.selling_price));
+                    $('#priceremark').val('');
+                    $('#pricemodal').off('shown.bs.modal').on('shown.bs.modal', function(){
+                        $('#pricenew').focus().select();
+                    });
+                    $('#pricemodal').modal('show');
+                }
+            });
+        });
+
+        $('#btnsaveprice').on('click', function() {
+            var newPrice = $.trim($('#pricenew').val());
+            if(newPrice === '' || isNaN(newPrice) || parseFloat(newPrice) < 0){
+                Swal.fire({ icon: 'warning', title: 'Invalid price', text: 'Enter a valid selling price.' });
+                return;
+            }
+
+            var $btn = $(this).prop('disabled', true);
+            $.ajax({
+                type: "POST",
+                data: {
+                    recordID: $('#pricerecordid').val(),
+                    new_selling_price: newPrice,
+                    remark: $('#priceremark').val()
+                },
+                url: '<?php echo base_url() ?>Product/Productpriceupdate',
+                success: function(result) {
+                    $btn.prop('disabled', false);
+                    var obj = JSON.parse(result);
+                    var act = JSON.parse(obj.action);
+
+                    if(obj.status == 1){
+                        $('#pricemodal').modal('hide');
+                        $('#tblproduct').DataTable().ajax.reload(null, false);
+                        Swal.fire({ icon: 'success', title: act.message, showConfirmButton: false, timer: 2000 });
+                    } else {
+                        Swal.fire({ icon: act.type == 'warning' ? 'warning' : 'error', title: act.message });
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false);
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong. Please try again later.' });
+                }
+            });
+        });
+
+        $('#tblproduct tbody').on('click', '.btnPriceHistory', function() {
+            var id = $(this).data('id');
+            $.ajax({
+                type: "POST",
+                data: { recordID: id },
+                url: '<?php echo base_url() ?>Product/Getpricehistory',
+                success: function(result) {
+                    var rows = JSON.parse(result);
+                    var tbody = $('#tablepricehistory tbody').empty();
+
+                    if(!rows.length){
+                        tbody.append('<tr><td colspan="6" class="text-center">No price changes yet</td></tr>');
+                    }
+
+                    $.each(rows, function(i, r){
+                        var diff = (parseFloat(r.new_selling_price) || 0) - (parseFloat(r.old_selling_price) || 0);
+                        var cls = diff > 0 ? 'text-success' : 'text-danger';
+                        var sign = diff > 0 ? '+' : '';
+                        tbody.append('<tr>' +
+                            '<td>' + escHtml(r.insertdatetime) + '</td>' +
+                            '<td class="text-right">' + fmtPrice(r.old_selling_price) + '</td>' +
+                            '<td class="text-right font-weight-bold">' + fmtPrice(r.new_selling_price) + '</td>' +
+                            '<td class="text-right ' + cls + '">' + sign + fmtPrice(diff) + '</td>' +
+                            '<td>' + escHtml(r.remark) + '</td>' +
+                            '<td>' + escHtml(r.username) + '</td>' +
+                            '</tr>');
+                    });
+
+                    $('#pricehistorymodal').modal('show');
+                }
+            });
         });
     });
 

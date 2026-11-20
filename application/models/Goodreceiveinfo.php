@@ -145,6 +145,7 @@
 		$batchno=$this->input->post('batchno');
 		$invoice=$this->input->post('invoice');
 		$discount=$this->input->post('discount');
+		$discount_type = $this->input->post('discount_type');  
 		$vat_type=$this->input->post('vat_type');
 		$subtotal=$this->input->post('subtotal');
 		$vat=$this->input->post('vat');
@@ -221,7 +222,25 @@
 		}
 
 		// header totals from the lines (same formula as finaltotalcalculate() on the screen)
-		$discount  = floatval($discount);
+		$discountinput = floatval($discount);
+
+		if ($discount_type == 2) {
+			if ($discountinput < 0 || $discountinput > 100) {
+				$this->db->trans_rollback();
+				$actionObj = new stdClass();
+				$actionObj->icon = 'fas fa-exclamation-triangle';
+				$actionObj->title = '';
+				$actionObj->message = 'Discount percentage must be between 0 and 100';
+				$actionObj->url = '';
+				$actionObj->target = '_blank';
+				$actionObj->type = 'danger';
+				echo json_encode(array('status' => 0, 'action' => json_encode($actionObj)));
+				return;
+			}
+			$discount = round(($linesum * $discountinput) / 100, 2);   // percent -> amount
+		} else {
+			$discount = $discountinput;                                 // already an amount
+		}
 		$vat       = floatval($vat);
 		$subtotal  = round($linesum - $discount, 2);
 		$vatamount = ($vat_type == 1) ? round(($subtotal * $vat) / 100, 2) : 0;
@@ -416,12 +435,12 @@
 
 		$html .= '
 			<tr>
-				<td width="80%" style="text-align: right; font-weight: bold;">Discount</td>
-				<td width="20%" style="text-align: right; font-weight: bold;">Rs. ' . number_format(($respond->row(0)->discountcost), 2) . '</td>
-			</tr>
-			<tr>
 				<td width="80%" style="text-align: right; font-weight: bold;">Sub Total</td>
 				<td width="20%" style="text-align: right; font-weight: bold;">Rs. ' . number_format(($respond->row(0)->subtotalcost), 2) . '</td>
+			</tr>
+			<tr>
+				<td width="80%" style="text-align: right; font-weight: bold;">Discount</td>
+				<td width="20%" style="text-align: right; font-weight: bold;">Rs. ' . number_format(($respond->row(0)->discountcost), 2) . '</td>
 			</tr>
 			<tr>
 				<td width="80%" style="text-align: right; font-weight: bold;">Vat (' . floatval($respond->row(0)->vat) . '%)</td>

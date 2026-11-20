@@ -9,6 +9,7 @@ class Report extends CI_Controller {
 		$this->load->model('Commeninfo');
 		$result['menuaccess']=$this->Commeninfo->Getmenuprivilege();
 		$result['getcategory']=$this->Reportinfo->Categoryget();
+		$result['getsupplier'] = $this->Reportinfo->Supplierget();
 		$this->load->view('report', $result);
 	}
 
