@@ -42,6 +42,7 @@ class PdfGRNinfo extends CI_Model {
             COALESCE(tbl_grn.discount, 0) AS discount,
             COALESCE(tbl_grn.remark, '') AS remark,
             COALESCE(tbl_grndetail.qty, 0) AS qty,
+            COALESCE(tbl_grndetail.free_qty, 0) AS free_qty,
             COALESCE(tbl_grndetail.costunitprice, 0) AS costunitprice,
             COALESCE(tbl_category.idtbl_category, 0) AS idtbl_category,
             COALESCE(tbl_grndetail.comment, '') AS comment,
@@ -95,6 +96,11 @@ class PdfGRNinfo extends CI_Model {
         $totalSum  = $q->grn_subtotal;
         $grn_total = $q->grn_total;
         $grn_vat   = $q->vatamount;
+
+        // Sub Total printed before the GRN discount (subtotalcost in the database is already after the discount),
+        // so Sub Total - Discount = Total on the paper
+        $grn_discount = (float)$q->discount;
+        $grn_gross    = (float)$q->grn_subtotal + $grn_discount;
 
         $this->db->select('tbl_company.company AS companyname,tbl_company.address1 As companyaddress,tbl_company.mobile AS companymobile, tbl_company.phone companyphone,tbl_company.email AS companyemail, tbl_company_branch.branch AS branchname');
         $this->db->from('tbl_grn');
@@ -157,18 +163,24 @@ class PdfGRNinfo extends CI_Model {
                 $desc  = ($r->idtbl_category == 4) ? $r->comment : $r->product_name;
                 $price = !empty($r->unitprice) ? $r->unitprice : $r->costunitprice;
 
+                // received qty, with the free item qty in brackets e.g. 11 (1)
+                $free   = (float)$r->free_qty;
+                $qtyTxt = $this->lq_e((float)$r->qty) . ($free > 0 ? ' (' . $this->lq_e($free) . ')' : '');
+
                 $p .= $this->at(119,  $y, 124, $this->rowH, $this->lq_e($r->product_code));                         // Stock Code
                 $p .= $this->at(257,  $y, 100, $this->rowH, $this->lq_e($r->model_no));                             // Model No.
                 $p .= $this->at(372,  $y, 438, $this->rowH, $this->lq_e($desc));                                    // Description
-                $p .= $this->at(816,  $y, 95,  $this->rowH, $this->lq_e((float)$r->qty), 'center');                 // Qty.
+                $p .= $this->at(816,  $y, 95,  $this->rowH, $qtyTxt, 'center', false, (strlen($qtyTxt) > 8) ? 7 : null); // Qty. (free)
                 $p .= $this->at(911,  $y, 137, $this->rowH, number_format((float)$price, 2), 'right');              // Unit Price
                 $p .= $this->at(1058, $y, 205, $this->rowH, number_format((float)$r->total, 2), 'right');           // Total
             }
 
             // ---------- totals / continued (bottom of the grid) ----------
             if ($isLast) {
-                // $p .= $this->at(911, $this->totalsY,      137, 22, 'Sub Total', 'right');
-                // $p .= $this->at(1058, $this->totalsY,     205, 22, number_format((float)$totalSum, 2), 'right');
+                $p .= $this->at(911, $this->totalsY,       137, 22, 'Sub Total', 'right');
+                $p .= $this->at(1058, $this->totalsY,      205, 22, number_format($grn_gross, 2), 'right');
+                $p .= $this->at(911, $this->totalsY + 22,  137, 22, 'Discount', 'right');
+                $p .= $this->at(1058, $this->totalsY + 22, 205, 22, number_format($grn_discount, 2), 'right');
                 // $p .= $this->at(911, $this->totalsY + 22, 137, 22, 'VAT', 'right');
                 // $p .= $this->at(1058, $this->totalsY + 22, 205, 22, number_format((float)$grn_vat, 2), 'right');
                 $p .= $this->at(911, $this->totalsY + 44, 137, 22, 'Total', 'right', true);

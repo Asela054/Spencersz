@@ -125,7 +125,9 @@ include "include/topnavbar.php";
             3: { label: 'Returned by Customer', short: 'Customer Return', color: '#17a2b8', icon: 'fa-undo' },
             4: { label: 'Returned to Supplier', short: 'Supplier Return', color: '#fd7e14', icon: 'fa-truck' },
             5: { label: 'Damaged',              short: 'Damaged',         color: '#dc3545', icon: 'fa-exclamation-triangle' },
-            6: { label: 'Transfer',             short: 'Transfer',        color: '#6f42c1', icon: 'fa-exchange-alt' }
+            6: { label: 'Transfer',             short: 'Transfer',        color: '#6f42c1', icon: 'fa-exchange-alt' },
+            10: { label: 'Adjustment (+)', short: 'Adj +', color: '#20c997', icon: 'fa-plus-circle' },
+            11: { label: 'Adjustment (-)', short: 'Adj -', color: '#e83e8c', icon: 'fa-minus-circle' }
         };
 
         var STATUS = {
