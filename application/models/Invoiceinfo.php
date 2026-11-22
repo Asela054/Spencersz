@@ -399,11 +399,6 @@ class Invoiceinfo extends CI_Model{
                 if ($serial && $serial->idtbl_product_serial) {
                     if (isset($usedSerial[$serial->idtbl_product_serial])) throw new RuntimeException('Serial added twice: ' . $serial->serialno);
                     $usedSerial[$serial->idtbl_product_serial] = true;
-                }
-
-                if ($serial && $serial->idtbl_product_serial) {
-                    if (isset($usedSerial[$serial->idtbl_product_serial])) throw new RuntimeException('Serial added twice: ' . $serial->serialno);
-                    $usedSerial[$serial->idtbl_product_serial] = true;
                     if ($sn === '' && !$isQuote) {
                         if (!isset($serialLines[$p->idtbl_product])) $serialLines[$p->idtbl_product] = ['n' => 0, 'name' => $p->product_name];
                         $serialLines[$p->idtbl_product]['n']++;
