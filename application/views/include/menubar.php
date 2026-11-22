@@ -68,14 +68,14 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			</a>
 
 			<!-- Product Menu New Added -->
-			<?php if(in_array("Product", $permissionallowed) || in_array("Category", $permissionallowed) || in_array("Brand", $permissionallowed) || in_array("Unit", $permissionallowed) || in_array("Productserial", $permissionallowed)){ ?>
+			<?php if(in_array("Product", $permissionallowed) || in_array("Category", $permissionallowed) || in_array("Brand", $permissionallowed) || in_array("Unit", $permissionallowed) || in_array("Productserial", $permissionallowed) || in_array("Combo", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
 				data-target="#collapseproduct" aria-expanded="false" aria-controls="collapseproduct">
 				<div class="nav-link-icon"><i class="fas fa-boxes"></i></div>
 				<span>Product</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Product" || $functionmenu=="Category" || $functionmenu=="Brand" || $functionmenu=="Unit" || $functionmenu=="Productserial"){echo 'show';} ?>"
+			<div class="collapse <?php if($functionmenu=="Product" || $functionmenu=="Category" || $functionmenu=="Brand" || $functionmenu=="Unit" || $functionmenu=="Productserial" || $functionmenu=="Combo"){echo 'show';} ?>"
 				id="collapseproduct" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion">
 					<?php if(in_array("Category", $permissionallowed)){ ?>
@@ -86,6 +86,8 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<a class="nav-link" href="<?php echo base_url().'Unit'; ?>">Unit</a>
 					<?php } if(in_array("Product", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Product'; ?>">Product</a>
+					<?php } if(in_array("Combo", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Combo'; ?>">Combo Pack</a>
 					<?php } if(in_array("Productserial", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Productserial'; ?>">Product Serial</a>
 					<?php } ?>
@@ -187,6 +189,14 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } ?>
 				</nav>
 			</div>
+			<?php } ?>
+
+			<!-- Stock Adjustment -->
+			<?php if(in_array("Stockadjustment", $permissionallowed)){ ?>
+			<a class="nav-link" href="<?php echo base_url().'Stockadjustment'; ?>">
+				<div class="nav-link-icon"><i class="fas fa-sliders-h"></i></div>
+				<span>Stock Adjustment</span>
+			</a>
 			<?php } ?>
 
 			<!-- Stock Transfer Menu New Added -->
