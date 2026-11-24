@@ -134,9 +134,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Purchaseorder", $permissionallowed)){ ?>
 					<a class="nav-link"
 						href="<?php echo base_url().'Purchaseorder'; ?>">Purchase Order</a>
-					<?php } if(in_array("ServicePurchaseOrder", $permissionallowed)){ ?>
-					<!-- <a class="nav-link"
-						href="<?php echo base_url().'ServicePurchaseOrder'; ?>">Service Purchase Order</a> -->
 					<?php } ?>
 				</nav>
 			</div>
@@ -183,9 +180,6 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<?php } if(in_array("Allstockview", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Allstockview'; ?>">All
 						Stock View</a>
-					<!-- <?php } if(in_array("IssueMaterials", $permissionallowed)){ ?>
-					<a class="nav-link" href="<?php echo base_url().'IssueMaterials'; ?>">Issue
-						Materials</a> -->
 					<?php } ?>
 				</nav>
 			</div>
@@ -224,13 +218,13 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 			<?php } ?>
 
 			<!-- Invoice Menu New Added -->
-			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed) || in_array("Giftvoucher", $permissionallowed) || in_array("Invoicelist", $permissionallowed) || in_array("Repair", $permissionallowed)){ ?>
+			<?php if(in_array("Dispatchnote", $permissionallowed) || in_array("Invoice", $permissionallowed) || in_array("Deletedinvoice", $permissionallowed) || in_array("Canceledinvoice", $permissionallowed) || in_array("Creditnote", $permissionallowed) || in_array("Giftvoucher", $permissionallowed) || in_array("Invoicelist", $permissionallowed) || in_array("Repair", $permissionallowed) || in_array("Pendingdelivery", $permissionallowed)){ ?>
 			<a class="nav-link collapsed" href="javascript:void(0);" data-toggle="collapse"
 				data-target="#collapsInvoice" aria-expanded="false" aria-controls="collapsInvoice">
 				<div class="nav-link-icon"><i class="fa fa-file-invoice"></i></div><span>Invoice</span>
 				<div class="sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
 			</a>
-			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote" || $functionmenu=="Giftvoucher" || $functionmenu2=="Invoicelist" || $functionmenu=="Repair"){echo 'show';} ?>"
+			<div class="collapse <?php if($functionmenu=="Dispatchnote" || $functionmenu=="Invoice" || $functionmenu=="Deletedinvoice" || $functionmenu=="Canceledinvoice" || $functionmenu=="Creditnote" || $functionmenu=="Giftvoucher" || $functionmenu2=="Invoicelist" || $functionmenu=="Repair" || $functionmenu=="Pendingdelivery"){echo 'show';} ?>"
 				id="collapsInvoice" data-parent="#accordionSidenav">
 				<nav class="sidenav-menu-nested nav accordion" id="accordionSidenavPages">
 					<?php if(in_array("Dispatchnote", $permissionallowed)){ ?>
@@ -240,6 +234,8 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 					<a class="nav-link" href="<?php echo base_url().'Invoice'; ?>">Invoice </a>
 					<?php } if(in_array("Invoicelist", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Invoice/Invoicelist'; ?>">Invoice List</a>
+					<?php } if(in_array("Pendingdelivery", $permissionallowed)){ ?>
+					<a class="nav-link" href="<?php echo base_url().'Pendingdelivery'; ?>">Pending Deliveries</a>
 					<?php } if(in_array("Creditnote", $permissionallowed)){ ?>
 					<a class="nav-link" href="<?php echo base_url().'Creditnote'; ?>">Credit Note</a>
 					<?php } if(in_array("Giftvoucher", $permissionallowed)){ ?>
@@ -351,6 +347,27 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 				<span>Serial Number Movement</span>
 			</a>
 			<?php } ?>
+
+            <?php if(in_array("Employee", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Employee">
+                <div class="nav-link-icon"><i class="fas fa-users"></i></div>
+                <span>Employee Information</span>
+            </a>
+            <?php } ?>
+
+            <?php if(in_array("Dayend", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Dayend">
+                <div class="nav-link-icon"><i class="far fa-calendar-check"></i></div>
+                <span>Day End</span>
+            </a>
+            <?php } ?>
+
+            <?php if(in_array("Cashbalance", $permissionallowed)){ ?>
+            <a class="nav-link" href="<?php echo base_url(); ?>Cashbalance">
+                <div class="nav-link-icon"><i class="fas fa-hand-holding-usd"></i></div>
+                <span>Cash Balance</span>
+            </a>
+            <?php } ?>
 
 			<!-- Company Menu New Added -->
 			<?php if(in_array("Company", $permissionallowed) || in_array("Companybranch", $permissionallowed)){ ?>

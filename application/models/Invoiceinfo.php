@@ -7,9 +7,18 @@ class Invoiceinfo extends CI_Model{
     private $printOffY = 0;   // shift the printing down (+) / up (-), in points
 
     const FIFO_PERMISSION = 'invoice-approve'; 
+    const DISCOUNT_PERMISSION = 'invoice-approve';
+    const ITEMDISC_PERMISSION = 'invoice-approve';
     const FIFO_GUARD      = 'web-erp';
     const FIFO_TOKEN_MINUTES = 15;
 
+    public function Getemployeelist(){
+        $this->db->select('idtbl_employee, emp_no, full_name');
+        $this->db->from('tbl_employee');
+        $this->db->where('status', 1);
+        $this->db->order_by('full_name');
+        return $this->db->get()->result();
+    }
     public function SubmitNewCustomer(){
         try{
             $this->db->trans_begin();
@@ -96,61 +105,124 @@ class Invoiceinfo extends CI_Model{
 
         echo json_encode($response);
     }
+    // public function Getproductdetails(){
+    //     $productbarcordname = trim((string)$this->input->post('productbarcordname'));
+
+    //     // $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months');
+    //     $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months, discount_percent, discount_start, discount_end');
+    //     $this->db->from('tbl_product');
+    //     $this->db->where('status', 1);
+    //     $this->db->group_start();
+    //         $this->db->where('product_code', $productbarcordname);
+    //         $this->db->or_like('product_name', $productbarcordname);
+    //     $this->db->group_end();
+    //     $respond = $this->db->get();
+
+    //     if ($respond->num_rows() > 0) {
+    //         foreach ($respond->result() as $row) {
+    //             $productList[] = array(
+    //                 'idtbl_product' => $row->idtbl_product,
+    //                 'product_code' => $row->product_code,
+    //                 'product_name' => $row->product_name,
+    //                 'model_no' => $row->model_no,
+    //                 'description' => $row->description,
+    //                 'cost_price' => $row->cost_price,
+    //                 'selling_price' => $row->selling_price,
+    //                 'warranty_months' => $row->warranty_months,
+    //                 'discount_percent' => $this->activediscount($row)
+    //             );
+
+    //             // $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
+    //             // $this->db->from('tbl_product_serial');
+    //             // $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
+    //             // $this->db->where('status', 1);
+    //             // $this->db->where_in('stock_status', array(1, 5, 6));
+
+    //             $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
+    //             $this->db->from('tbl_product_serial ps');
+    //             $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
+    //             $this->db->where('ps.tbl_product_idtbl_product', $row->idtbl_product);
+    //             $this->db->where('ps.status', 1);
+    //             $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
+    //             $this->db->where_in('ps.stock_status', array(1, 5, 6));
+    //             $this->db->order_by('g.grndate');
+    //             $this->db->order_by('g.idtbl_grn');
+    //             $this->db->order_by('ps.idtbl_product_serial');
+
+    //             $serialRespond = $this->db->get();
+    //             $productList[count($productList) - 1]['serials'] = $serialRespond->result();
+    //         }
+    //         echo json_encode(array(
+    //             'status' => 1,
+    //             'products' => $productList
+    //         ));
+    //     } else {
+    //         echo json_encode(array(
+    //             'status' => 0,
+    //             'message' => 'Product not found'
+    //         ));
+    //     }
+    // }
     public function Getproductdetails(){
         $productbarcordname = trim((string)$this->input->post('productbarcordname'));
 
-        $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months');
+        // $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months, discount_percent, discount_start, discount_end');
+        $this->db->select('idtbl_product, product_code, product_name, model_no, description, cost_price, selling_price, warranty_months, has_serial, discount_percent, discount_start, discount_end');
         $this->db->from('tbl_product');
         $this->db->where('status', 1);
         $this->db->group_start();
             $this->db->where('product_code', $productbarcordname);
             $this->db->or_like('product_name', $productbarcordname);
         $this->db->group_end();
-        $respond = $this->db->get();
+        $products = $this->db->get()->result();
 
-        if ($respond->num_rows() > 0) {
-            foreach ($respond->result() as $row) {
-                $productList[] = array(
-                    'idtbl_product' => $row->idtbl_product,
-                    'product_code' => $row->product_code,
-                    'product_name' => $row->product_name,
-                    'model_no' => $row->model_no,
-                    'description' => $row->description,
-                    'cost_price' => $row->cost_price,
-                    'selling_price' => $row->selling_price,
-                    'warranty_months' => $row->warranty_months
-                );
-
-                // $this->db->select('`idtbl_product_serial`, `serialno`, `costunitprice`, `saleprice`, `tbl_product_idtbl_product`');
-                // $this->db->from('tbl_product_serial');
-                // $this->db->where('tbl_product_idtbl_product', $row->idtbl_product);
-                // $this->db->where('status', 1);
-                // $this->db->where_in('stock_status', array(1, 5, 6));
-
-                $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
-                $this->db->from('tbl_product_serial ps');
-                $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
-                $this->db->where('ps.tbl_product_idtbl_product', $row->idtbl_product);
-                $this->db->where('ps.status', 1);
-                $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
-                $this->db->where_in('ps.stock_status', array(1, 5, 6));
-                $this->db->order_by('g.grndate');
-                $this->db->order_by('g.idtbl_grn');
-                $this->db->order_by('ps.idtbl_product_serial');
-
-                $serialRespond = $this->db->get();
-                $productList[count($productList) - 1]['serials'] = $serialRespond->result();
-            }
-            echo json_encode(array(
-                'status' => 1,
-                'products' => $productList
-            ));
-        } else {
-            echo json_encode(array(
-                'status' => 0,
-                'message' => 'Product not found'
-            ));
+        if (empty($products)) {
+            echo json_encode(array('status' => 0, 'message' => 'Product not found'));
+            return;
         }
+
+        // ONE query for the serials of all these products (was: one query per product)
+        $ids = array();
+        foreach ($products as $row) { $ids[] = (int)$row->idtbl_product; }
+
+        $partsByProduct = $this->partwarranties($ids);
+
+        $this->db->select('ps.idtbl_product_serial, ps.serialno, ps.costunitprice, ps.saleprice, ps.tbl_product_idtbl_product, ps.tbl_grn_idtbl_grn AS grn, g.grn_no, g.batchno, g.grndate');
+        $this->db->from('tbl_product_serial ps');
+        $this->db->join('tbl_grn g', 'g.idtbl_grn = ps.tbl_grn_idtbl_grn');
+        $this->db->where_in('ps.tbl_product_idtbl_product', $ids);
+        $this->db->where('ps.status', 1);
+        $this->db->where('ps.tbl_company_branch_idtbl_company_branch', (int)$_SESSION['branch_id']);
+        $this->db->where_in('ps.stock_status', array(1, 5, 6));
+        $this->db->order_by('g.grndate');
+        $this->db->order_by('g.idtbl_grn');
+        $this->db->order_by('ps.idtbl_product_serial');
+        $serialRows = $this->db->get()->result();
+
+        $serialsByProduct = array();
+        foreach ($serialRows as $s) {
+            $serialsByProduct[(int)$s->tbl_product_idtbl_product][] = $s;   // keeps the GRN (FIFO) order
+        }
+
+        $productList = array();
+        foreach ($products as $row) {
+            $productList[] = array(
+                'idtbl_product' => $row->idtbl_product,
+                'product_code' => $row->product_code,
+                'product_name' => $row->product_name,
+                'model_no' => $row->model_no,
+                'description' => $row->description,
+                'cost_price' => $row->cost_price,
+                'selling_price' => $row->selling_price,
+                'warranty_months' => $row->warranty_months,
+                'has_serial' => (int)$row->has_serial,
+                'discount_percent' => $this->activediscount($row),
+                'warranty_parts' => isset($partsByProduct[(int)$row->idtbl_product]) ? $partsByProduct[(int)$row->idtbl_product] : array(),
+                'serials' => isset($serialsByProduct[(int)$row->idtbl_product]) ? $serialsByProduct[(int)$row->idtbl_product] : array()
+            );
+        }
+
+        echo json_encode(array('status' => 1, 'products' => $productList));
     }
     public function CheckGiftVoucher(){
         $code = strtoupper(trim((string)$this->input->post('vouchercode')));
@@ -233,6 +305,8 @@ class Invoiceinfo extends CI_Model{
 
             $fifoTokens = (isset($inv['fifoTokens']) && is_array($inv['fifoTokens'])) ? $inv['fifoTokens'] : [];
             $bypassed   = [];
+            $itemDiscLog    = [];
+            $itemDiscTokens = [];
 
             $userid=$_SESSION['userid'];
             $company_id=$_SESSION['company_id'];
@@ -244,17 +318,45 @@ class Invoiceinfo extends CI_Model{
             $invoiceType = $inv['invoiceType'];
             $isQuote     = ($invoiceType === 'Corporate Quotation');
             $customer_id = !empty($inv['customerId']) ? (int)$inv['customerId'] : null;
+            $sales_rep_id = !empty($inv['salesRepId']) ? (int)$inv['salesRepId'] : null;
             $discount    = max(0, round((float)$inv['discount'], 2));
 
+            // a discount needs the approval of an authorised person
+            $discountToken = isset($inv['discountToken']) ? (string)$inv['discountToken'] : '';
+            $discountOv    = null;
+            if ($discount > 0) {
+                $discountOv = ($discountToken !== '') ? $this->discountoverride($discountToken, $discount) : null;
+                if (!$discountOv) throw new RuntimeException('Discount needs approval from an authorised person.');
+            }
+
+            $this->db->trans_begin();
+            $inTrans = true;
+
             // =============== 1. ITEMS (prices and stock come from the DB) ===============
-            $lines = []; $gross = 0; $reserved = [];
+            $lines = []; $gross = 0; $reserved = []; $usedSerial = []; $serialLines = [];
             foreach ($inv['items'] as $it) {
                 $p = $this->db->where('idtbl_product', (int)$it['id'])->get('tbl_product')->row();
                 if (!$p) throw new RuntimeException('Product not found');
-
+                
                 $serial = null; $qty = max(1, (int)$it['qty']); $stockPrice = 0;
 
-                if (!empty($it['serialId'])) {
+                $sn = isset($it['serialNo']) ? trim((string)$it['serialNo']) : '';
+
+                // PRE-ORDER line: sold now, delivered later (stock / serial / cost are taken at the delivery)
+                $isPre = (!$isQuote && !empty($it['preorder']));
+                $deliveryDate = null;
+                if ($isPre) {
+                    $deliveryDate = isset($it['deliveryDate']) ? trim((string)$it['deliveryDate']) : '';
+                    $dt = DateTime::createFromFormat('Y-m-d', $deliveryDate);
+                    if (!$dt || $dt->format('Y-m-d') !== $deliveryDate || $deliveryDate < $today)
+                        throw new RuntimeException($p->product_name . ': enter the delivery date (today or later)');
+                    if (!$customer_id) throw new RuntimeException('Select the customer for pre-order items');
+                    if ((int)$p->has_serial === 1) $qty = 1;   // serial items: one line per unit, the serial is chosen at the delivery
+                }
+
+                if ($isPre) {
+                    // nothing to take from the stock now
+                } elseif (!empty($it['serialId'])) {
                     $serial = $this->db->where('idtbl_product_serial', (int)$it['serialId'])
                                     ->where('tbl_product_idtbl_product', $p->idtbl_product)
                                     ->where('stock_status', 1)->where('status', 1)
@@ -262,6 +364,10 @@ class Invoiceinfo extends CI_Model{
                                     ->get('tbl_product_serial')->row();
                                     
                     if (!$serial) throw new RuntimeException($p->product_name . ': serial not available');
+                    $qty = 1;
+                } elseif ($sn !== '') {
+                    // TEMPORARY: serial typed by the cashier
+                    $serial = $this->_manual_serial($p, $sn, (float)$p->selling_price, $isQuote, $branch_id, $company_id, $userid, $now);
                     $qty = 1;
                 } else {
                     $batches = $this->db->select('idtbl_stock, qty, saleprice')
@@ -271,19 +377,63 @@ class Invoiceinfo extends CI_Model{
                         ->where('stock_status', 1)->where('status', 1)->where('qty >', 0)
                         ->order_by('idtbl_stock', 'ASC')->get('tbl_stock')->result();
 
+                    // if (!$isQuote) {
+                    //     $avail = 0; foreach ($batches as $b) $avail += (float)$b->qty;
+                    //     $already = isset($reserved[$p->idtbl_product]) ? $reserved[$p->idtbl_product] : 0;
+                    //     if ($avail - $already < $qty)
+                    //         throw new RuntimeException($p->product_name . ': only ' . ($avail - $already) . ' in stock');
+                    //     $reserved[$p->idtbl_product] = $already + $qty;
+                    // }
                     if (!$isQuote) {
                         $avail = 0; foreach ($batches as $b) $avail += (float)$b->qty;
                         $already = isset($reserved[$p->idtbl_product]) ? $reserved[$p->idtbl_product] : 0;
-                        if ($avail - $already < $qty)
-                            throw new RuntimeException($p->product_name . ': only ' . ($avail - $already) . ' in stock');
+                        $pend    = $this->pendingqty($p->idtbl_product, $branch_id);   // reserved for pending deliveries
+                        if ($avail - $pend - $already < $qty)
+                            throw new RuntimeException($p->product_name . ': only ' . max(0, $avail - $pend - $already) . ' available' . ($pend ? ' (' . $pend . ' reserved for pending deliveries)' : ''));
                         $reserved[$p->idtbl_product] = $already + $qty;
                     }
                     $stockPrice = $batches ? (float)$batches[0]->saleprice : 0;
                 }
 
+                // the same serial cannot be on two lines
+                if ($serial && $serial->idtbl_product_serial) {
+                    if (isset($usedSerial[$serial->idtbl_product_serial])) throw new RuntimeException('Serial added twice: ' . $serial->serialno);
+                    $usedSerial[$serial->idtbl_product_serial] = true;
+                    if ($sn === '' && !$isQuote) {
+                        if (!isset($serialLines[$p->idtbl_product])) $serialLines[$p->idtbl_product] = ['n' => 0, 'name' => $p->product_name];
+                        $serialLines[$p->idtbl_product]['n']++;
+                    }
+                }
+
                 if ($serial && (float)$serial->saleprice > 0) $price = (float)$serial->saleprice;
                 elseif ($stockPrice > 0)                      $price = $stockPrice;
-                else                                          $price = (float)$p->sellingprice;   // CHANGE (fallback only)
+                else                                          $price = (float)$p->selling_price;   // CHANGE (fallback only)
+
+                // product discount (the browser price is never trusted, it is calculated here)
+                // $listPrice = $price;
+                // $discPct   = $this->activediscount($p);
+                // if ($discPct > 0) $price = round($listPrice * (1 - $discPct / 100), 2);
+
+                // product discount, then the extra item discount given by an authorised person
+                $listPrice = $price;
+                $discPct   = $this->activediscount($p);
+                if ($discPct > 0) $price = round($listPrice * (1 - $discPct / 100), 2);
+
+                $extraPct = isset($it['extraDisc']) ? round((float)$it['extraDisc'], 2) : 0;
+                if ($extraPct > 0) {
+                    $extraTok = isset($it['extraToken']) ? (string)$it['extraToken'] : '';
+                    $extraOv  = ($extraPct < 100 && $extraTok !== '')
+                              ? $this->itemdiscountoverride($extraTok, (int)$p->idtbl_product, $extraPct) : null;
+                    if (!$extraOv) throw new RuntimeException($p->product_name . ': item discount needs approval from an authorised person.');
+
+                    $before = $price;
+                    $price  = round($before * (1 - $extraPct / 100), 2);
+                    $itemDiscLog[]            = array('pid' => (int)$p->idtbl_product, 'pct' => $extraPct,
+                                                      'amount' => round(($before - $price) * $qty, 2), 'ov' => $extraOv);
+                    $itemDiscTokens[$extraTok] = true;
+                } else {
+                    $extraPct = 0;
+                }
 
                 $total = round($price * $qty, 2);
                 $gross += $total;
@@ -291,16 +441,35 @@ class Invoiceinfo extends CI_Model{
                 $lines[] = [
                     'product_code'    => $p->product_code,        // CHANGE
                     'product_name'    => $p->product_name,        // CHANGE
-                    'serialno'        => $serial ? $serial->serialno : null,
+                    'serialno'        => $serial ? $serial->serialno : '',
                     'warranty_months' => $p->warranty_months,     // CHANGE
+                    'warranty_parts'  => $this->partsjson($p->idtbl_product),
                     'qty'             => $qty,
+                    'is_preorder'     => $isPre ? 1 : 0,
+                    'delivery_status' => $isPre ? 2 : 1,
+                    'delivered_qty'   => $isPre ? 0 : $qty,
+                    'delivery_date'   => $deliveryDate,
                     'unitprice'       => $price,
+                    'list_price'      => $listPrice,
+                    'discount_percent'=> $discPct,
+                    'extra_discount_percent' => $extraPct,
+                    'discount_amount' => round(($listPrice - $price) * $qty, 2),
                     'costunitprice'   => $serial ? (float)$serial->costunitprice : 0,
                     'line_total'      => $total,
                     'tbl_product_idtbl_product'               => $p->idtbl_product,
                     'tbl_product_serial_idtbl_product_serial' => $serial ? $serial->idtbl_product_serial : null,
                     '_grndetail'      => $serial ? $serial->tbl_grndetail_idtbl_grndetail : null,   // removed before insert
+                    '_manual'         => ($sn !== ''),   // removed before insert
                 ];
+            }
+            // serials that are reserved for pending deliveries are not sold to other customers
+            foreach ($serialLines as $pid => $sl) {
+                $free = (int)$this->db->query("SELECT COUNT(*) AS c FROM tbl_product_serial
+                                               WHERE tbl_product_idtbl_product = ? AND status = 1 AND stock_status = 1
+                                               AND tbl_company_branch_idtbl_company_branch = ?", array((int)$pid, $branch_id))->row()->c;
+                $pend = $this->pendingqty($pid, $branch_id);
+                if ($free - $pend < $sl['n'])
+                    throw new RuntimeException($sl['name'] . ': ' . $pend . ' unit(s) are reserved for pending deliveries');
             }
 
             $net = max(0, round($gross - $discount, 2));
@@ -310,7 +479,7 @@ class Invoiceinfo extends CI_Model{
             if (!$isQuote) {
                 $byProduct = [];
                 foreach ($lines as $l) {
-                    if ($l['tbl_product_serial_idtbl_product_serial']) {
+                    if ($l['tbl_product_serial_idtbl_product_serial'] && empty($l['_manual'])) {
                         $byProduct[$l['tbl_product_idtbl_product']][] = (int)$l['tbl_product_serial_idtbl_product_serial'];
                     }
                 }
@@ -411,8 +580,6 @@ class Invoiceinfo extends CI_Model{
             }
 
             // =============== 4. SAVE (all or nothing) ===============
-            $this->db->trans_begin();
-            $inTrans = true;
 
             $branch = $this->db->select('code')->where('idtbl_company_branch', $branch_id)
                    ->get('tbl_company_branch')->row();
@@ -447,7 +614,7 @@ class Invoiceinfo extends CI_Model{
                 'payment_status' => $payStatus, 'status' => 1,
                 'insertdatetime' => $now, 'updateuser' => $userid, 'updatedatetime' => $now,
                 'tbl_user_idtbl_user' => $userid, 'tbl_customer_idtbl_customer' => $customer_id,
-                'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id,
+                'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id, 'salesrepid' => $sales_rep_id
             ]);
             $invoice_id = $this->db->insert_id();
             if (!$invoice_id) throw new Exception('Invoice insert failed');
@@ -466,6 +633,34 @@ class Invoiceinfo extends CI_Model{
                 ]);
             }
 
+            foreach ($itemDiscLog as $d) {
+                $this->db->insert('tbl_discount_approval_log', [
+                    'doc_type'                  => 'INVOICE_ITEM',
+                    'doc_id'                    => $invoice_id,
+                    'tbl_product_idtbl_product' => $d['pid'],
+                    'discount_percent'          => $d['pct'],
+                    'discount_amount'           => $d['amount'],
+                    'approved_by'               => $d['ov']['approved_by'],
+                    'reason'                    => $d['ov']['reason'],
+                    'status'                    => 1,
+                    'insertdatetime'            => $now,
+                    'tbl_user_idtbl_user'       => $userid,
+                ]);
+            }
+
+            if ($discountOv) {
+                $this->db->insert('tbl_discount_approval_log', [
+                    'doc_type'            => 'INVOICE',
+                    'doc_id'              => $invoice_id,
+                    'discount_amount'     => $discount,
+                    'approved_by'         => $discountOv['approved_by'],
+                    'reason'              => $discountOv['reason'],
+                    'status'              => 1,
+                    'insertdatetime'      => $now,
+                    'tbl_user_idtbl_user' => $userid,
+                ]);
+            }
+
             // ----- hold invoice -----
             $hold_id = !empty($inv['holdId']) ? (int)$inv['holdId'] : 0;
             if ($hold_id) {
@@ -477,15 +672,20 @@ class Invoiceinfo extends CI_Model{
                 $this->db->where('idtbl_invoice', $quotation_id)
                         ->update('tbl_invoice', ['converted_invoice_id' => $invoice_id, 'updatedatetime' => $now, 'updateuser' => $userid]);
             }
-
+            
             // ----- invoice lines + serial / stock -----
             foreach ($lines as $l) {
                 $sid       = $l['tbl_product_serial_idtbl_product_serial'];
                 $grnDetail = $l['_grndetail'];
-                unset($l['_grndetail']);
+                unset($l['_grndetail'], $l['_manual']);
 
                 // non-serial: take stock first, the real cost comes from the batches used
-                if (!$isQuote && !$sid) {
+                // if (!$isQuote && !$sid) {
+                //     $l['costunitprice'] = $this->_deduct_stock($l['tbl_product_idtbl_product'], $l['qty'], $branch_id, $userid, $now);
+                // }
+
+                // non-serial: take stock first, the real cost comes from the batches used
+                if (!$isQuote && !$sid && empty($l['is_preorder'])) {
                     $l['costunitprice'] = $this->_deduct_stock($l['tbl_product_idtbl_product'], $l['qty'], $branch_id, $userid, $now);
                 }
 
@@ -493,7 +693,7 @@ class Invoiceinfo extends CI_Model{
                 $l['tbl_user_idtbl_user'] = $userid; $l['tbl_invoice_idtbl_invoice'] = $invoice_id;
                 $this->db->insert('tbl_invoice_detail', $l);
                 $detail_id = $this->db->insert_id();
-
+            
                 if (!$isQuote && $sid) {
                     // 1 (in stock) -> 2 (sold), only if still in stock
                     $this->db->where('idtbl_product_serial', $sid)->where('stock_status', 1)->where('status', 1)
@@ -522,7 +722,7 @@ class Invoiceinfo extends CI_Model{
                             ->update('tbl_stock', ['stock_status' => 2]);
                 }
             }
-
+            
             // ----- payments -----
             $changeLeft = $change;
             foreach ($pays as $x) {
@@ -580,7 +780,7 @@ class Invoiceinfo extends CI_Model{
                 if ($this->db->affected_rows() !== 1)
                     throw new RuntimeException('Credit note was already used');
             }
-
+            
             if ($this->db->trans_status() === FALSE) {
                 $err = $this->db->error();
                 throw new Exception('DB error: ' . $err['code'] . ' ' . $err['message']);
@@ -589,6 +789,8 @@ class Invoiceinfo extends CI_Model{
             $this->db->trans_commit();
             $inTrans = false;
             foreach ($bypassed as $b) { unset($_SESSION['fifo_override'][$b['token']]); }
+            if ($discountToken !== '') { unset($_SESSION['discount_override'][$discountToken]); }
+            foreach (array_keys($itemDiscTokens) as $t) { unset($_SESSION['itemdisc_override'][$t]); }
 
             return $this->_jsonResponse(1, 'fas fa-check-circle', 'Invoice saved', 'success', ['invoice_no' => $invoice_no, 'invoice_id' => $invoice_id]);
 
@@ -848,6 +1050,253 @@ class Invoiceinfo extends CI_Model{
         );
         echo json_encode(array('ok'=>true, 'token'=>$token, 'approver'=>$u->name));
     }
+    /* Approver's username/password + permission check. The token is bound to the discount amount. */
+    public function Discountverify(){
+        $userID   = (int)$_SESSION['userid'];
+        $amount   = round((float)$this->input->post('amount'), 2);
+        $username = trim($this->input->post('username'));
+        $password = (string)$this->input->post('password');
+        $reason   = trim($this->input->post('reason'));
+
+        if($amount<=0){ return $this->_fifoJson(false, 'Invalid discount amount.'); }
+        if($username==='' || $password===''){ return $this->_fifoJson(false, 'Enter the username and password.'); }
+        if($reason===''){ return $this->_fifoJson(false, 'Enter the reason for the discount.'); }
+
+        $u=$this->db->query("SELECT idtbl_user, name, password FROM tbl_user WHERE username = ? AND status = 1", array($username))->row();
+        if(!$u || !password_verify($password, $u->password)){ return $this->_fifoJson(false, 'Invalid username or password.'); }
+
+        // same permission lookup as Fifoignoreverify() (use the table names you use there)
+        $perm=$this->db->query("SELECT 1
+                                FROM tbl_user_has_tbl_roles ur
+                                JOIN tbl_roles r ON r.idtbl_roles = ur.tbl_roles_idtbl_roles AND r.status = 1
+                                JOIN tbl_roles_has_tbl_permissions rp ON rp.tbl_roles_idtbl_roles = r.idtbl_roles
+                                JOIN tbl_permissions p ON p.idtbl_permissions = rp.tbl_permissions_idtbl_permissions
+                                WHERE ur.tbl_user_idtbl_user = ? AND p.permission = ? AND p.guard_name = ?
+                                LIMIT 1", array((int)$u->idtbl_user, self::DISCOUNT_PERMISSION, self::FIFO_GUARD))->row();
+        if(!$perm){ return $this->_fifoJson(false, 'This user does not have permission to approve discounts.'); }
+
+        $token=bin2hex(random_bytes(16));
+        if(!isset($_SESSION['discount_override']) || !is_array($_SESSION['discount_override'])){ $_SESSION['discount_override']=array(); }
+        foreach($_SESSION['discount_override'] as $k => $o){ if($o['expires']<time()){ unset($_SESSION['discount_override'][$k]); } }
+        $_SESSION['discount_override'][$token]=array(
+            'amount'       => $amount,
+            'approved_by'  => (int)$u->idtbl_user,
+            'requested_by' => $userID,
+            'reason'       => $reason,
+            'expires'      => time()+(self::FIFO_TOKEN_MINUTES*60),
+        );
+        echo json_encode(array('ok'=>true, 'token'=>$token, 'approver'=>$u->name));
+    }
+
+    /* approval of an extra discount % for ONE product (the token is bound to the product and the percentage) */
+    public function Itemdiscountverify(){
+        $userID   = (int)$_SESSION['userid'];
+        $pid      = (int)$this->input->post('product_id');
+        $pct      = round((float)$this->input->post('percent'), 2);
+        $username = trim($this->input->post('username'));
+        $password = (string)$this->input->post('password');
+        $reason   = trim($this->input->post('reason'));
+
+        if(!$pid || $pct<=0 || $pct>=100){ return $this->_fifoJson(false, 'Invalid discount percentage.'); }
+        if($reason===''){ return $this->_fifoJson(false, 'Enter the reason for the discount.'); }
+
+        list($u, $err)=$this->approver($username, $password, self::ITEMDISC_PERMISSION);
+        if(!$u){ return $this->_fifoJson(false, $err); }
+
+        $token=bin2hex(random_bytes(16));
+        if(!isset($_SESSION['itemdisc_override']) || !is_array($_SESSION['itemdisc_override'])){ $_SESSION['itemdisc_override']=array(); }
+        foreach($_SESSION['itemdisc_override'] as $k => $o){ if($o['expires']<time()){ unset($_SESSION['itemdisc_override'][$k]); } }
+        $_SESSION['itemdisc_override'][$token]=array(
+            'product_id'   => $pid,
+            'percent'      => $pct,
+            'approved_by'  => (int)$u->idtbl_user,
+            'requested_by' => $userID,
+            'reason'       => $reason,
+            'expires'      => time()+(self::FIFO_TOKEN_MINUTES*60),
+        );
+        echo json_encode(array('ok'=>true, 'token'=>$token, 'approver'=>$u->name));
+    }
+
+    /* ---------- pending deliveries of this branch ---------- */
+    public function Getpending(){
+        $branch=(int)$_SESSION['branch_id'];
+        $rows=$this->db->query("SELECT d.idtbl_invoice_detail AS id, i.idtbl_invoice AS invoice_id, i.invoice_no, i.invoice_date, i.customer_name,
+                                    c.telephone_no AS phone, d.tbl_product_idtbl_product AS product_id, d.product_code, d.product_name,
+                                    p.has_serial, d.qty, d.delivered_qty, (d.qty - d.delivered_qty) AS remaining, d.delivery_date,
+                                    DATEDIFF(d.delivery_date, CURDATE()) AS days_left,
+                                    IF(p.has_serial = 1,
+                                        (SELECT COUNT(*) FROM tbl_product_serial ps WHERE ps.tbl_product_idtbl_product = d.tbl_product_idtbl_product
+                                        AND ps.status = 1 AND ps.stock_status = 1 AND ps.tbl_company_branch_idtbl_company_branch = i.tbl_company_branch_idtbl_company_branch),
+                                        (SELECT COALESCE(SUM(s.qty),0) FROM tbl_stock s WHERE s.tbl_product_idtbl_product = d.tbl_product_idtbl_product
+                                        AND s.tbl_company_branch_idtbl_company_branch = i.tbl_company_branch_idtbl_company_branch AND s.stock_status = 1 AND s.status = 1)
+                                    ) AS in_stock
+                                FROM tbl_invoice_detail d
+                                JOIN tbl_invoice i ON i.idtbl_invoice = d.tbl_invoice_idtbl_invoice
+                                JOIN tbl_product p ON p.idtbl_product = d.tbl_product_idtbl_product
+                                LEFT JOIN tbl_customer c ON c.idtbl_customer = i.tbl_customer_idtbl_customer
+                                WHERE d.is_preorder = 1 AND d.delivery_status = 2 AND d.status = 1 AND i.status = 1
+                                AND i.tbl_company_branch_idtbl_company_branch = ?
+                                ORDER BY d.delivery_date, i.idtbl_invoice, d.idtbl_invoice_detail", array($branch))->result();
+        echo json_encode($rows);
+    }
+
+    /* free serials for a pending serial line, oldest GRN first (FIFO) */
+    public function Getdeliveryserials(){
+        $branch=(int)$_SESSION['branch_id'];
+        $detailID=(int)$this->input->post('detail_id');
+        $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno, g.grn_no, g.batchno, g.grndate
+                                FROM tbl_invoice_detail d
+                                JOIN tbl_invoice i ON i.idtbl_invoice = d.tbl_invoice_idtbl_invoice AND i.tbl_company_branch_idtbl_company_branch = ?
+                                JOIN tbl_product_serial ps ON ps.tbl_product_idtbl_product = d.tbl_product_idtbl_product
+                                    AND ps.status = 1 AND ps.stock_status = 1 AND ps.tbl_company_branch_idtbl_company_branch = ?
+                                JOIN tbl_grn g ON g.idtbl_grn = ps.tbl_grn_idtbl_grn
+                                WHERE d.idtbl_invoice_detail = ? AND d.is_preorder = 1 AND d.delivery_status = 2
+                                AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
+                                                WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
+                                ".$this->transferable()."
+                                ORDER BY g.grndate, g.idtbl_grn, ps.idtbl_product_serial", array($branch, $branch, $detailID))->result();
+        echo json_encode($rows);
+    }
+
+    /* ---------- deliver a pending line (full or part) ---------- */
+    public function Deliverpending(){
+        $userID=(int)$_SESSION['userid'];
+        $company=(int)$_SESSION['company_id'];
+        $branch=(int)$_SESSION['branch_id'];
+        $now=date('Y-m-d H:i:s');
+        $today=date('Y-m-d');
+
+        $inTrans=false;
+        $old_debug=$this->db->db_debug;
+        $this->db->db_debug=FALSE;
+
+        try{
+            $detailID=(int)$this->input->post('detail_id');
+            $date=trim((string)$this->input->post('delivered_date'));
+            $dt=DateTime::createFromFormat('Y-m-d', $date);
+            if(!$dt || $dt->format('Y-m-d')!==$date || $date>$today){ throw new RuntimeException('Enter a valid delivered date (not in the future).'); }
+
+            $this->db->trans_begin();
+            $inTrans=true;
+
+            $d=$this->db->query("SELECT d.*, i.invoice_no, i.invoice_date
+                                FROM tbl_invoice_detail d JOIN tbl_invoice i ON i.idtbl_invoice = d.tbl_invoice_idtbl_invoice
+                                WHERE d.idtbl_invoice_detail = ? AND d.is_preorder = 1 AND d.delivery_status = 2 AND d.status = 1
+                                AND i.status = 1 AND i.tbl_company_branch_idtbl_company_branch = ? FOR UPDATE", array($detailID, $branch))->row();
+            if(!$d){ throw new RuntimeException('Pending line not found (it may already be delivered).'); }
+            if($date<$d->invoice_date){ throw new RuntimeException('Delivered date cannot be before the invoice date ('.$d->invoice_date.').'); }
+
+            $p=$this->db->where('idtbl_product', (int)$d->tbl_product_idtbl_product)->get('tbl_product')->row();
+            $remaining=(int)$d->qty-(int)$d->delivered_qty;
+
+            $sid=null; $qty=1; $cost=0.0; $upd=array();
+
+            if((int)$p->has_serial===1){
+                // ----- serial item: one serial, FIFO -----
+                $ids=array_values(array_unique(array_map('intval', (array)$this->input->post('serial_ids'))));
+                if(count($ids)!==1){ throw new RuntimeException('Select the serial number to deliver.'); }
+                $sid=$ids[0];
+
+                $s=$this->db->where('idtbl_product_serial', $sid)->where('tbl_product_idtbl_product', (int)$p->idtbl_product)
+                            ->where('stock_status', 1)->where('status', 1)->where('tbl_company_branch_idtbl_company_branch', $branch)
+                            ->get('tbl_product_serial')->row();
+                if(!$s){ throw new RuntimeException('This serial is not available in stock.'); }
+
+                $fifo=$this->fifocheck((int)$p->idtbl_product, $branch, array($sid));
+                if($fifo!==true){ throw new RuntimeException($fifo); }
+
+                $this->db->where('idtbl_product_serial', $sid)->where('stock_status', 1)->where('status', 1)
+                        ->update('tbl_product_serial', array('stock_status'=>2, 'sold_invoice_id'=>$d->tbl_invoice_idtbl_invoice, 'sold_date'=>$date,
+                                                            'updateuser'=>$userID, 'updatedatetime'=>$now));
+                if($this->db->affected_rows()!==1){ throw new RuntimeException('The serial was just taken by another sale.'); }
+
+                $this->db->insert('tbl_serial_movement', array(
+                    'movement_type'=>2, 'from_status'=>1, 'to_status'=>2,
+                    'doc_type'=>'INVOICE', 'doc_id'=>$d->tbl_invoice_idtbl_invoice, 'doc_detail_id'=>$detailID,
+                    'branch_id'=>$branch, 'remark'=>'Delivered on '.$d->invoice_no,
+                    'insertdatetime'=>$now, 'tbl_user_idtbl_user'=>$userID,
+                    'tbl_product_serial_idtbl_product_serial'=>$sid));
+
+                // keep tbl_stock in step (same two statements as the normal sale)
+                $this->db->set('qty', 'qty - 1', FALSE)->set('updatedatetime', $now)->set('updateuser', $userID)
+                        ->where('tbl_grndetail_idtbl_grndetail', $s->tbl_grndetail_idtbl_grndetail)
+                        ->where('tbl_product_idtbl_product', (int)$p->idtbl_product)
+                        ->where('qty >=', 1)->update('tbl_stock');
+                $this->db->where('tbl_grndetail_idtbl_grndetail', $s->tbl_grndetail_idtbl_grndetail)
+                        ->where('qty <=', 0)->where('stock_status', 1)
+                        ->update('tbl_stock', array('stock_status'=>2));
+
+                $cost=(float)$s->costunitprice;
+                $upd=array('serialno'=>$s->serialno, 'tbl_product_serial_idtbl_product_serial'=>$sid, 'costunitprice'=>$cost,
+                        'delivered_qty'=>(int)$d->delivered_qty+1, 'delivery_status'=>1);
+            }
+            else{
+                // ----- item without serial: stock is taken now (FIFO batches), part delivery is allowed -----
+                $qty=(int)$this->input->post('qty');
+                if($qty<1 || $qty>$remaining){ throw new RuntimeException('Quantity must be between 1 and '.$remaining.'.'); }
+
+                $cost=(float)$this->_deduct_stock((int)$p->idtbl_product, $qty, $branch, $userID, $now);   // throws when the stock is not enough
+
+                $done=(int)$d->delivered_qty;
+                $upd=array('costunitprice'=>round((((float)$d->costunitprice*$done)+($cost*$qty))/($done+$qty), 2),   // weighted average of the deliveries
+                        'delivered_qty'=>$done+$qty,
+                        'delivery_status'=>($done+$qty>=(int)$d->qty) ? 1 : 2);
+            }
+
+            $this->db->where('idtbl_invoice_detail', $detailID)->update('tbl_invoice_detail', $upd);
+
+            $this->db->insert('tbl_invoice_delivery', array(
+                'tbl_invoice_idtbl_invoice'=>$d->tbl_invoice_idtbl_invoice,
+                'tbl_invoice_detail_idtbl_invoice_detail'=>$detailID,
+                'tbl_product_idtbl_product'=>(int)$p->idtbl_product,
+                'tbl_product_serial_idtbl_product_serial'=>$sid,
+                'qty'=>$qty, 'costunitprice'=>$cost, 'delivered_date'=>$date, 'status'=>1,
+                'insertdatetime'=>$now, 'tbl_user_idtbl_user'=>$userID, 'tbl_company_idtbl_company'=>$company, 'tbl_company_branch_idtbl_company_branch'=>$branch));
+
+            if($this->db->trans_status()===FALSE){
+                $err=$this->db->error();
+                throw new Exception('DB error: '.$err['code'].' '.$err['message']);
+            }
+            $this->db->trans_commit();
+            $inTrans=false;
+
+            echo json_encode(array('ok'=>true, 'msg'=>'Delivered', 'invoice_id'=>(int)$d->tbl_invoice_idtbl_invoice, 'date'=>$date));
+        }
+        catch(RuntimeException $e){
+            if($inTrans){ $this->db->trans_rollback(); }
+            echo json_encode(array('ok'=>false, 'msg'=>$e->getMessage()));
+        }
+        catch(Throwable $e){
+            if($inTrans){ $this->db->trans_rollback(); }
+            log_message('error', 'Deliverpending failed: '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine());
+            echo json_encode(array('ok'=>false, 'msg'=>'Could not save the delivery.', 'Deliverpending failed: '.$e->getMessage().' @ '.$e->getFile().':'.$e->getLine()));
+        }
+        finally{
+            $this->db->db_debug=$old_debug;
+        }
+    }
+
+    /* data of one delivery note: everything delivered for an invoice on a date */
+    public function Deliverynotedata($invoice_id, $date){
+        $branch=(int)$_SESSION['branch_id'];
+        if(!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$date)){ return null; }
+
+        $inv=$this->db->query("SELECT i.*, c.address_line1, c.address_line2, c.city, c.telephone_no
+                            FROM tbl_invoice i LEFT JOIN tbl_customer c ON c.idtbl_customer = i.tbl_customer_idtbl_customer
+                            WHERE i.idtbl_invoice = ? AND i.tbl_company_branch_idtbl_company_branch = ?", array((int)$invoice_id, $branch))->row();
+        if(!$inv){ return null; }
+
+        $rows=$this->db->query("SELECT v.idtbl_invoice_delivery, v.qty, d.product_code, d.product_name, d.warranty_months, ps.serialno
+                                FROM tbl_invoice_delivery v
+                                JOIN tbl_invoice_detail d ON d.idtbl_invoice_detail = v.tbl_invoice_detail_idtbl_invoice_detail
+                                LEFT JOIN tbl_product_serial ps ON ps.idtbl_product_serial = v.tbl_product_serial_idtbl_product_serial
+                                WHERE v.tbl_invoice_idtbl_invoice = ? AND v.delivered_date = ? AND v.status = 1
+                                ORDER BY v.idtbl_invoice_delivery", array((int)$invoice_id, $date))->result();
+        if(!$rows){ return null; }
+
+        return array('inv'=>$inv, 'rows'=>$rows, 'date'=>$date);
+    }
+    
 
     // ── Private helper ────────────────────────────────────────────────────────────
     private function _jsonResponse($status, $icon, $message, $type, $extra = []) {
@@ -954,6 +1403,17 @@ class Invoiceinfo extends CI_Model{
         $first=key($skipped);
         return 'FIFO: batch '.$names[$maxSel].' cannot be sold because older stock from '.$names[$first].' is still available. Sell the older serial numbers first.';
     }
+    /* discount % that is valid TODAY for this product row (0 = no discount) */
+    private function activediscount($p){
+        $d=(float)$p->discount_percent;
+        if($d<=0 || $d>=100){ return 0.0; }
+
+        $today=date('Y-m-d');
+        if(!empty($p->discount_start) && $p->discount_start>$today){ return 0.0; }
+        if(!empty($p->discount_end) && $p->discount_end<$today){ return 0.0; }
+
+        return round($d, 2);
+    }
     /* only these serial statuses can be transferred:
        1 = in stock, 5 = returned by customer, 6 = display item
        everything else (2 sold, 3 returned to supplier, 4 damaged, 7 defective) is excluded.
@@ -970,5 +1430,135 @@ class Invoiceinfo extends CI_Model{
 
     private function _fifoJson($ok, $msg){
         echo json_encode(array('ok'=>$ok, 'msg'=>$msg));
+    }
+
+    // TEMPORARY: a serial typed by the cashier at the invoice. It is registered the same way Goodreceiveserialinsert() does it
+    // (tbl_product_serial + tbl_serial_movement), under the oldest approved GRN line of this product that still has room.
+    private function _manual_serial($p, $serialno, $price, $isQuote, $branch_id, $company_id, $userid, $now)
+    {
+        if ($serialno === '' || mb_strlen($serialno) > 100) throw new RuntimeException('Invalid serial number');
+
+        $ex = $this->db->where('serialno', $serialno)->where('status', 1)->get('tbl_product_serial')->row();
+        if ($ex) {
+            // already in the system: only free stock of this product in this branch can be sold
+            if ((int)$ex->tbl_product_idtbl_product === (int)$p->idtbl_product && (int)$ex->stock_status === 1
+                && (int)$ex->tbl_company_branch_idtbl_company_branch === (int)$branch_id) {
+                return $ex;
+            }
+            throw new RuntimeException('Serial number ' . $serialno . ' already exists and is not available for sale');
+        }
+
+        if ($isQuote) {                                   // a quotation saves nothing
+            return (object)['idtbl_product_serial' => null, 'serialno' => $serialno, 'saleprice' => 0,
+                            'costunitprice' => 0, 'tbl_grndetail_idtbl_grndetail' => null];
+        }
+
+        // GRN information (tbl_grn + tbl_grndetail): oldest approved line with room for one more serial number
+        $d = $this->db->query(
+            "SELECT d.idtbl_grndetail, d.tbl_grn_idtbl_grn AS grn_id, d.costunitprice, g.grn_no, g.batchno
+            FROM tbl_grndetail d
+            JOIN tbl_grn g ON g.idtbl_grn = d.tbl_grn_idtbl_grn
+            WHERE d.tbl_product_idtbl_product = ? AND d.status = 1
+                AND g.status = 1 AND g.approvestatus = 1
+                AND g.tbl_company_idtbl_company = ? AND g.tbl_company_branch_idtbl_company_branch = ?
+                AND FLOOR(d.qty) > (SELECT COUNT(*) FROM tbl_product_serial ps
+                                    WHERE ps.tbl_grndetail_idtbl_grndetail = d.idtbl_grndetail AND ps.status = 1)
+            ORDER BY g.grndate, g.idtbl_grn, d.idtbl_grndetail
+            LIMIT 1 FOR UPDATE", [$p->idtbl_product, $company_id, $branch_id])->row();
+        if (!$d) {
+            throw new RuntimeException('No GRN stock is available for ' . $p->product_name
+                . ' (every received quantity already has a serial number). Please receive the stock first.');
+        }
+
+        $this->db->insert('tbl_product_serial', [
+            'serialno' => $serialno, 'batchno' => $d->batchno,
+            'tbl_grn_idtbl_grn' => $d->grn_id, 'tbl_grndetail_idtbl_grndetail' => $d->idtbl_grndetail,
+            'costunitprice' => $d->costunitprice, 'saleprice' => $price,
+            'tbl_product_idtbl_product' => $p->idtbl_product,
+            'stock_status' => 1, 'status' => 1,
+            'insertdatetime' => $now, 'tbl_user_idtbl_user' => $userid,
+            'tbl_company_idtbl_company' => $company_id, 'tbl_company_branch_idtbl_company_branch' => $branch_id,
+        ]);
+        $sid = $this->db->insert_id();
+        if (!$sid) throw new Exception('Serial insert failed');
+
+        $this->db->insert('tbl_serial_movement', [
+            'movement_type' => 1, 'from_status' => NULL, 'to_status' => 1,
+            'doc_type' => 'GRN', 'doc_id' => $d->grn_id, 'doc_detail_id' => $d->idtbl_grndetail,
+            'branch_id' => $branch_id, 'remark' => 'Serial added from ' . $d->grn_no . ' (entered at invoice)',
+            'insertdatetime' => $now, 'tbl_user_idtbl_user' => $userid,
+            'tbl_product_serial_idtbl_product_serial' => $sid,
+        ]);
+
+        return $this->db->where('idtbl_product_serial', $sid)->get('tbl_product_serial')->row();
+    }
+
+    /* part warranties (tbl_product_warranty): [product_id => [ ['name'=>..., 'months'=>...], ... ]] */
+    private function partwarranties($ids){
+        $map = array();
+        if (empty($ids)) { return $map; }
+
+        $rows = $this->db->select('tbl_product_idtbl_product AS pid, warranty_name, warranty_months')
+                        ->from('tbl_product_warranty')
+                        ->where_in('tbl_product_idtbl_product', $ids)
+                        ->where('status', 1)
+                        ->order_by('idtbl_product_warranty')
+                        ->get()->result();
+        foreach ($rows as $r) {
+            $map[(int)$r->pid][] = array('name' => $r->warranty_name, 'months' => (int)$r->warranty_months);
+        }
+        return $map;
+    }
+
+    /* part warranties of one product as a JSON string (NULL when it has none) */
+    private function partsjson($pid){
+        $map = $this->partwarranties(array((int)$pid));
+        return !empty($map[(int)$pid]) ? json_encode($map[(int)$pid], JSON_UNESCAPED_UNICODE) : null;
+    }
+
+    /* the approval row when the token is valid for THIS cashier and covers this discount, otherwise null */
+    private function discountoverride($token, $discount){
+        $o = isset($_SESSION['discount_override'][$token]) ? $_SESSION['discount_override'][$token] : null;
+        if(!$o) return null;
+        if($o['expires'] < time() || (int)$o['requested_by'] !== (int)$_SESSION['userid'] || round($discount, 2) > round((float)$o['amount'], 2)) return null;
+        return $o;
+    }
+
+    /* the approval row when the token is for THIS cashier + THIS product and covers this percentage, otherwise null */
+    private function itemdiscountoverride($token, $pid, $pct){
+        $o = isset($_SESSION['itemdisc_override'][$token]) ? $_SESSION['itemdisc_override'][$token] : null;
+        if(!$o) return null;
+        if($o['expires'] < time() || (int)$o['requested_by'] !== (int)$_SESSION['userid']
+        || (int)$o['product_id'] !== (int)$pid || round($pct, 2) > round((float)$o['percent'], 2)) return null;
+        return $o;
+    }
+
+    /* [user row, null] when username/password are right and the user has the permission, otherwise [null, message] */
+    private function approver($username, $password, $permission){
+        if($username==='' || $password===''){ return array(null, 'Enter the username and password.'); }
+
+        $u=$this->db->query("SELECT idtbl_user, name, password FROM tbl_user WHERE username = ? AND status = 1", array($username))->row();
+        if(!$u || !password_verify($password, $u->password)){ return array(null, 'Invalid username or password.'); }
+
+        // same permission lookup as Fifoignoreverify() / Discountverify()
+        $perm=$this->db->query("SELECT 1
+                                FROM tbl_user_has_tbl_roles ur
+                                JOIN tbl_roles r ON r.idtbl_roles = ur.tbl_roles_idtbl_roles AND r.status = 1
+                                JOIN tbl_roles_has_tbl_permissions rp ON rp.tbl_roles_idtbl_roles = r.idtbl_roles
+                                JOIN tbl_permissions p ON p.idtbl_permissions = rp.tbl_permissions_idtbl_permissions
+                                WHERE ur.tbl_user_idtbl_user = ? AND p.permission = ? AND p.guard_name = ?
+                                LIMIT 1", array((int)$u->idtbl_user, $permission, self::FIFO_GUARD))->row();
+        if(!$perm){ return array(null, 'This user does not have permission to approve this.'); }
+
+        return array($u, null);
+    }
+
+    /* quantity of a product that is sold to customers but not delivered yet (it is reserved for them) */
+    private function pendingqty($pid, $branch){
+        $r=$this->db->query("SELECT COALESCE(SUM(d.qty - d.delivered_qty),0) AS q
+                            FROM tbl_invoice_detail d JOIN tbl_invoice i ON i.idtbl_invoice = d.tbl_invoice_idtbl_invoice
+                            WHERE d.tbl_product_idtbl_product = ? AND d.is_preorder = 1 AND d.delivery_status = 2 AND d.status = 1
+                            AND i.status = 1 AND i.tbl_company_branch_idtbl_company_branch = ?", array((int)$pid, (int)$branch))->row();
+        return (int)$r->q;
     }
 }

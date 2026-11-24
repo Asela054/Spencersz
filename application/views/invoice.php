@@ -491,6 +491,7 @@ include "include/topnavbar.php";
                                         <label class="form-label mb-1 text-warning-emphasis fw-bold"><i
                                                 class="fas fa-qrcode mr-1"></i> Serial No / IMEI Capture
                                             [Mandatory]</label>
+                                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 ml-2" onclick="openPreorder()" title="Item is not in stock: sell now, deliver later">Pre-order</button>
                                         <input type="text" id="imeiInput"
                                             class="form-control form-control-sm imei-input-box"
                                             placeholder="Select a product first..."
@@ -544,6 +545,12 @@ include "include/topnavbar.php";
 								<span class="fw-bold text-muted"><i class="fas fa-truck-loading mr-1 text-danger"></i>
 									Fulfillment:</span>
 								<div class="d-flex gap-3">
+                                    <select class="form-control form-control-sm mr-2" id="salerepSelect" style="width: 200px;">
+                                        <option value="">-- Select Sales Rep --</option>
+                                        <?php foreach($employeelist as $employee): ?>
+                                            <option value="<?= $employee->idtbl_employee ?>"><?= $employee->full_name ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
 									<div class="form-check form-check-inline mb-0">
 										<input class="form-check-input" type="radio" name="fulfillmentRadio"
 											id="pickupRadio" value="Store Pickup" checked>
@@ -572,7 +579,7 @@ include "include/topnavbar.php";
 									<span class="text-danger mr-2">- LKR </span>
 									<input type="number" id="discountInput"
 										class="form-control form-control-sm text-right p-0 px-1 border-0 bg-dark text-white font-monospace"
-										style="width: 80px;" value="0" oninput="recalculateInvoice()">
+										style="width: 80px;" min="0" step="0.01" value="0" oninput="recalculateInvoice()" onchange="discountChanged()">
 								</div>
 							</div>
 							<div class="totals-row">
@@ -736,13 +743,13 @@ include "include/topnavbar.php";
 
 <!-- MODAL 2: INVENTORY CATALOG MODAL -->
 <div class="modal fade" id="catalogModal" tabindex="-1" aria-hidden="true">
-	<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+	<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
 		<div class="modal-content">
 			<div class="modal-header bg-danger text-white py-2">
 				<h6 class="modal-title fw-bold text-light"><i class="fas fa-list mr-2"></i>Product Catalog Inventory</h6>
 				<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true" class="text-light">&times;</span></button>
 			</div>
-			<div class="modal-body p-3">
+			<!-- <div class="modal-body p-3">
 				<input type="text" id="catalogSearchFilter" class="form-control mb-3"
 					placeholder="Filter by product name or SKU..." oninput="renderCatalogModalTable()">
 				<div class="table-responsive">
@@ -757,10 +764,22 @@ include "include/topnavbar.php";
 							</tr>
 						</thead>
 						<tbody id="catalogModalTableBody">
-							<!-- Dynamically Populated -->
 						</tbody>
 					</table>
 				</div>
+			</div> -->
+            <div class="modal-body p-3">
+				<table class="table table-hover table-striped table-sm align-middle nowrap w-100" id="dataTableCatalog">
+					<thead>
+						<tr>
+							<th>SKU</th>
+							<th>Product Title</th>
+							<th>Warranty</th>
+							<th>Price (LKR)</th>
+							<th>Action</th>
+						</tr>
+					</thead>
+				</table>
 			</div>
 		</div>
 	</div>
@@ -870,7 +889,7 @@ include "include/topnavbar.php";
 	</div>
 </div>
 
-<!-- MODAL 3: INVOICE RECEIPT PDF -->
+<!-- MODAL 4: INVOICE RECEIPT PDF -->
 <div class="modal fade" id="invoicePdfModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
@@ -880,9 +899,11 @@ include "include/topnavbar.php";
             </div>
             <div class="modal-body p-0">
                 <iframe id="invoicePdfFrame" style="width:100%; height:78vh; border:0;"></iframe>
+                <iframe id="posBillFrame" style="position:fixed; right:0; bottom:0; width:0; height:0; border:0;"></iframe>
             </div>
             <div class="modal-footer py-2">
                 <a id="invoicePdfOpen" href="#" target="_blank" class="btn btn-outline-secondary btn-sm">Open / Download</a>
+                <button type="button" class="btn btn-outline-dark btn-sm" onclick="printPosBill()" title="Xprinter XP-420B"><i class="fas fa-receipt"></i> POS Bill</button>
                 <button type="button" class="btn btn-spencersz btn-sm" onclick="printInvoicePdf()"><i class="fas fa-print"></i> Print</button>
                 <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
             </div>
@@ -890,7 +911,7 @@ include "include/topnavbar.php";
     </div>
 </div>
 
-<!-- MODAL 4: HOLD LIST -->
+<!-- MODAL 5: HOLD LIST -->
 <div class="modal fade" id="holdListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -915,7 +936,7 @@ include "include/topnavbar.php";
     </div>
 </div>
 
-<!-- MODAL 4: QUOTATION LIST -->
+<!-- MODAL 6: QUOTATION LIST -->
 <div class="modal fade" id="quotationListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -931,7 +952,7 @@ include "include/topnavbar.php";
     </div>
 </div>
 
-<!-- MODAL 4: FIFO LIST -->
+<!-- MODAL 7: FIFO LIST -->
 <div class="modal fade" id="fifomodal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -947,7 +968,8 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
-<!-- MODAL 5: FIFO AUTH -->
+
+<!-- MODAL 8: FIFO AUTH -->
 <div class="modal fade" id="fifoauthmodal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -974,6 +996,106 @@ include "include/topnavbar.php";
             <div class="modal-footer">
                 <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
                 <button type="button" id="btnfifoapprove" class="btn btn-danger btn-sm px-4"><i class="fas fa-check mr-1"></i>Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 9: Discount AUTH -->
+<div class="modal fade" id="discountauthmodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-shield mr-2 text-danger"></i>Approve discount</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Discount: <b>LKR <span id="da_amount"></span></b><br>A user with discount approval permission must enter their username and password.</p>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Username*</label>
+                    <input type="text" id="da_user" class="form-control form-control-sm" autocomplete="off">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Password*</label>
+                    <input type="password" id="da_pass" class="form-control form-control-sm" autocomplete="new-password">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="small font-weight-bold">Reason*</label>
+                    <input type="text" id="da_reason" class="form-control form-control-sm" maxlength="255">
+                </div>
+                <div id="da_msg" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btndiscountapprove" class="btn btn-danger btn-sm px-4"><i class="fas fa-check mr-1"></i>Approve</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 10: Item Discount AUTH -->
+<div class="modal fade" id="itemdiscmodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-shield mr-2 text-danger"></i>Item discount</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">Item: <b id="id_item"></b><br>An extra discount on top of the product discount needs the approval of an authorised person. Enter 0 to remove it.</p>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Extra discount %*</label>
+                    <input type="number" id="id_pct" class="form-control form-control-sm" min="0" max="99.99" step="0.01">
+                </div>
+                <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="id_all">
+                    <label class="form-check-label small" for="id_all">Apply to all lines of this product</label>
+                </div>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Username*</label>
+                    <input type="text" id="id_user" class="form-control form-control-sm" autocomplete="off">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Password*</label>
+                    <input type="password" id="id_pass" class="form-control form-control-sm" autocomplete="new-password">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="small font-weight-bold">Reason*</label>
+                    <input type="text" id="id_reason" class="form-control form-control-sm" maxlength="255">
+                </div>
+                <div id="id_msg" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btnitemdisc" class="btn btn-danger btn-sm px-4"><i class="fas fa-check mr-1"></i>Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 11: Pre-order -->
+<div class="modal fade" id="preordermodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-truck mr-2 text-danger"></i>Pre-order (deliver later)</h5>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">Item: <b id="po_item"></b><br>The customer pays now. Stock and serial number are taken when the item is delivered.</p>
+                <div class="form-group mb-2">
+                    <label class="small font-weight-bold">Quantity*</label>
+                    <input type="number" id="po_qty" class="form-control form-control-sm" min="1" max="999" value="1">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="small font-weight-bold">Delivery date* (date the customer asked for)</label>
+                    <input type="date" id="po_date" class="form-control form-control-sm">
+                </div>
+                <div id="po_msg" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm border px-3" data-dismiss="modal">Cancel</button>
+                <button type="button" id="btnaddpreorder" class="btn btn-danger btn-sm px-4"><i class="fas fa-plus mr-1"></i>Add to cart</button>
             </div>
         </div>
     </div>
@@ -1082,6 +1204,32 @@ include "include/topnavbar.php";
 	// Database Mock
 	const productCatalog = [];
 	const PAYMENT_MODES = [];
+    const MANUAL_SERIAL = true;   // TEMPORARY: the cashier types the serial numbers. Set to false when serials are entered through GRN.
+
+    // price after the product discount (same formula as the server: round to 2 decimals)
+    function discPrice(base, pct) {
+        return Math.round(base * (1 - (pct || 0) / 100) * 100) / 100;
+    }
+    // "Compressor: 60 Months" lines for the part warranties of a product
+    function warrantyPartsHtml(parts) {
+        if (!parts || !parts.length) return '';
+        return parts.map(w =>
+            '<div class="text-muted" style="font-size:0.65rem;">' + escH(w.name) + ': <b>' + w.months + ' Months</b></div>'
+        ).join('');
+    }
+    // unit price for a serial: its own sale price if it has one, otherwise the product list price, then the discount
+    function serialPrice(prod, s) {
+        const base = (s && parseFloat(s.saleprice) > 0) ? parseFloat(s.saleprice) : prod.listPrice;
+        return discPrice(base, prod.discount);
+    }
+    // "425,000 255,000 -40%" tag for lists
+    function priceTag(p) {
+        const f = n => n.toLocaleString();
+        return p.discount > 0
+            ? '<span class="text-muted" style="text-decoration:line-through;font-size:0.68rem;">' + f(p.listPrice) + '</span> ' + f(p.price) +
+              ' <span class="badge badge-danger" style="font-size:0.6rem;">-' + p.discount + '%</span>'
+            : f(p.price);
+    }
 
     function loadProductlist() {
         $.ajax({
@@ -1092,13 +1240,29 @@ include "include/topnavbar.php";
                 if (obj.status == 1) {
                     productCatalog.length = 0; // Clear existing catalog
                     obj.products.forEach(function (product) {
+                        // productCatalog.push({
+                        //     id: product.idtbl_product,
+                        //     sku: product.product_code,
+                        //     name: product.product_name,
+                        //     price: parseFloat(product.selling_price),
+                        //     warranty: product.warranty_months + ' Months',
+                        //     warrantymonth: product.warranty_months,
+                        //     serials: product.serials || []
+                        // });
+                        const listPrice = parseFloat(product.selling_price);
+                        const discount  = parseFloat(product.discount_percent) || 0;
                         productCatalog.push({
                             id: product.idtbl_product,
                             sku: product.product_code,
                             name: product.product_name,
-                            price: parseFloat(product.selling_price),
+                            key: (product.product_name + ' ' + product.product_code).toLowerCase(),
+                            listPrice: listPrice,
+                            discount: discount,
+                            price: discPrice(listPrice, discount),      // effective price (used by non-serial lines)
                             warranty: product.warranty_months + ' Months',
                             warrantymonth: product.warranty_months,
+                            warrantyParts: product.warranty_parts || [],
+                            hasSerial: parseInt(product.has_serial, 10) === 1,
                             serials: product.serials || []
                         });
                     });
@@ -1195,9 +1359,18 @@ include "include/topnavbar.php";
 		}
 
 		let totalQtyCount = 0;
-
 		cart.forEach((item, index) => {
 			totalQtyCount += item.qty;
+
+			// const pr   = productCatalog.find(p => p.id == item.id);
+			// const dpct = pr ? pr.discount : 0;
+			// const orig = dpct > 0 ? Math.round(item.price / (1 - dpct / 100) * 100) / 100 : 0;
+            const pr    = productCatalog.find(p => p.id == item.id);
+			const dpct  = pr ? pr.discount : 0;
+			const extra = item.extraDisc || 0;
+			const baseP = (item.basePrice !== undefined) ? item.basePrice : item.price;   // price after the product discount
+			const orig  = dpct > 0 ? Math.round(baseP / (1 - dpct / 100) * 100) / 100 : 0;
+
 			const row = document.createElement("tr");
 			row.innerHTML = `
                 <td class="text-muted">${index + 1}</td>
@@ -1205,8 +1378,15 @@ include "include/topnavbar.php";
                 <div class="fw-bold text-dark">${item.name}</div>
                 <div class="text-warning-emphasis font-monospace" style="font-size: 0.72rem;"><i class="fas fa-microchip me-1"></i>${item.imei || "PENDING SCAN"}</div>
                 </td>
-                <td><span class="badge bg-success text-light" style="font-size: 0.65rem;">${item.warranty}</span></td>
-                <td class="text-end font-monospace">${item.price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td><span class="badge bg-success text-light" style="font-size: 0.65rem;">${item.warranty}</span>${warrantyPartsHtml(pr ? pr.warrantyParts : [])}</td>
+                <td class="text-end font-monospace">
+                    ${orig > 0 ? `<div class="text-muted" style="font-size:0.7rem;text-decoration:line-through;">${orig.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>` : ''}
+                    ${extra > 0 ? `<div class="text-muted" style="font-size:0.7rem;text-decoration:line-through;">${baseP.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>` : ''}
+                    ${item.price.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    ${orig > 0 ? `<span class="badge badge-danger" style="font-size:0.6rem;">-${dpct}%</span>` : ''}
+                    ${extra > 0 ? `<span class="badge badge-warning" style="font-size:0.6rem;">-${extra}% extra</span>` : ''}
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 ml-1" style="font-size:0.65rem;" title="Item discount" onclick="openItemDiscount(${index})">%</button>
+                </td>
                 <td class="text-center">
                 <div class="input-group input-group-sm mx-auto" style="width: 80px;">
                     <div class="input-group-prepend">
@@ -1220,7 +1400,9 @@ include "include/topnavbar.php";
                 </td>
                 <td class="text-end fw-bold font-monospace">${(item.price * item.qty).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                 <td class="text-center">
-                <button class="btn btn-sm text-danger p-0" onclick="removeCartItem(${index})"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-sm text-danger p-0" onclick="removeCartItem(${index})" title="Remove">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 448 512" fill="currentColor" style="vertical-align:-2px;"><path d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/></svg>
+                    </button>
                 </td>
                 <td class="d-none">${item.id}</td>
                 <td class="d-none">${item.warrantymonth}</td>
@@ -1235,7 +1417,9 @@ include "include/topnavbar.php";
 	}
 
 	function changeQty(index, delta) {
-        if (cart[index].serialId && delta > 0) return; // one serial = one unit
+        // if (cart[index].serialId && delta > 0) return; // one serial = one unit
+        // if ((cart[index].serialId || cart[index].manualSerial) && delta > 0) return; // one serial = one unit
+        if ((cart[index].serialId || cart[index].manualSerial || (cart[index].preorder && cart[index].hasSerial)) && delta > 0) return;
 		cart[index].qty += delta;
 		if (cart[index].qty <= 0) {
 			cart.splice(index, 1);
@@ -1249,55 +1433,113 @@ include "include/topnavbar.php";
 	}
 
 	// Live Search Autocomplete & Barcode Input
+	// function handleLiveSearch(val) {
+	// 	const box = document.getElementById("autocompleteBox");
+	// 	const query = val.toLowerCase().trim();
+	// 	if (!query) {
+	// 		box.style.display = "none";
+	// 		return;
+	// 	}
+
+	// 	const matches = productCatalog.filter(p => p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query));
+	// 	if (matches.length === 0) {
+	// 		box.style.display = "none";
+	// 		return;
+	// 	}
+
+	// 	box.innerHTML = "";
+	// 	matches.forEach(m => {
+	// 		const item = document.createElement("div");
+	// 		item.className = "autocomplete-item";
+	// 		item.innerHTML = `
+    //             <div>
+    //             <div class="fw-bold" style="font-size:0.78rem;">${m.name}</div>
+    //             <small class="text-muted">${m.sku}</small>
+    //             </div>
+    //             <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${priceTag(m)}</span>
+    //         `;
+	// 		// item.onclick = () => {
+	// 		// 	addItemToCart(m);
+	// 		// 	box.style.display = "none";
+	// 		// 	document.getElementById("barcodeInput").value = "";
+	// 		// };
+    //         item.onclick = () => {
+    //             selectProduct(m);
+    //             document.getElementById("barcodeInput").value = "";
+    //         };
+	// 		box.appendChild(item);
+	// 	});
+	// 	box.style.display = "block";
+	// }
+    	// Live Search Autocomplete & Barcode Input
+	let liveSearchTimer = null;
+
+	// wait until the cashier pauses typing (120 ms) before searching
 	function handleLiveSearch(val) {
+		clearTimeout(liveSearchTimer);
+		liveSearchTimer = setTimeout(renderLiveSearch, 120);
+	}
+
+	function renderLiveSearch() {
 		const box = document.getElementById("autocompleteBox");
-		const query = val.toLowerCase().trim();
+		const query = document.getElementById("barcodeInput").value.toLowerCase().trim();   // current value (the box may already be cleared by Enter)
 		if (!query) {
 			box.style.display = "none";
 			return;
 		}
 
-		const matches = productCatalog.filter(p => p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query));
+		// stop after 30 matches: nobody reads more than that, and it keeps the DOM small
+		const matches = [];
+		for (let i = 0; i < productCatalog.length && matches.length < 30; i++) {
+			if (productCatalog[i].key.includes(query)) matches.push(productCatalog[i]);
+		}
 		if (matches.length === 0) {
 			box.style.display = "none";
 			return;
 		}
 
-		box.innerHTML = "";
-		matches.forEach(m => {
-			const item = document.createElement("div");
-			item.className = "autocomplete-item";
-			item.innerHTML = `
+		// build one string and write it once (instead of creating one element per product)
+		box.innerHTML = matches.map((m, i) => `
+            <div class="autocomplete-item" data-i="${i}">
                 <div>
-                <div class="fw-bold" style="font-size:0.78rem;">${m.name}</div>
-                <small class="text-muted">${m.sku}</small>
+                <div class="fw-bold" style="font-size:0.78rem;">${escH(m.name)}</div>
+                <small class="text-muted">${escH(m.sku)}</small>
                 </div>
-                <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${m.price.toLocaleString()}</span>
-            `;
-			// item.onclick = () => {
-			// 	addItemToCart(m);
-			// 	box.style.display = "none";
-			// 	document.getElementById("barcodeInput").value = "";
-			// };
-            item.onclick = () => {
-                selectProduct(m);
-                document.getElementById("barcodeInput").value = "";
-            };
-			box.appendChild(item);
-		});
+                <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${priceTag(m)}</span>
+            </div>`).join('');
+
+		box.onclick = function (e) {
+			const el = e.target.closest('.autocomplete-item');
+			if (!el) return;
+			selectProduct(matches[parseInt(el.getAttribute('data-i'), 10)]);
+			document.getElementById("barcodeInput").value = "";
+		};
 		box.style.display = "block";
 	}
 
-	function handleBarcodeKeyDown(e) {
+	// function handleBarcodeKeyDown(e) {
+	// 	if (e.key === 'Enter') {
+	// 		e.preventDefault();
+	// 		const val = e.target.value.trim().toLowerCase();
+	// 		const match = productCatalog.find(p => p.sku.toLowerCase() === val || p.name.toLowerCase().includes(val));
+	// 		// if (match) {
+	// 		// 	addItemToCart(match);
+	// 		// 	e.target.value = "";
+	// 		// 	document.getElementById("autocompleteBox").style.display = "none";
+	// 		// }
+    //         if (match) {
+    //             selectProduct(match);
+    //             e.target.value = "";
+    //             document.getElementById("autocompleteBox").style.display = "none";
+    //         }
+	// 	}
+	// }
+    function handleBarcodeKeyDown(e) {
 		if (e.key === 'Enter') {
 			e.preventDefault();
+			clearTimeout(liveSearchTimer);   // a pending search must not re-open the box after Enter
 			const val = e.target.value.trim().toLowerCase();
-			const match = productCatalog.find(p => p.sku.toLowerCase() === val || p.name.toLowerCase().includes(val));
-			// if (match) {
-			// 	addItemToCart(match);
-			// 	e.target.value = "";
-			// 	document.getElementById("autocompleteBox").style.display = "none";
-			// }
+			const match = productCatalog.find(p => p.sku.toLowerCase() === val || p.key.includes(val));
             if (match) {
                 selectProduct(match);
                 e.target.value = "";
@@ -1334,38 +1576,139 @@ include "include/topnavbar.php";
     //     $('#imeiInput').focus();
 	// }
 
+	// function openCatalogModal() {
+	// 	renderCatalogModalTable();
+    //     $('#catalogModal').modal('show');
+	// }
+
+	// function renderCatalogModalTable() {
+	// 	const filter = (document.getElementById("catalogSearchFilter").value || "").toLowerCase();
+	// 	const tbody = document.getElementById("catalogModalTableBody");
+	// 	tbody.innerHTML = "";
+
+	// 	productCatalog.filter(p => p.key.includes(filter)).forEach(
+    //     p => {
+    //         const tr = document.createElement("tr");
+    //         tr.innerHTML = `
+    //             <td class="fw-bold">${p.sku}</td>
+    //             <td>${p.name}</td>
+    //             <td><span class="badge bg-success text-white border">${p.warranty}</span>${warrantyPartsHtml(p.warrantyParts)}</td>
+    //             <td class="fw-bold font-monospace">LKR ${priceTag(p)}</td>
+    //             <td class="text-center">
+    //             <button class="btn btn-spencersz btn-sm" onclick="addItemFromCatalog('${p.sku}')"><i class="fas fa-plus"></i></button>
+    //             </td>
+    //         `;
+    //         tbody.appendChild(tr);
+    //     });
+	// }
+
+	// function addItemFromCatalog(sku) {
+    //     const prod = productCatalog.find(p => p.sku === sku);
+    //     if (!prod) return;   
+    //     $('#catalogModal').modal('hide');
+    //     selectProduct(prod);
+    // }
+    
+    // ============================= Product catalog (DataTables, server side) =============================
+	let catalogTable = null;
+
 	function openCatalogModal() {
-		renderCatalogModalTable();
-        $('#catalogModal').modal('show');
+		$('#catalogModal').modal('show');
 	}
 
-	function renderCatalogModalTable() {
-		const filter = (document.getElementById("catalogSearchFilter").value || "").toLowerCase();
-		const tbody = document.getElementById("catalogModalTableBody");
-		tbody.innerHTML = "";
-
-		productCatalog.filter(p => p.name.toLowerCase().includes(filter) || p.sku.toLowerCase().includes(filter)).forEach(
-        p => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td class="fw-bold">${p.sku}</td>
-                <td>${p.name}</td>
-                <td><span class="badge bg-success text-white border">${p.warranty}</span></td>
-                <td class="fw-bold font-monospace">LKR ${p.price.toLocaleString()}</td>
-                <td class="text-center">
-                <button class="btn btn-spencersz btn-sm" onclick="addItemFromCatalog('${p.sku}')"><i class="fas fa-plus"></i></button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+	// price cell: list price struck through + the price after the product discount (same rule as the server)
+	function catalogPriceCell(r) {
+		const list  = parseFloat(r.selling_price) || 0;
+		const today = todayStr();
+		let d = parseFloat(r.discount_percent) || 0;
+		if (d <= 0 || d >= 100 || (r.discount_start && r.discount_start > today) || (r.discount_end && r.discount_end < today)) d = 0;
+		const f = n => n.toLocaleString('en-US', {minimumFractionDigits: 2});
+		return d > 0
+			? '<span class="text-muted" style="text-decoration:line-through;font-size:0.68rem;">' + f(list) + '</span> ' + f(discPrice(list, d)) +
+			  ' <span class="badge badge-danger" style="font-size:0.6rem;">-' + d + '%</span>'
+			: f(list);
 	}
 
-	function addItemFromCatalog(sku) {
-        const prod = productCatalog.find(p => p.sku === sku);
-        if (!prod) return;   
-        $('#catalogModal').modal('hide');
-        selectProduct(prod);
-    }
+	// the table is built the first time the modal is shown: only one page of products is loaded
+	$('#catalogModal').on('shown.bs.modal', function () {
+		if (catalogTable) {
+			catalogTable.columns.adjust();
+			$('#dataTableCatalog_filter input').focus();
+			return;
+		}
+		catalogTable = $('#dataTableCatalog').DataTable({
+			processing: true,
+			serverSide: true,
+			pageLength: 10,
+			lengthChange: false,
+			dom: "<'row'<'col-12'f>>" + "<'row'<'col-12'tr>>" + "<'row'<'col-sm-5'i><'col-sm-7'p>>",
+			language: { search: '', searchPlaceholder: 'Search by product name, SKU or model...' },
+			ajax: { url: '<?php echo base_url(); ?>scripts/productcataloglist.php', type: 'POST' },
+			order: [[1, 'asc']],
+			columns: [
+				{ data: 'product_code', className: 'fw-bold' },
+				{ data: 'product_name', render: function (d) { return escH(d); } },
+				{ data: 'warranty_months', searchable: false, orderable: false,
+				  render: function (d) { return '<span class="badge bg-success text-white border">' + escH(d) + ' Months</span>'; } },
+				{ data: null, searchable: false, orderable: false, className: 'fw-bold font-monospace',
+				  render: function (d, t, r) { return 'LKR ' + catalogPriceCell(r); } },
+				{ data: 'product_code', searchable: false, orderable: false, className: 'text-center',
+				  render: function (d) { return '<button type="button" class="btn btn-spencersz btn-sm btn-catalog-add" data-code="' + escH(d) + '"><i class="fas fa-plus"></i></button>'; } }
+			]
+		});
+		$('#dataTableCatalog_filter input').focus();
+	});
+
+	$('#dataTableCatalog').on('click', '.btn-catalog-add', function () {
+		addItemFromCatalog($(this).attr('data-code'));
+	});
+
+	// the full product (price, serial numbers, ...) is loaded only for the product that was picked
+	function addItemFromCatalog(code) {
+		code = String(code);
+		let prod = productCatalog.find(p => p.sku === code);
+		if (prod) {
+			$('#catalogModal').modal('hide');
+			selectProduct(prod);
+			return;
+		}
+
+		$.ajax({
+			url: '<?php echo base_url(); ?>Invoice/Getproductdetails',
+			type: 'POST',
+			dataType: 'json',
+			data: { productbarcordname: code },
+			success: function (obj) {
+				const product = (obj.status == 1) ? obj.products.find(x => x.product_code === code) : null;
+				if (!product) {
+					Swal.fire({ icon: 'error', title: 'Product not found', confirmButtonColor: '#D0111B' });
+					return;
+				}
+				const listPrice = parseFloat(product.selling_price);
+				const discount  = parseFloat(product.discount_percent) || 0;
+				prod = {
+					id: product.idtbl_product,
+					sku: product.product_code,
+					name: product.product_name,
+					key: (product.product_name + ' ' + product.product_code).toLowerCase(),
+					listPrice: listPrice,
+					discount: discount,
+					price: discPrice(listPrice, discount),
+					warranty: product.warranty_months + ' Months',
+					warrantymonth: product.warranty_months,
+					warrantyParts: product.warranty_parts || [],
+					hasSerial: parseInt(product.has_serial, 10) === 1,
+					serials: product.serials || []
+				};
+				productCatalog.push(prod);            // next time it is already there
+				$('#catalogModal').modal('hide');
+				selectProduct(prod);
+			},
+			error: function () {
+				Swal.fire({ icon: 'error', title: 'Could not load the product', confirmButtonColor: '#D0111B' });
+			}
+		});
+	}
 
 	// Totals & Split Payments Calculations
 	function recalculateInvoice() {
@@ -1456,6 +1799,8 @@ include "include/topnavbar.php";
 	// }
 
 	function completeTransaction() {
+        if (!discountGuard()) return;
+
 		if (cart.length === 0) {
             Swal.fire({
                 icon: 'error',
@@ -1587,7 +1932,15 @@ include "include/topnavbar.php";
             creditNoteId: document.getElementById("creditnoteid").value || null,
             fulfillment: document.querySelector('input[name="fulfillmentRadio"]:checked').value,
             discount: parseFloat(document.getElementById("discountInput").value) || 0,
-            items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty })),
+            discountToken: (discountApproval && (parseFloat(document.getElementById("discountInput").value) || 0) > 0) ? discountApproval.token : null,
+            salesRepId: document.getElementById("salerepSelect").value,       
+            // items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, qty: i.qty })),
+            // items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, serialNo: i.manualSerial || null, qty: i.qty })),
+            // items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, serialNo: i.manualSerial || null, qty: i.qty,
+                                    // extraDisc: i.extraDisc || 0, extraToken: i.extraToken || null })),
+            items: cart.map(i => ({ id: i.id, serialId: i.serialId || null, serialNo: i.manualSerial || null, qty: i.qty,
+                        extraDisc: i.extraDisc || 0, extraToken: i.extraToken || null,
+                        preorder: i.preorder ? 1 : 0, deliveryDate: i.deliveryDate || null })),
             fifoTokens: (function () {
                 const t = {};
                 cart.forEach(c => { if (c.fifoIgnored && fifoApprovals[c.id]) t[c.id] = fifoApprovals[c.id].token; });
@@ -1614,6 +1967,8 @@ include "include/topnavbar.php";
                     activeQuotationId = null; 
                     refreshHoldCount();
                     fifoApprovals = {};
+                    discountApproval = null; discountLast = 0;
+                    $('#discountInput').val(0); $('#discountBy').text('');
                     cart = [];
                     renderCartTable();
                     resetPayments();
@@ -1626,6 +1981,11 @@ include "include/topnavbar.php";
                     showInvoicePdf(savedId);
                 } else {
                     if (JSON.stringify(res).indexOf('FIFO approval') !== -1) clearFifoApprovals();
+                    if (JSON.stringify(res).indexOf('Discount needs approval') !== -1) { discountApproval = null; $('#discountBy').text(''); }
+                    if (JSON.stringify(res).indexOf('item discount needs approval') !== -1) {
+                        cart.forEach(removeItemDiscount);
+                        renderCartTable();
+                    }
                     action(res.action);
                 }
                 btn.disabled = false;
@@ -1721,12 +2081,39 @@ include "include/topnavbar.php";
 
     //---------------------- ON 12/10/2026 ----------------------//
 
+    // function selectProduct(prod) {
+    //     document.getElementById("autocompleteBox").style.display = "none";
+
+    //     // Product without serials: add straight to the cart
+    //     if (!prod.serials || prod.serials.length === 0) {
+    //         addItemToCart(prod);
+    //         return;
+    //     }
+
+    //     pendingProduct = prod;
+    //     const imei = document.getElementById("imeiInput");
+    //     imei.value = "";
+    //     imei.placeholder = "Scan / select serial for: " + prod.name;
+    //     imei.focus();
+    //     showSerialList("");
+    // }
+
     function selectProduct(prod) {
         document.getElementById("autocompleteBox").style.display = "none";
 
-        // Product without serials: add straight to the cart
+        // Product without registered serials
         if (!prod.serials || prod.serials.length === 0) {
-            addItemToCart(prod);
+            if (!MANUAL_SERIAL) {
+                addItemToCart(prod);
+                return;
+            }
+
+            // TEMPORARY: ask for the serial number. Enter on an empty box = add without a serial number
+            pendingProduct = prod;
+            const imei0 = document.getElementById("imeiInput");
+            imei0.value = "";
+            imei0.placeholder = "Type / scan serial for: " + prod.name + "   (Enter on empty = no serial)";
+            imei0.focus();
             return;
         }
 
@@ -1738,10 +2125,18 @@ include "include/topnavbar.php";
         showSerialList("");
     }
 
+    // function availableSerials(q) {
+    //     if (!pendingProduct) return [];
+    //     q = (q || "").toLowerCase().trim();
+    //     return pendingProduct.serials.filter(s =>
+    //         !cart.some(c => c.serialId == s.idtbl_product_serial) &&
+    //         s.serialno.toLowerCase().includes(q)
+    //     );
+    // }
     function availableSerials(q) {
         if (!pendingProduct) return [];
         q = (q || "").toLowerCase().trim();
-        return pendingProduct.serials.filter(s =>
+        return (pendingProduct.serials || []).filter(s =>
             !cart.some(c => c.serialId == s.idtbl_product_serial) &&
             s.serialno.toLowerCase().includes(q)
         );
@@ -1806,6 +2201,210 @@ include "include/topnavbar.php";
         return { rankOf, batches, oldest };
     }
 
+    // ============================= Discount approval =============================
+    let discountApproval = null;   // { amount, token, approver } approved by an authorised person
+    let discountLast     = 0;      // last accepted discount (restored when the approval is cancelled)
+    let discountPending  = null;   // discount waiting for the approval
+    let discountResume   = false;  // open the receipt preview right after the approval
+
+    function discountChanged() {
+        const val = r2(parseFloat($('#discountInput').val()) || 0);
+        if (val <= 0) {
+            discountApproval = null; discountLast = 0;
+            $('#discountInput').val(0); $('#discountBy').text('');
+            recalculateInvoice();
+            return;
+        }
+        if (discountApproval && val <= discountApproval.amount) {   // lowering an approved discount needs no new approval
+            discountLast = val;
+            recalculateInvoice();
+            return;
+        }
+        openDiscountAuth(val);
+    }
+
+    // used before the receipt preview: a discount that is not approved yet stops the sale
+    function discountGuard() {
+        const val = r2(parseFloat($('#discountInput').val()) || 0);
+        if (val > 0 && (!discountApproval || val > discountApproval.amount)) {
+            discountResume = true;
+            openDiscountAuth(val);
+            return false;
+        }
+        return true;
+    }
+
+    function openDiscountAuth(val) {
+        discountPending = val;
+        $('#da_amount').text(val.toLocaleString('en-US', {minimumFractionDigits: 2}));
+        $('#da_user, #da_pass, #da_reason').val('');
+        $('#da_msg').text('');
+        $('#discountauthmodal').modal('show');
+    }
+
+    // closed without an approval -> back to the last accepted discount
+    $('#discountauthmodal').on('hidden.bs.modal', function () {
+        if (discountPending !== null) {
+            discountPending = null;
+            discountResume = false;
+            $('#discountInput').val(discountLast);
+            recalculateInvoice();
+        }
+    });
+
+    $('#btndiscountapprove').on('click', function () {
+        const u = $.trim($('#da_user').val()), p = $('#da_pass').val(), r = $.trim($('#da_reason').val());
+        if (discountPending === null) return;
+        if (!u || !p || !r) { $('#da_msg').text('Enter the username, password and reason.'); return; }
+
+        const amount = discountPending;
+        $('#btndiscountapprove').prop('disabled', true);
+        $.ajax({
+            url: '<?php echo base_url(); ?>Invoice/Discountverify',
+            type: 'POST', dataType: 'json',
+            data: { amount: amount, username: u, password: p, reason: r },
+            success: function (res) {
+                $('#btndiscountapprove').prop('disabled', false);
+                $('#da_pass').val('');
+                if (!res.ok) { $('#da_msg').text(res.msg); return; }
+
+                discountApproval = { amount: amount, token: res.token, approver: res.approver };
+                discountLast = amount;
+                discountPending = null;
+                $('#discountBy').text('Approved: ' + res.approver);
+                const resume = discountResume;
+                discountResume = false;
+                $('#discountauthmodal').modal('hide');
+                recalculateInvoice();
+                if (resume) setTimeout(completeTransaction, 400);
+            },
+            error: function () {
+                $('#btndiscountapprove').prop('disabled', false);
+                $('#da_msg').text('Server error. Please try again.');
+            }
+        });
+    });
+
+    // ============================= Item discount (extra %, needs approval) =============================
+    let itemDiscIndex = -1;
+
+    function applyItemDiscount(item, pct, token) {
+        if (item.basePrice === undefined) item.basePrice = item.price;   // price after the product discount
+        item.extraDisc  = pct;
+        item.extraToken = token;
+        item.price      = discPrice(item.basePrice, pct);
+    }
+
+    function removeItemDiscount(item) {
+        if (item.basePrice !== undefined) item.price = item.basePrice;
+        item.basePrice  = undefined;
+        item.extraDisc  = 0;
+        item.extraToken = null;
+    }
+
+    function openItemDiscount(index) {
+        const item = cart[index];
+        if (!item) return;
+        itemDiscIndex = index;
+        $('#id_item').text(item.name + (item.imei ? ' (' + item.imei + ')' : ''));
+        $('#id_pct').val(item.extraDisc || '');
+        $('#id_all').prop('checked', false);
+        $('#id_user, #id_pass, #id_reason').val('');
+        $('#id_msg').text('');
+        $('#itemdiscmodal').modal('show');
+    }
+
+    $('#btnitemdisc').on('click', function () {
+        const item = cart[itemDiscIndex];
+        if (!item) return;
+
+        const pct = r2(parseFloat($('#id_pct').val()) || 0);
+        if (pct < 0 || pct >= 100) { $('#id_msg').text('Discount % must be between 0 and 99.99.'); return; }
+
+        const targets = $('#id_all').is(':checked') ? cart.filter(c => c.id == item.id) : [item];
+
+        if (pct === 0) {                                   // removing a discount needs no approval
+            targets.forEach(removeItemDiscount);
+            $('#itemdiscmodal').modal('hide');
+            renderCartTable();
+            recalculateInvoice();
+            return;
+        }
+
+        const u = $.trim($('#id_user').val()), p = $('#id_pass').val(), r = $.trim($('#id_reason').val());
+        if (!u || !p || !r) { $('#id_msg').text('Enter the username, password and reason.'); return; }
+
+        $('#btnitemdisc').prop('disabled', true);
+        $.ajax({
+            url: '<?php echo base_url(); ?>Invoice/Itemdiscountverify',
+            type: 'POST', dataType: 'json',
+            data: { product_id: item.id, percent: pct, username: u, password: p, reason: r },
+            success: function (res) {
+                $('#btnitemdisc').prop('disabled', false);
+                $('#id_pass').val('');
+                if (!res.ok) { $('#id_msg').text(res.msg); return; }
+
+                targets.forEach(c => applyItemDiscount(c, pct, res.token));
+                $('#itemdiscmodal').modal('hide');
+                renderCartTable();
+                recalculateInvoice();
+            },
+            error: function () {
+                $('#btnitemdisc').prop('disabled', false);
+                $('#id_msg').text('Server error. Please try again.');
+            }
+        });
+    });
+
+    // ============================= Pre-order (sell now, deliver later) =============================
+    function todayStr() {                      // local date (toISOString() is UTC and gives yesterday early in the morning)
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function openPreorder() {
+        if (!pendingProduct) { 
+            Swal.fire({
+                icon: 'warning',
+                title: 'Select a product first',
+                text: 'Search and select the product, then click Pre-order.',
+                confirmButtonColor: '#D0111B',
+                confirmButtonText: 'OK'
+            }).then(function () {
+                document.getElementById("barcodeInput").focus();   // cashier can start searching straight away
+            });
+            return; 
+        }
+        $('#po_item').text(pendingProduct.name);
+        $('#po_qty').val(1);
+        $('#po_date').val('').attr('min', todayStr());
+        $('#po_msg').text('');
+        $('#preordermodal').modal('show');
+    }
+
+    $('#btnaddpreorder').on('click', function () {
+        const p = pendingProduct;
+        if (!p) return;
+        const date = $('#po_date').val();
+        const qty  = parseInt($('#po_qty').val(), 10) || 0;
+        if (!date || date < todayStr()) { $('#po_msg').text('Enter the delivery date (today or later).'); return; }
+        if (qty < 1 || qty > 999)       { $('#po_msg').text('Enter a valid quantity.'); return; }
+
+        const base = {
+            id: p.id, sku: p.sku, name: p.name, warranty: p.warranty, warrantymonth: p.warrantymonth,
+            price: p.price, serialId: null, serialno: null, costprice: 0,
+            preorder: true, hasSerial: !!p.hasSerial, deliveryDate: date,
+            imei: 'PRE-ORDER - deliver on ' + date
+        };
+        if (p.hasSerial) { for (let i = 0; i < qty; i++) cart.push({ ...base, qty: 1 }); }   // serial items: one line per unit
+        else             { cart.push({ ...base, qty: qty }); }
+
+        $('#preordermodal').modal('hide');
+        resetImeiBox();
+        renderCartTable();
+        document.getElementById("barcodeInput").focus();
+    });
+
     function showSerialList(val) {
         const box = document.getElementById("serialBox");
         if (!pendingProduct) { box.style.display = "none"; return; }
@@ -1850,7 +2449,8 @@ include "include/topnavbar.php";
                 box.appendChild(h);
             }
 
-            const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : pendingProduct.price;
+            // const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : pendingProduct.price;
+            const price = serialPrice(pendingProduct, s);
             const item = document.createElement("div");
             item.className = "autocomplete-item" + (blocked ? " fifo-blocked" : "");
             item.innerHTML = `
@@ -1864,61 +2464,139 @@ include "include/topnavbar.php";
         box.style.display = "block";
     }
 
+    // function handleImeiAttach(e) {
+    //     if (e.key !== 'Enter') return;
+    //     e.preventDefault();
+
+    //     const val = e.target.value.trim().toLowerCase();
+    //     if (!val) return;
+
+    //     if (!pendingProduct) {
+    //         Swal.fire({
+    //             title: 'Product Required',
+    //             text: "Please select a product first.",
+    //             icon: 'warning',
+    //             confirmButtonColor: '#D0111B',
+    //             confirmButtonText: 'OK'
+    //         }).then(() => {
+    //             document.getElementById("barcodeInput").focus();
+    //         });
+    //         return;
+    //     }
+
+    //     // exact match first, otherwise a single partial match
+    //     let serial = pendingProduct.serials.find(s => s.serialno.toLowerCase() === val);
+    //     if (!serial) {
+    //         const partial = availableSerials(val);
+    //         if (partial.length === 1) serial = partial[0];
+    //     }
+
+    //     if (!serial) {
+    //         Swal.fire({
+    //             title: 'Not Found',
+    //             text: "Serial / IMEI not found for this product.",
+    //             icon: 'error',
+    //             confirmButtonColor: '#D0111B',
+    //             confirmButtonText: 'OK'
+    //         }).then(() => {
+    //             e.target.value = ""; // Clear input on error
+    //         });
+    //         return;
+    //     }
+
+    //     if (cart.some(c => c.serialId == serial.idtbl_product_serial)) {
+    //         Swal.fire({
+    //             title: 'Duplicate Serial',
+    //             text: "This serial is already in the cart.",
+    //             icon: 'info',
+    //             confirmButtonColor: '#D0111B',
+    //             confirmButtonText: 'OK'
+    //         }).then(() => {
+    //             e.target.value = "";
+    //         });
+    //         return;
+    //     }
+
+    //     addSerialToCart(pendingProduct, serial);
+    //     e.target.value = ""; // Clear input after successful addition
+    // }
     function handleImeiAttach(e) {
         if (e.key !== 'Enter') return;
         e.preventDefault();
 
-        const val = e.target.value.trim().toLowerCase();
-        if (!val) return;
+        const raw = e.target.value.trim();
+        const val = raw.toLowerCase();
+
+        // TEMPORARY: Enter on an empty box = add the product without a serial number
+        if (!val) {
+            if (MANUAL_SERIAL && pendingProduct && (!pendingProduct.serials || pendingProduct.serials.length === 0)) {
+                const p = pendingProduct;
+                resetImeiBox();
+                addItemToCart(p);
+            }
+            return;
+        }
 
         if (!pendingProduct) {
-            Swal.fire({
-                title: 'Product Required',
-                text: "Please select a product first.",
-                icon: 'warning',
-                confirmButtonColor: '#D0111B',
-                confirmButtonText: 'OK'
-            }).then(() => {
-                document.getElementById("barcodeInput").focus();
-            });
+            alert("Please select a product first.");
+            document.getElementById("barcodeInput").focus();
             return;
         }
 
         // exact match first, otherwise a single partial match
-        let serial = pendingProduct.serials.find(s => s.serialno.toLowerCase() === val);
+        let serial = (pendingProduct.serials || []).find(s => s.serialno.toLowerCase() === val);
         if (!serial) {
             const partial = availableSerials(val);
             if (partial.length === 1) serial = partial[0];
         }
 
         if (!serial) {
-            Swal.fire({
-                title: 'Not Found',
-                text: "Serial / IMEI not found for this product.",
-                icon: 'error',
-                confirmButtonColor: '#D0111B',
-                confirmButtonText: 'OK'
-            }).then(() => {
-                e.target.value = ""; // Clear input on error
-            });
+            // TEMPORARY: not in the stock list = a new serial typed by the cashier
+            if (MANUAL_SERIAL) { addManualSerial(pendingProduct, raw); return; }
+            alert("Serial / IMEI not found for this product.");
             return;
         }
-
         if (cart.some(c => c.serialId == serial.idtbl_product_serial)) {
-            Swal.fire({
-                title: 'Duplicate Serial',
-                text: "This serial is already in the cart.",
-                icon: 'info',
-                confirmButtonColor: '#D0111B',
-                confirmButtonText: 'OK'
-            }).then(() => {
-                e.target.value = "";
-            });
+            alert("This serial is already in the cart.");
+            e.target.value = "";
             return;
         }
-
         addSerialToCart(pendingProduct, serial);
-        e.target.value = ""; // Clear input after successful addition
+    }
+
+    function resetImeiBox() {
+        pendingProduct = null;
+        const imei = document.getElementById("imeiInput");
+        imei.value = "";
+        imei.placeholder = "Select a product first...";
+        document.getElementById("serialBox").style.display = "none";
+    }
+
+    // TEMPORARY: a serial typed by the cashier. It is registered when the invoice is saved.
+    function addManualSerial(prod, serialNo) {
+        const sn = serialNo.trim();
+        if (cart.some(c => (c.serialno || '').toLowerCase() === sn.toLowerCase())) {
+            alert("This serial is already in the cart.");
+            return;
+        }
+        Swal.fire({
+            icon: 'question',
+            title: 'New serial number',
+            text: 'Add serial ' + sn + ' to ' + prod.name + '? Please check the number.',
+            showCancelButton: true,
+            confirmButtonText: 'Add'
+        }).then(function (r) {
+            if (r.dismiss) { $('#imeiInput').focus(); return; }
+            cart.push({
+                id: prod.id, sku: prod.sku, name: prod.name, warranty: prod.warranty, warrantymonth: prod.warrantymonth,
+                price: prod.price, qty: 1,
+                serialId: null, manualSerial: sn, serialno: sn,
+                costprice: 0, imei: 'S/N: ' + sn + ' (new)'
+            });
+            resetImeiBox();
+            renderCartTable();
+            document.getElementById("barcodeInput").focus();
+        });
     }
 
     // FIFO check (client side, same as stock transfer), then add
@@ -1948,7 +2626,8 @@ include "include/topnavbar.php";
     function pushSerialToCart(prod, s, ignored) {
         if (cart.some(c => c.serialId == s.idtbl_product_serial)) return;   // a double Enter must not add it twice
 
-        const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price;
+        // const price = parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price;
+        const price = serialPrice(prod, s);
 
         cart.push({
             id: prod.id,
@@ -2070,7 +2749,9 @@ include "include/topnavbar.php";
 
     // Only for products WITHOUT serials
     function addItemToCart(prod) {
-        const existing = cart.find(c => c.sku === prod.sku && !c.serialId);
+        // const existing = cart.find(c => c.sku === prod.sku && !c.serialId);
+        // const existing = cart.find(c => c.sku === prod.sku && !c.serialId && !c.manualSerial);
+        const existing = cart.find(c => c.sku === prod.sku && !c.serialId && !c.manualSerial && !c.preorder);
         if (existing) {
             existing.qty++;
         } else {
@@ -2423,7 +3104,22 @@ include "include/topnavbar.php";
         calculateSplitPayments();
     }
 
+    // function showInvoicePdf(invoiceId) {
+    //     const url = '<?php echo base_url(); ?>Invoice/Printinvoice/' + invoiceId;
+    //     $('#invoicePdfFrame').attr('src', url);
+    //     $('#invoicePdfOpen').attr('href', url);
+    //     $('#invoicePdfModal').modal('show');
+    // }
+
+    // function printInvoicePdf() {
+    //     const f = document.getElementById('invoicePdfFrame');
+    //     f.contentWindow.focus();
+    //     f.contentWindow.print();
+    // }
+    let lastInvoiceId = 0;
+
     function showInvoicePdf(invoiceId) {
+        lastInvoiceId = invoiceId;
         const url = '<?php echo base_url(); ?>Invoice/Printinvoice/' + invoiceId;
         $('#invoicePdfFrame').attr('src', url);
         $('#invoicePdfOpen').attr('href', url);
@@ -2436,8 +3132,23 @@ include "include/topnavbar.php";
         f.contentWindow.print();
     }
 
+    // POS bill for the Xprinter XP-420B: opens the bill in a small window which prints itself
+    function printPosBill() {
+        if (!lastInvoiceId) return;
+        const w = window.open('<?php echo base_url(); ?>Invoice/Printbill/' + lastInvoiceId + '?print=1', 'posbill', 'width=420,height=640');
+        if (!w) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Pop-up blocked',
+                text: 'Allow pop-ups for this site to print the POS bill.',
+                confirmButtonColor: '#D0111B'
+            });
+        }
+    }
+
     $('#invoicePdfModal').on('hidden.bs.modal', function () {
         $('#invoicePdfFrame').attr('src', 'about:blank');   // free the PDF
+        $('#posBillFrame').attr('src', 'about:blank');
         window.location.reload();
     });
 
@@ -2447,6 +3158,9 @@ include "include/topnavbar.php";
     function resetInvoiceForm() {
         cart = [];
         $('#discountInput').val(0);
+        discountApproval = null; 
+        discountLast = 0; 
+        $('#discountBy').text('');
         $('#custSearchInput, #custNameInput, #custIDInput').val('');
         $('#creditnoteid').html('<option value="">-- None --</option>');
         $('#invoiceTypeSelect').val('Retail Tax Invoice (VAT)');
@@ -2525,6 +3239,14 @@ include "include/topnavbar.php";
                 $('#holdListModal').modal('hide');
                 loadBillIntoCart(res.bill);
                 activeHoldId = res.bill.id;
+
+                // the held discount is shown again, but an approval is never stored with a hold,
+                // so the old approval is dropped and it is asked again when the sale is completed
+                discountApproval = null;
+                discountLast = 0;
+                $('#discountBy').text(
+                    (parseFloat($('#discountInput').val()) || 0) > 0 ? 'Needs approval' : ''
+                );
             }
         });
     }
@@ -2550,7 +3272,8 @@ include "include/topnavbar.php";
                 if (cart.some(c => c.serialId == s.idtbl_product_serial)) return;
                 cart.push({
                     id: prod.id, sku: prod.sku, name: prod.name, warranty: prod.warranty, warrantymonth: prod.warrantymonth,
-                    price: parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price, qty: 1,
+                    // price: parseFloat(s.saleprice) > 0 ? parseFloat(s.saleprice) : prod.price, qty: 1,
+                    price: serialPrice(prod, s), qty: 1,
                     serialId: s.idtbl_product_serial, serialno: s.serialno,
                     costprice: parseFloat(s.costunitprice) || 0, imei: 'S/N: ' + s.serialno
                 });
