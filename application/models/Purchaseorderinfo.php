@@ -833,4 +833,23 @@
 			echo json_encode($obj);
 		}
 	}
+
+	public function GetProductSuppliers() {
+		$productID = (int)$this->input->post('productID');
+
+		$this->db->distinct();
+		$this->db->select('s.suppliername');
+		$this->db->from('tbl_grndetail AS gd');
+		$this->db->join('tbl_grn AS g', 'g.idtbl_grn = gd.tbl_grn_idtbl_grn');
+		$this->db->join('tbl_supplier AS s', 's.idtbl_supplier = g.tbl_supplier_idtbl_supplier');
+		$this->db->where('gd.tbl_product_idtbl_product', $productID);
+		$this->db->where('gd.status', 1);
+		$this->db->where('g.status', 1);
+		$this->db->order_by('s.suppliername', 'ASC');
+		$rows = $this->db->get()->result();
+
+		$names = array();
+		foreach ($rows as $r) { $names[] = $r->suppliername; }
+		echo json_encode($names);
+	}
 }

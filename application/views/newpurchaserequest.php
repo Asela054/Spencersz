@@ -50,7 +50,15 @@ include "include/topnavbar.php";
 
                                     <div class="form-group mb-1">
                                         <label class="small font-weight-bold text-dark">Product*</label>
-                                        <select class="form-control form-control-sm" name="product" id="product"></select>
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-grow-1" style="min-width:0;">
+                                                <select class="form-control form-control-sm" name="product" id="product"></select>
+                                            </div>
+                                            <button type="button" class="btn btn-outline-primary btn-sm ml-1 btnproductsuppliers"
+                                                    data-target-select="#product" title="Previous GRN suppliers">
+                                                <i class="fas fa-question"></i>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div class="form-row mb-1">
@@ -495,6 +503,43 @@ $(document).ready(function() {
             confirmButtonText: "Check"
         }).then((result) => {
             if (result.isConfirmed) { checkjob(1); }
+        });
+    });
+
+    $(document).on('click', '.btnproductsuppliers', function () {
+        var productID = $($(this).data('target-select')).val();
+        var productText = $($(this).data('target-select')).find('option:selected').text();
+
+        if (!productID) {
+            Swal.fire({ icon: 'info', title: 'Select a product first' });
+            return;
+        }
+
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            data: { productID: productID },
+            url: '<?php echo base_url() ?>Purchaseorder/GetProductSuppliers', // use Newpurchaserequest/... on the request page
+            success: function (names) {
+                var html;
+                if (names.length === 0) {
+                    html = '<p class="text-muted mb-0">No previous GRN found for this product.</p>';
+                } else {
+                    html = '<ul class="list-group text-left">';
+                    $.each(names, function (i, n) {
+                        html += '<li class="list-group-item py-2">' + $('<div>').text(n).html() + '</li>';
+                    });
+                    html += '</ul>';
+                }
+                Swal.fire({
+                    title: 'Previous Suppliers',
+                    html: '<div class="small font-weight-bold mb-2">' + $('<div>').text(productText).html() + '</div>' + html,
+                    confirmButtonText: 'Close'
+                });
+            },
+            error: function () {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Could not load suppliers.' });
+            }
         });
     });
 });

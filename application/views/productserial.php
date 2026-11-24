@@ -26,14 +26,9 @@ include "include/topnavbar.php";
                             <div class="col-md-6 col-lg-4">
                                 <div class="form-group mb-1">
                                     <label class="small font-weight-bold">Product*</label>
-                                    <select class="form-control form-control-sm" name="product" id="product">
-                                        <option value="">Select</option>
-                                        <?php foreach($productlist as $rowproduct){ ?>
-                                        <option value="<?php echo $rowproduct->idtbl_product ?>">
-                                            <?php echo $rowproduct->product_code.' - '.$rowproduct->product_name.(!empty($rowproduct->model_no) ? ' ('.$rowproduct->model_no.')' : ''); ?>
-                                        </option>
-                                        <?php } ?>
-                                    </select>
+                                        <select class="form-control form-control-sm" name="product" id="product">
+                                            <option value="">Select</option>
+                                        </select>
                                 </div>
                             </div>
                         </div>
@@ -101,7 +96,20 @@ include "include/topnavbar.php";
         var serialtable=null;
         var productname='';
 
-        if($.fn.select2){ $('#product').select2(); }
+        $('#product').select2({
+            width: '100%',
+            placeholder: 'Select',
+            allowClear: true,
+            minimumInputLength: 0,
+            ajax: {
+                url: '<?php echo base_url() ?>Productserial/Getproductsearch',
+                type: 'POST',
+                dataType: 'json',
+                delay: 250,
+                data: function(params){ return { term: params.term || '' }; },
+                processResults: function(data){ return data; }
+            }
+        });
 
         function esc(v){ return $('<div>').text(v==null ? '' : v).html(); }
         function money(v){ return Number(v||0).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -348,7 +356,7 @@ include "include/topnavbar.php";
 
         $('#product').on('change', function() {
             var id = $(this).val();
-            if(id==''){
+            if(!id){
                 $('#resultArea').hide();
                 $('#emptyCard').show();
                 return;

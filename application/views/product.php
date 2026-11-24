@@ -413,6 +413,41 @@ include "include/topnavbar.php";
         </div>
     </div>
 </div>
+
+<!-- GRN suppliers modal -->
+<div class="modal fade" id="grnsuppliermodal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-truck-loading mr-2"></i>GRN Suppliers - <span id="grnproducttitle"></span></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-sm small" id="tablegrnsuppliers">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>GRN No</th>
+                                <th>Supplier</th>
+                                <th>Invoice No</th>
+                                <!-- <th class="text-right">Qty</th>
+                                <th class="text-right">Free</th>
+                                <th class="text-right">Unit Price</th>
+                                <th class="text-right">Discount</th>
+                                <th class="text-right">Cost Price</th>
+                                <th>Status</th> -->
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <?php include "include/footerscripts.php"; ?>
 <script>
     $(document).ready(function() {
@@ -659,6 +694,7 @@ include "include/topnavbar.php";
                         var button='';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Edit" class="btn btn-primary btn-sm btnEdit mr-1 ';if(editcheck!=1){button+='d-none';}button+='" id="'+full['idtbl_product']+'"><i class="fas fa-pen"></i></button>';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Update Selling Price" class="btn btn-info btn-sm btnPrice mr-1 ';if(editcheck!=1){button+='d-none';}button+='" data-id="'+full['idtbl_product']+'"><i class="fas fa-tags"></i></button>';
+                        button+='<button data-toggle="tooltip" data-placement="bottom" title="GRN Suppliers" class="btn btn-warning btn-sm btnGrnSuppliers mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-truck-loading"></i></button>';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Price History" class="btn btn-dark btn-sm btnPriceHistory mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-history"></i></button>';
                         button+='<button data-toggle="tooltip" data-placement="bottom" title="Print Barcode" class="btn btn-secondary btn-sm btnBarcode mr-1" data-id="'+full['idtbl_product']+'"><i class="fas fa-barcode"></i></button>';
                         if(full['status']==1){
@@ -839,6 +875,45 @@ include "include/topnavbar.php";
                     });
 
                     $('#pricehistorymodal').modal('show');
+                }
+            });
+        });
+
+        $('#tblproduct tbody').on('click', '.btnGrnSuppliers', function() {
+            var id = $(this).data('id');
+            $.ajax({
+                type: "POST",
+                data: { recordID: id },
+                url: '<?php echo base_url() ?>Product/Getgrnsuppliers',
+                success: function(result) {
+                    var obj = JSON.parse(result);
+                    var tbody = $('#tablegrnsuppliers tbody').empty();
+
+                    $('#grnproducttitle').text(obj.product.product_code ? obj.product.product_code + ' / ' + obj.product.product_name : '');
+
+                    if(!obj.rows.length){
+                        tbody.append('<tr><td colspan="10" class="text-center">No GRN found for this product</td></tr>');
+                    }
+
+                    $.each(obj.rows, function(i, r){
+                        var badge = r.approvestatus == 1
+                            ? '<span class="badge badge-success">Approved</span>'
+                            : '<span class="badge badge-warning">Pending</span>';
+                        tbody.append('<tr>' +
+                            '<td>' + escHtml(r.grndate) + '</td>' +
+                            '<td>' + escHtml(r.grn_no) + '</td>' +
+                            '<td class="font-weight-bold">' + escHtml(r.suppliername) + '</td>' +
+                            '<td>' + escHtml(r.invoicenum) + '</td>' +
+                            // '<td class="text-right">' + parseFloat(r.qty) + '</td>' +
+                            // '<td class="text-right">' + parseFloat(r.free_qty) + '</td>' +
+                            // '<td class="text-right">' + fmtPrice(r.unitprice) + '</td>' +
+                            // '<td class="text-right">' + fmtPrice(r.unit_discount) + '</td>' +
+                            // '<td class="text-right">' + fmtPrice(r.costunitprice) + '</td>' +
+                            // '<td>' + badge + '</td>' +
+                            '</tr>');
+                    });
+
+                    $('#grnsuppliermodal').modal('show');
                 }
             });
         });

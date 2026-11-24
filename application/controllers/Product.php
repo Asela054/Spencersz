@@ -60,4 +60,9 @@ class Product extends CI_Controller {
         $data['value'] = !empty($product->barcode) ? $product->barcode : $product->product_code;
         $this->load->view('barcodeprint', $data);
     }
+
+    public function Getgrnsuppliers(){
+        $this->load->model('Productinfo');
+        $this->Productinfo->Getgrnsuppliers();
+    }
 }

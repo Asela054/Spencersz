@@ -695,4 +695,29 @@ class Productinfo extends CI_Model{
         $this->db->order_by('unit', 'ASC');
         return $this->db->get()->result();
     }
+
+    public function Getgrnsuppliers(){
+        $recordID=$this->input->post('recordID');
+
+        $this->db->select('product_code, product_name');
+        $this->db->from('tbl_product');
+        $this->db->where('idtbl_product', $recordID);
+        $product=$this->db->get()->row();
+
+        $this->db->select('g.grn_no, g.grndate, g.invoicenum, g.approvestatus, s.suppliername, d.qty, d.free_qty, d.unitprice, d.costunitprice, d.unit_discount');
+        $this->db->from('tbl_grndetail d');
+        $this->db->join('tbl_grn g', 'g.idtbl_grn = d.tbl_grn_idtbl_grn');
+        $this->db->join('tbl_supplier s', 's.idtbl_supplier = g.tbl_supplier_idtbl_supplier', 'left');
+        $this->db->where('d.tbl_product_idtbl_product', $recordID);
+        $this->db->where('d.status', 1);
+        $this->db->where('g.status', 1);
+        $this->db->order_by('g.grndate', 'DESC');
+        $this->db->order_by('g.idtbl_grn', 'DESC');
+        $rows=$this->db->get()->result();
+
+        echo json_encode(array(
+            'product'=> $product ? $product : new stdClass(),
+            'rows'=> $rows
+        ));
+    }
 }
