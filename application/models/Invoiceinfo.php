@@ -184,6 +184,7 @@ class Invoiceinfo extends CI_Model{
         // ONE query for the serials of all these products (was: one query per product)
         $ids = array();
         foreach ($products as $row) { $ids[] = (int)$row->idtbl_product; }
+        $availMap = $this->availableqty($ids, (int)$_SESSION['branch_id']);
 
         $partsByProduct = $this->partwarranties($ids);
 
@@ -217,6 +218,7 @@ class Invoiceinfo extends CI_Model{
                 'warranty_months' => $row->warranty_months,
                 'has_serial' => (int)$row->has_serial,
                 'discount_percent' => $this->activediscount($row),
+                'available_qty' => isset($availMap[(int)$row->idtbl_product]) ? $availMap[(int)$row->idtbl_product] : 0,
                 'warranty_parts' => isset($partsByProduct[(int)$row->idtbl_product]) ? $partsByProduct[(int)$row->idtbl_product] : array(),
                 'serials' => isset($serialsByProduct[(int)$row->idtbl_product]) ? $serialsByProduct[(int)$row->idtbl_product] : array()
             );
@@ -1296,6 +1298,12 @@ class Invoiceinfo extends CI_Model{
 
         return array('inv'=>$inv, 'rows'=>$rows, 'date'=>$date);
     }
+
+    /* available qty of the products on one page of the catalog modal: {product_id: qty} */
+    public function Getavailableqty(){
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)$this->input->post('ids')))));
+        echo json_encode((object)$this->availableqty($ids, (int)$_SESSION['branch_id']));
+    }
     
 
     // ── Private helper ────────────────────────────────────────────────────────────
@@ -1560,5 +1568,33 @@ class Invoiceinfo extends CI_Model{
                             WHERE d.tbl_product_idtbl_product = ? AND d.is_preorder = 1 AND d.delivery_status = 2 AND d.status = 1
                             AND i.status = 1 AND i.tbl_company_branch_idtbl_company_branch = ?", array((int)$pid, (int)$branch))->row();
         return (int)$r->q;
+    }
+
+    /* [product_id => available qty] in this branch (tbl_stock), minus what is reserved for pending deliveries */
+    private function availableqty($ids, $branch){
+        $out = array();
+        foreach ($ids as $id) { $out[(int)$id] = 0; }
+        if (empty($ids)) { return $out; }
+
+        // stock of these products in this branch
+        $rows = $this->db->select('tbl_product_idtbl_product AS pid, COALESCE(SUM(qty),0) AS q', FALSE)
+                        ->from('tbl_stock')
+                        ->where_in('tbl_product_idtbl_product', $ids)
+                        ->where('status', 1)->where('stock_status', 1)
+                        ->where('tbl_company_branch_idtbl_company_branch', $branch)
+                        ->group_by('tbl_product_idtbl_product')->get()->result();
+        foreach ($rows as $r) { $out[(int)$r->pid] = (int)floor((float)$r->q); }
+
+        // reserved for pending deliveries (pre-orders): remove this block to show the plain stock qty
+        $rows = $this->db->select('d.tbl_product_idtbl_product AS pid, SUM(d.qty - d.delivered_qty) AS q', FALSE)
+                        ->from('tbl_invoice_detail d')
+                        ->join('tbl_invoice i', 'i.idtbl_invoice = d.tbl_invoice_idtbl_invoice')
+                        ->where_in('d.tbl_product_idtbl_product', $ids)
+                        ->where('d.is_preorder', 1)->where('d.delivery_status', 2)->where('d.status', 1)
+                        ->where('i.status', 1)->where('i.tbl_company_branch_idtbl_company_branch', $branch)
+                        ->group_by('d.tbl_product_idtbl_product')->get()->result();
+        foreach ($rows as $r) { $out[(int)$r->pid] = max(0, $out[(int)$r->pid] - (int)$r->q); }
+
+        return $out;
     }
 }
