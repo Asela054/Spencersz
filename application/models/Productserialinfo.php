@@ -1,14 +1,33 @@
 <?php
 class Productserialinfo extends CI_Model{
-    public function Getproductlist(){
+    public function Getproductsearch(){
+        $term=trim((string)$this->input->post('term'));
+        $limit=($term==='') ? 5 : 20; 
+
         $this->db->select('idtbl_product, product_code, product_name, model_no');
         $this->db->from('tbl_product');
         $this->db->where('status', 1);
         $this->db->where('has_serial', 1);
+        if($term!==''){
+            $this->db->group_start();
+            $this->db->like('product_code', $term);
+            $this->db->or_like('product_name', $term);
+            $this->db->or_like('model_no', $term);
+            $this->db->or_like('barcode', $term);
+            $this->db->group_end();
+        }
         $this->db->order_by('product_name', 'ASC');
+        $this->db->limit($limit);
+        $rows=$this->db->get()->result();
 
-        $respond=$this->db->get();
-        return $respond->result();
+        $results=array();
+        foreach($rows as $r){
+            $results[]=array(
+                'id'=>$r->idtbl_product,
+                'text'=>$r->product_code.' - '.$r->product_name.(!empty($r->model_no) ? ' ('.$r->model_no.')' : '')
+            );
+        }
+        echo json_encode(array('results'=>$results));
     }
     public function Getproductdetail(){
         $productID=$this->input->post('productID');

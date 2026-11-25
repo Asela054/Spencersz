@@ -9,6 +9,7 @@ $tabs = [
 	'transfer'  => ['Stocktransferreport',  'Transfers',     'fa-exchange-alt',        'Stock Transfer Report',         'Movements between showrooms and warehouses, with live status.'],
 	'dead'      => ['Deadstockreport',      'Slow moving',   'fa-hourglass-half',      'Dead / Slow-Moving Stock',      'Stock on hand that has not sold for a set number of days.'],
 	'valuation' => ['Stockvaluationreport', 'Valuation',     'fa-coins',               'Stock Valuation by Category & Brand', 'Stock value at cost grouped by category and brand.'],
+	'fast'      => ['Fastmovingreport',     'Fast moving',   'fa-bolt',                'Fast Moving Items',             'Products ranked by units sold in a period, with current stock and days of cover.'],
 ];
 $cur = $tabs[$report];
 $defBranch = (int)(isset($_SESSION['branch_id']) ? $_SESSION['branch_id'] : 0);
@@ -76,8 +77,9 @@ $defBranch = (int)(isset($_SESSION['branch_id']) ? $_SESSION['branch_id'] : 0);
 							</div>
 							<?php } ?>
 
-							<?php if ($report == 'card' || $report == 'transfer') { ?>
-							<div class="col-lg-2 col-md-2 col-6 mb-2"><label>From</label><input type="date" id="fFrom" class="form-control" value="<?php echo date('Y-m-01'); ?>"></div>
+							<?php if ($report == 'card' || $report == 'transfer' || $report == 'fast') {
+								$defFrom = ($report == 'fast') ? date('Y-m-d', strtotime('-30 days')) : date('Y-m-01'); ?>
+							<div class="col-lg-2 col-md-2 col-6 mb-2"><label>From</label><input type="date" id="fFrom" class="form-control" value="<?php echo $defFrom; ?>"></div>
 							<div class="col-lg-2 col-md-2 col-6 mb-2"><label>To</label><input type="date" id="fTo" class="form-control" value="<?php echo date('Y-m-d'); ?>"></div>
 							<?php } ?>
 
@@ -100,6 +102,19 @@ $defBranch = (int)(isset($_SESSION['branch_id']) ? $_SESSION['branch_id'] : 0);
 
 							<?php if ($report == 'dead') { ?>
 							<div class="col-lg-2 col-md-3 mb-2"><label>No sales for at least (days)</label><input type="number" min="0" id="fDays" class="form-control" value="90"></div>
+							<?php } ?>
+
+							<?php if ($report == 'fast') { ?>
+							<div class="col-lg-2 col-md-3 mb-2">
+								<label>Show</label>
+								<select id="fTop" class="form-control">
+									<option value="10">Top 10</option>
+									<option value="20" selected>Top 20</option>
+									<option value="50">Top 50</option>
+									<option value="100">Top 100</option>
+									<option value="0">All sold items</option>
+								</select>
+							</div>
 							<?php } ?>
 
 							<?php if ($report == 'current') { ?>
@@ -278,12 +293,34 @@ $(function () {
 		};
 	};
 
+	R.fast = function (d) {
+		var rows = d.data, tq = sum(rows, 'qty_sold'), tr = sum(rows, 'revenue'), max = rows.length ? +rows[0].qty_sold : 0, risk = 0;
+		var body = rows.map(function (r, i) {
+			var q = +r.qty_sold, st = +r.stock, perDay = q / d.days, cover = perDay > 0 ? st / perDay : 0, cls, txt;
+			if (st <= 0)         { cls = 'bad';  txt = 'Out of stock'; risk++; }
+			else if (cover < 7)  { cls = 'bad';  txt = 'Under 1 week'; risk++; }
+			else if (cover < 14) { cls = 'warn'; txt = 'Low cover';    risk++; }
+			else                 { cls = 'ok';   txt = 'OK'; }
+			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
+				'<td class="r"><b>' + num(q) + '</b></td><td class="r">' + money(r.revenue) + '</td><td class="r">' + num(r.invoices) + '</td>' +
+				'<td class="r">' + num(perDay) + '</td><td class="r">' + num(st) + '</td><td class="r">' + (st > 0 ? num(cover) : '0') + '</td>' +
+				'<td>' + (r.last_sale ? esc(r.last_sale) : '-') + '</td><td style="width:100px">' + bar(max ? q / max * 100 : 0) + '</td><td>' + badge(cls, txt) + '</td></tr>';
+		}).join('');
+		return {
+			kpis: kpi('fa-bolt', rows.length, 'Products sold') + kpi('fa-cubes', num(tq), 'Units sold in ' + d.days + ' days', 'info') +
+				kpi('fa-coins', 'Rs. ' + money(tr), 'Sales incl. VAT') + kpi('fa-exclamation-triangle', risk, 'Need restocking soon', risk ? 'warn' : ''),
+			html: rows.length ? table(th(['#', 'Product', 'Category', 'Brand', '>Units sold', '>Sales (incl. VAT)', '>Invoices', '>Avg / day', '>In stock', '>Days of cover', 'Last sale', 'Volume', 'Status']), body,
+				'<tr><td colspan="4" class="r">Total</td><td class="r">' + num(tq) + '</td><td class="r">' + money(tr) + '</td><td colspan="8"></td></tr>') : empty('No sales found in this period.', 'fa-info-circle')
+		};
+	};
+
 	/* ---------- load ---------- */
 	function params() {
 		return {
 			report: REPORT, branch_id: $('#fBranch').val(), from: $('#fFrom').val(), to: $('#fTo').val(),
 			product_id: $('#fProduct').val(), days: $('#fDays').val(), ttype: $('#fType').val(), tstatus: $('#fStatus').val(),
-			split: $('#fSplit').is(':checked') ? 1 : 0
+			split: $('#fSplit').is(':checked') ? 1 : 0,
+			top: $('#fTop').val()
 		};
 	}
 	function run() {
@@ -302,7 +339,7 @@ $(function () {
 			}});
 	}
 	$('#btnRun').on('click', run);
-	$('#fBranch,#fFrom,#fTo,#fType,#fStatus,#fSplit,#fProduct').on('change', run);
+	$('#fBranch,#fFrom,#fTo,#fType,#fStatus,#fSplit,#fProduct,#fTop').on('change', run);
 	$('#fDays').on('keyup', function (e) { if (e.keyCode == 13) run(); });
 	if ($.fn.select2 && $('#fProduct').length) { $('#fProduct').select2({width: '100%'}); }
 	run();

@@ -164,6 +164,33 @@ try {
         echo json_encode(['data' => $out]);
         break;
 
+    /* 13. FAST MOVING ------------------------------------------------- */
+    case 'fast':
+        if ($from > $to) { $t = $from; $from = $to; $to = $t; }
+        $days = max(1, (int)((strtotime($to) - strtotime($from)) / 86400) + 1);
+        $top  = (int)($_POST['top'] ?? 20);
+        $top  = ($top > 0 && $top <= 500) ? $top : 500;
+        $bv   = $branch > 0 ? " AND v.branch_id = $branch" : "";
+        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.reorder_level,
+                    c.category, b.brand, u.unit,
+                    sl.qty_sold, sl.revenue, sl.invoices, sl.last_sale,
+                    COALESCE(st.qty, 0) AS stock
+             FROM (SELECT v.product_id, SUM(v.qty) AS qty_sold, SUM(v.amount_incl_vat) AS revenue,
+                          COUNT(DISTINCT v.invoice_id) AS invoices, MAX(v.acc_date) AS last_sale
+                     FROM vw_sales_lines v
+                    WHERE v.acc_date BETWEEN '$from' AND '$to' $bv
+                    GROUP BY v.product_id) sl
+             JOIN tbl_product p ON p.idtbl_product = sl.product_id
+             $prodJoins
+             LEFT JOIN (SELECT s.tbl_product_idtbl_product AS pid, SUM(s.qty) AS qty
+                          FROM tbl_stock s WHERE s.status IN (1,2) $bs GROUP BY s.tbl_product_idtbl_product) st
+                    ON st.pid = p.idtbl_product
+             WHERE sl.qty_sold > 0
+             ORDER BY sl.qty_sold DESC, sl.revenue DESC
+             LIMIT $top");
+        echo json_encode(['data' => $out, 'days' => $days, 'from' => $from, 'to' => $to]);
+        break;
+
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown report']);

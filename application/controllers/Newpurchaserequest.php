@@ -51,4 +51,9 @@ class Newpurchaserequest extends CI_Controller {
         $query = trim((string)$this->input->post('query'));
         echo json_encode($this->Newpurchaserequestinfo->searchProducts($query));
     }
+
+    public function GetProductSuppliers(){
+        $this->load->model('Newpurchaserequestinfo');
+        $this->Newpurchaserequestinfo->GetProductSuppliers();
+    }
 }

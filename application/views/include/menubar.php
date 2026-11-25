@@ -271,7 +271,7 @@ if(!empty($comsplit[1])): $comshowline2 = '('.$comsplit[1];else: $comshowline2 =
 
 			<!-- Report Menu New Added -->
 			<?php
-			$stockRptPages = ['Stocklistreport','Stockcard','Reorderstockreport','Stocktransferreport','Deadstockreport','Stockvaluationreport'];
+			$stockRptPages = ['Stocklistreport','Stockcard','Reorderstockreport','Stocktransferreport','Deadstockreport','Stockvaluationreport','Fastmovingreport'];
 			$stockRptEntry = '';
 			foreach ($stockRptPages as $p) {
 				if (in_array($p, $permissionallowed)) { $stockRptEntry = $p; break; }

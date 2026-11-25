@@ -80,4 +80,9 @@ class Purchaseorder extends CI_Controller {
         $this->load->model('PorderPrintinfo');
         $this->PorderPrintinfo->Printinvoice($x);
     }
+
+    public function GetProductSuppliers(){
+        $this->load->model('Purchaseorderinfo');
+        $this->Purchaseorderinfo->GetProductSuppliers();
+    }
 }
