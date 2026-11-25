@@ -140,6 +140,9 @@ class Invoice extends CI_Controller {
     public function Itemdiscountverify(){
         $this->Invoiceinfo->Itemdiscountverify();
     }
+    public function Getavailableqty(){
+        $this->Invoiceinfo->Getavailableqty();
+    }
     // public function generateVouchers() {
     //     $currentDateTime = date('Y-m-d H:i:s');
     //     $batchData = [];

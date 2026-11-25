@@ -776,6 +776,7 @@ include "include/topnavbar.php";
 							<th>Product Title</th>
 							<th>Warranty</th>
 							<th>Price (LKR)</th>
+                            <th>Available</th>
 							<th>Action</th>
 						</tr>
 					</thead>
@@ -1231,6 +1232,13 @@ include "include/topnavbar.php";
             : f(p.price);
     }
 
+    // "5 in stock" / "Out of stock" badge
+    function qtyBadge(n) {
+        n = parseInt(n, 10) || 0;
+        return '<span class="badge ' + (n > 0 ? 'badge-success' : 'badge-danger') + '" style="font-size:0.65rem;">' +
+               (n > 0 ? n + ' in stock' : 'Out of stock') + '</span>';
+    }
+
     function loadProductlist() {
         $.ajax({
             url: '<?php echo base_url(); ?>Invoice/Getproductdetails',
@@ -1263,6 +1271,7 @@ include "include/topnavbar.php";
                             warrantymonth: product.warranty_months,
                             warrantyParts: product.warranty_parts || [],
                             hasSerial: parseInt(product.has_serial, 10) === 1,
+                            available: parseInt(product.available_qty, 10) || 0,
                             serials: product.serials || []
                         });
                     });
@@ -1505,7 +1514,10 @@ include "include/topnavbar.php";
                 <div class="fw-bold" style="font-size:0.78rem;">${escH(m.name)}</div>
                 <small class="text-muted">${escH(m.sku)}</small>
                 </div>
-                <span class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${priceTag(m)}</span>
+                <div class="text-right">
+                    <div class="fw-bold text-danger font-monospace" style="font-size:0.78rem;">LKR ${priceTag(m)}</div>
+                    <div>${qtyBadge(m.available)}</div>
+                </div>
             </div>`).join('');
 
 		box.onclick = function (e) {
@@ -1652,9 +1664,27 @@ include "include/topnavbar.php";
 				  render: function (d) { return '<span class="badge bg-success text-white border">' + escH(d) + ' Months</span>'; } },
 				{ data: null, searchable: false, orderable: false, className: 'fw-bold font-monospace',
 				  render: function (d, t, r) { return 'LKR ' + catalogPriceCell(r); } },
+                { data: 'idtbl_product', searchable: false, orderable: false,
+				  render: function (d) { return '<span class="cat-qty" data-id="' + d + '"><span class="text-muted small">...</span></span>'; } },
 				{ data: 'product_code', searchable: false, orderable: false, className: 'text-center',
 				  render: function (d) { return '<button type="button" class="btn btn-spencersz btn-sm btn-catalog-add" data-code="' + escH(d) + '"><i class="fas fa-plus"></i></button>'; } }
-			]
+			],
+            drawCallback: function () {
+				const ids = [];
+				$('#dataTableCatalog .cat-qty').each(function () { ids.push($(this).attr('data-id')); });
+				if (!ids.length) return;
+				$.ajax({
+					url: '<?php echo base_url(); ?>Invoice/Getavailableqty',
+					type: 'POST',
+					dataType: 'json',
+					data: { ids: ids },
+					success: function (map) {
+						$('#dataTableCatalog .cat-qty').each(function () {
+							$(this).html(qtyBadge(map[$(this).attr('data-id')] || 0));
+						});
+					}
+				});
+			}
 		});
 		$('#dataTableCatalog_filter input').focus();
 	});
@@ -1698,6 +1728,7 @@ include "include/topnavbar.php";
 					warrantymonth: product.warranty_months,
 					warrantyParts: product.warranty_parts || [],
 					hasSerial: parseInt(product.has_serial, 10) === 1,
+                    available: parseInt(product.available_qty, 10) || 0,
 					serials: product.serials || []
 				};
 				productCatalog.push(prod);            // next time it is already there
