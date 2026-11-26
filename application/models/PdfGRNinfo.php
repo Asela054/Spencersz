@@ -7,13 +7,19 @@ class PdfGRNinfo extends CI_Model {
        Every x / y / w / h used by the GRN print is in ARTWORK PIXELS measured
        from the top-left corner of the artwork (converted to pt by px()).
        Only DATA is printed - the form design is already on the paper.
+
+       PRINT SETTINGS (important): print on a 9.5 x 11 in paper size, margins
+       None, scale 100% (turn OFF "Fit to page"). If the page is scaled the
+       data will not line up with the form.
        ===================================================================== */
     private $paperW = 684;     // 9.5in in pt
     private $paperH = 792;     // 11in in pt
     private $artW   = 1382;    // artwork width in px
 
-    private $shiftX = -18;     // printer calibration in mm (+ moves right): the LQ-310 printed ~18 mm too far right
-    private $shiftY = 0;       // printer calibration in mm (+ moves down)
+    // printer calibration in mm (+ moves right / down). Keep 0 when printing at 100% on 9.5 x 11 in paper;
+    // the old -18 was only compensating for the page being shrunk by the print dialog.
+    private $shiftX = 0;
+    private $shiftY = 0;
     private $guide  = false;   // true = red outline around every field (alignment test)
 
     private $fontSize   = 9;    // pt
@@ -203,6 +209,7 @@ class PdfGRNinfo extends CI_Model {
         $this->pdf->setPaper(array(0, 0, $this->paperW, $this->paperH));
         $this->pdf->loadHtml($html);
         $this->pdf->render();
+        $this->lq_noscale();
         $this->pdf->stream($this->lq_filename('Goods Received Note - ' . $grnNo) . '.pdf', array("Attachment" => 0));
     }
 
@@ -382,6 +389,14 @@ class PdfGRNinfo extends CI_Model {
     }
 
     /* ================= data-only print helpers (GRN on pre-printed stationery) ================= */
+
+    // ask the PDF viewer to print at 100% (no "Fit to page"); best effort, depends on the Dompdf version
+    private function lq_noscale(){
+        $c = method_exists($this->pdf, 'getCanvas') ? $this->pdf->getCanvas() : $this->pdf->get_canvas();
+        if (method_exists($c, 'get_cpdf') && method_exists($c->get_cpdf(), 'addViewerPreference')) {
+            $c->get_cpdf()->addViewerPreference('PrintScaling', 'None');
+        }
+    }
 
     // artwork px -> pt
     private function px($v){
