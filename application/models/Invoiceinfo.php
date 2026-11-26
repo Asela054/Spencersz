@@ -316,6 +316,16 @@ class Invoiceinfo extends CI_Model{
             $now        = date('Y-m-d H:i:s');
             $today      = date('Y-m-d');
             $vat_rate   = 18;
+            // invoice date chosen by the cashier (default today): not in the future, and not on a day that is already closed
+            $invoiceDate = isset($inv['invoiceDate']) ? trim((string)$inv['invoiceDate']) : $today;
+            $idt = DateTime::createFromFormat('Y-m-d', $invoiceDate);
+            if (!$idt || $idt->format('Y-m-d') !== $invoiceDate) throw new RuntimeException('Invalid invoice date');
+            if ($invoiceDate > $today) throw new RuntimeException('Invoice date cannot be in the future');
+            if ($invoiceDate < $today) {
+                $closedDay = $this->db->query("SELECT 1 FROM tbl_day_end WHERE day_date = ? AND tbl_company_branch_idtbl_company_branch = ? AND status = 1",
+                                              array($invoiceDate, $branch_id))->row();
+                if ($closedDay) throw new RuntimeException('Day end is already done for ' . $invoiceDate . '. Choose another date.');
+            }
 
             $invoiceType = $inv['invoiceType'];
             $isQuote     = ($invoiceType === 'Corporate Quotation');
@@ -607,7 +617,7 @@ class Invoiceinfo extends CI_Model{
             $invoice_no = $prefix . str_pad(((int)$last->m) + 1, 5, '0', STR_PAD_LEFT);   // 26OCT_BR03_00001
 
             $this->db->insert('tbl_invoice', [
-                'invoice_no' => $invoice_no, 'invoice_date' => $today, 'invoice_type' => $invoiceType,
+                'invoice_no' => $invoice_no, 'invoice_date' => $invoiceDate, 'invoice_type' => $invoiceType,
                 'customer_nic' => $inv['customerNic'], 'customer_name' => $inv['customerName'],
                 'fulfillment' => $inv['fulfillment'],
                 'gross_total' => $gross, 'discount' => $discount, 'vat_rate' => $vat_rate, 'vatamount' => $vat,
@@ -700,7 +710,7 @@ class Invoiceinfo extends CI_Model{
                     // 1 (in stock) -> 2 (sold), only if still in stock
                     $this->db->where('idtbl_product_serial', $sid)->where('stock_status', 1)->where('status', 1)
                             ->update('tbl_product_serial', [
-                                'stock_status' => 2, 'sold_invoice_id' => $invoice_id, 'sold_date' => $today,
+                                'stock_status' => 2, 'sold_invoice_id' => $invoice_id, 'sold_date' => $invoiceDate,
                                 'updateuser' => $userid, 'updatedatetime' => $now,
                             ]);
                     if ($this->db->affected_rows() !== 1)

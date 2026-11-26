@@ -460,6 +460,11 @@ include "include/topnavbar.php";
 											<option value="Corporate Quotation">Corporate Quotation</option>
 										</select>
 									</div>
+                                    <div class="col-md-4">
+										<label class="form-label mb-1 text-muted fw-semibold">Invoice Date</label>
+										<input type="date" id="invoiceDateInput" class="form-control form-control-sm fw-bold"
+											value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
+									</div>
                                     <input type="hidden" id="custIDInput" value="">
 								</div>
 							</div>
@@ -1832,6 +1837,17 @@ include "include/topnavbar.php";
 	function completeTransaction() {
         if (!discountGuard()) return;
 
+        const invDate = document.getElementById("invoiceDateInput").value;
+        if (!invDate || invDate > todayStr()) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invoice date',
+                text: 'Select the invoice date (today or an earlier date).',
+                confirmButtonColor: '#D0111B'
+            });
+            return;
+        }
+
 		if (cart.length === 0) {
             Swal.fire({
                 icon: 'error',
@@ -1957,6 +1973,7 @@ include "include/topnavbar.php";
     function saveInvoice() {
         const payload = {
             invoiceType: document.getElementById("invoiceTypeSelect").value,
+            invoiceDate: document.getElementById("invoiceDateInput").value,
             customerNic: document.getElementById("custSearchInput").value,
             customerName: document.getElementById("custNameInput").value,
             customerId: document.getElementById("custIDInput").value,       
@@ -2006,6 +2023,7 @@ include "include/topnavbar.php";
                     const cid = document.getElementById("custIDInput").value;
                     if (cid) loadCreditNotes(cid); else recalcPayable();
                     document.getElementById("invoiceTypeSelect").value = "Retail Tax Invoice (VAT)";
+                    document.getElementById("invoiceDateInput").value = todayStr();
                     loadProductlist();
 
                     $('#receiptPreviewModal').modal('hide');
@@ -3189,6 +3207,7 @@ include "include/topnavbar.php";
     function resetInvoiceForm() {
         cart = [];
         $('#discountInput').val(0);
+        $('#invoiceDateInput').val(todayStr()).attr('max', todayStr());
         discountApproval = null; 
         discountLast = 0; 
         $('#discountBy').text('');
