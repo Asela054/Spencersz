@@ -47,7 +47,7 @@ $supplyShown = $isTax ? $supply : round($inv->net_total, 2);
     <div class="sep"></div>
     <div class="c b"><?= $e($title) ?></div>
     <div class="row"><span>No: <b><?= $e($inv->invoice_no) ?></b></span></div>
-    <div class="row"><span>Date: <?= $e(date('d-m-Y H:i', strtotime($inv->insertdatetime))) ?></span><span><?= $cashier !== '' ? 'Cashier: ' . $e($cashier) : '' ?></span></div>
+    <div class="row"><span>Date: <?= $e(date('d-m-Y', strtotime($inv->invoice_date)) . ' ' . date('H:i', strtotime($inv->insertdatetime))) ?></span><span><?= $cashier !== '' ? 'Cashier: ' . $e($cashier) : '' ?></span></div>
     <?php if ($inv->customer_name) { ?><div>Customer: <?= $e($inv->customer_name) ?></div><?php } ?>
     <?php if ($customer && trim((string)$customer->vat_no) !== '' && trim((string)$customer->vat_no) !== '-') { ?><div>Customer TIN: <?= $e($customer->vat_no) ?></div><?php } ?>
 
