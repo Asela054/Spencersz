@@ -30,6 +30,9 @@ class Product extends CI_Controller {
         $this->load->model('Productinfo');
         $this->Productinfo->Getnextcode();
     }
+    public function Checkmodelno(){
+        $this->Productinfo->Checkmodelno();
+    }
     public function Getproductprice(){
         $this->load->model('Productinfo');
         $this->Productinfo->Getproductprice();

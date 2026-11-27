@@ -47,8 +47,18 @@
 									<label for="quicksearch">Filter results</label>
 									<input type="text" id="quicksearch" class="form-control form-control-sm" placeholder="Product, code, batch or warehouse" disabled>
 								</div>
+
+								<?php if (!empty($canviewall)) { ?>
+								<div class="grow" style="display:flex;align-items:center">
+									<div class="custom-control custom-checkbox">
+										<input type="checkbox" class="custom-control-input" id="allBranches">
+										<label class="custom-control-label" for="allBranches">Show all branches stock</label>
+									</div>
+								</div>
+								<?php } ?>
+
 								<div class="sr-actions">
-									<button type="submit" id="submitBtnStock" class="btn btn-brand btn-sm px-4" <?php if($addcheck==0){echo 'disabled';} ?>>
+									<button type="submit" id="submitBtnStock" class="btn btn-brand btn-sm px-4" <?php if(isset($addcheck) && $addcheck==0){echo 'disabled';} ?>>
 										<i class="fas fa-search mr-1"></i>Search
 									</button>
 									<button type="button" id="btnExcel" class="btn btn-ghost btn-sm px-3" onclick="exportToExcel()" disabled>
@@ -81,9 +91,14 @@
 </div>
 <?php include "include/footerscripts.php"; ?>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.24/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
 var reportGroups = {};   // { categoryName: [rows] }
 var reportTotals = {};
+var loadedAllBranches = false;
 
 function fmt(n) {
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -94,6 +109,13 @@ function fmtQty(n) {
 function esc(s) {
     return $('<div>').text(s == null ? '' : s).html();
 }
+function supplierLabel() {
+    var v = $('#supplier').val();
+    return (v && v !== '0') ? $('#supplier option:selected').text() : 'All suppliers';
+}
+function scopeLabel() {
+    return loadedAllBranches ? 'All branches' : 'Current branch';
+}
 
 $(document).ready(function () {
 
@@ -103,12 +125,28 @@ $(document).ready(function () {
         $('#mainTable').html('<div class="sr-empty"><i class="fas fa-circle-notch fa-spin"></i><div>Loading stock...</div></div>');
         $('#summary').empty();
 
+        var all = $('#allBranches').is(':checked') ? 1 : 0;
+
         $.ajax({
             type: "POST",
             url: "<?php echo base_url(); ?>Report/stockReport",
-            data: { category: $("#category").val(), supplier: $("#supplier").val() },
+            dataType: "text",
+            data: {
+                category: $("#category").val(),
+                supplier: $("#supplier").val(),
+                all_branches: all
+            },
             success: function (result) {
-                var dataArray = JSON.parse(result);
+                var dataArray;
+                try {
+                    dataArray = JSON.parse(result);
+                } catch (e) {
+                    $('#mainTable').html('<div class="sr-empty"><i class="fas fa-exclamation-triangle"></i>' +
+                        '<div>Server returned an invalid response:<br><small>' + esc(result.substring(0, 400)) + '</small></div></div>');
+                    return;
+                }
+
+                loadedAllBranches = !!all;
                 reportGroups = {};
                 reportTotals = { qty: 0, value: 0, lines: dataArray.length };
 
@@ -123,11 +161,16 @@ $(document).ready(function () {
                 $('#quicksearch').val('');
                 renderReport();
             },
-            error: function () {
-                $('#mainTable').html('<div class="sr-empty"><i class="fas fa-exclamation-triangle"></i><div>Could not load the report. Please try again.</div></div>');
+            error: function (xhr) {
+                $('#mainTable').html('<div class="sr-empty"><i class="fas fa-exclamation-triangle"></i>' +
+                    '<div>Could not load the report (HTTP ' + xhr.status + ').<br><small>' +
+                    esc((xhr.responseText || xhr.statusText || '').substring(0, 400)) + '</small></div></div>');
             }
         });
     });
+
+    // reload when the all-branches box is toggled
+    $('#allBranches').on('change', function () { $('#searchStock').submit(); });
 
     $('#quicksearch').on('input', function () {
         var term = $.trim($(this).val()).toLowerCase();
@@ -149,11 +192,6 @@ $(document).ready(function () {
 
     $("#searchStock").submit();   // load all on open
 });
-
-function supplierLabel() {
-    var v = $('#supplier').val();
-    return (v && v !== '0') ? $('#supplier option:selected').text() : 'All suppliers';
-}
 
 function renderReport() {
     var names = Object.keys(reportGroups).sort();
@@ -193,7 +231,7 @@ function generateTable(type, items) {
 
         rows += '<tr>' +
             '<td><div>' + esc(item.product_name) + '</div><div class="code">' + esc(item.product_code) + '</div></td>' +
-            '<td>' + esc(item.batchno) + '</td>' +
+            '<td>' + esc(item.model_no) + '</td>' +
             '<td>' + esc(item.wh_name) + '</td>' +
             '<td class="num">' + fmtQty(qty) + '</td>' +
             '<td class="ctr"><span class="pill">' + esc(item.measure_type) + '</span></td>' +
@@ -211,7 +249,7 @@ function generateTable(type, items) {
         '<div class="sr-table-wrap">' +
             '<table class="sr-table">' +
                 '<thead><tr>' +
-                    '<th>Product</th><th>Batch no</th><th>Warehouse</th>' +
+                    '<th>Product</th><th>Model no</th><th>Warehouse</th>' +
                     '<th class="num">Quantity</th><th class="ctr">UOM</th>' +
                     '<th class="num">Cost price</th><th class="num">Total</th>' +
                 '</tr></thead>' +
@@ -234,9 +272,9 @@ function exportToExcel() {
 
     var aoa = [
         ['Stock Category Wise Report'],
-        ['Supplier: ' + supplierLabel()],
+        ['Supplier: ' + supplierLabel() + '   |   Scope: ' + scopeLabel()],
         [],
-        ['Category', 'Product code', 'Product', 'Supplier', 'Batch no', 'Warehouse', 'Quantity', 'UOM', 'Cost price', 'Total']
+        ['Category', 'Product code', 'Product', 'Supplier', 'Model no', 'Warehouse', 'Quantity', 'UOM', 'Cost price', 'Total']
     ];
     var tq = 0, tv = 0;
 
@@ -246,7 +284,7 @@ function exportToExcel() {
             var q = parseFloat(it.qty) || 0, p = parseFloat(it.unitprice) || 0;
             gq += q; gt += q * p;
             aoa.push([name, it.product_code || '', it.product_name || '', it.supplier_name || '',
-                      it.batchno || '', it.wh_name || '', q, it.measure_type || '', p, q * p]);
+                      it.model_no || '', it.wh_name || '', q, it.measure_type || '', p, q * p]);
         });
         aoa.push([name + ' total', '', '', '', '', '', gq, '', '', gt]);
         tq += gq; tv += gt;
@@ -263,6 +301,7 @@ function exportToExcel() {
 function exportToPDF() {
     var names = Object.keys(reportGroups).sort();
     if (!names.length) { return; }
+    if (!window.jspdf) { alert('PDF library is not loaded.'); return; }
 
     var jsPDF = window.jspdf.jsPDF;
     var doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
@@ -272,7 +311,8 @@ function exportToPDF() {
     doc.text('Stock Category Wise Report', 40, 40);
     doc.setFontSize(9);
     doc.setTextColor(110);
-    doc.text('Generated: ' + new Date().toLocaleString() + '   |   Supplier: ' + supplierLabel(), 40, 56);
+    doc.text('Generated: ' + new Date().toLocaleString() + '   |   Supplier: ' + supplierLabel() +
+             '   |   Scope: ' + scopeLabel(), 40, 56);
     doc.text('Total stock value: Rs. ' + fmt(reportTotals.value), pageW - 40, 56, { align: 'right' });
     doc.setTextColor(0);
 
@@ -284,14 +324,14 @@ function exportToPDF() {
             gq += q; gt += q * p;
             body.push([
                 (it.product_code ? it.product_code + ' - ' : '') + (it.product_name || ''),
-                it.batchno || '', it.wh_name || '', fmtQty(q), it.measure_type || '', fmt(p), fmt(q * p)
+                it.model_no || '', it.wh_name || '', fmtQty(q), it.measure_type || '', fmt(p), fmt(q * p)
             ]);
         });
 
         doc.autoTable({
             startY: y,
-            head: [[{ content: name, colSpan: 7, styles: { halign: 'left', fillColor: [163, 15, 45] } }],
-                   ['Product', 'Batch no', 'Warehouse', 'Quantity', 'UOM', 'Cost price', 'Total']],
+            head: [[{ content: name, colSpan: 7, styles: { halign: 'left', fillColor: [163, 15, 45], textColor: 255 } }],
+                   ['Product', 'Model no', 'Warehouse', 'Quantity', 'UOM', 'Cost price', 'Total']],
             body: body,
             foot: [['Category total', '', '', fmtQty(gq), '', '', fmt(gt)]],
             styles: { fontSize: 8.5, cellPadding: 4 },
@@ -306,9 +346,5 @@ function exportToPDF() {
     doc.save('stock_category_report.pdf');
 }
 </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.24/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <?php include "include/footer.php"; ?>

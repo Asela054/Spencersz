@@ -144,6 +144,7 @@
 		$porder=$this->input->post('porder');
 		$batchno=$this->input->post('batchno');
 		$invoice=$this->input->post('invoice');
+		$invoicedate=$this->input->post('invoicedate');
 		$discount=$this->input->post('discount');
 		$discount_type = $this->input->post('discount_type');  
 		$vat_type=$this->input->post('vat_type');
@@ -251,6 +252,7 @@
 			'grndate'=> $grndate,
 			'total'=> $total,
 			'invoicenum'=> $invoice,
+			'invoicedate'=> $invoicedate,
 			'discount'=> $discount,
 			'approvestatus'=> '0',
 			'subtotal'=> $subtotal, 
@@ -376,7 +378,7 @@
 		$sql="SELECT `u`.*, `ua`.`suppliername`, `ua`.`telephone_no`, `ua`.`address_line1`, `ub`.`branch`, `ub`.`phone`, `ub`.`address1`, `ub`.`address2`, `ub`.`mobile`, `ub`.`email` AS `locemail`, `uc`.`company` FROM `tbl_grn` AS `u` LEFT JOIN `tbl_supplier` AS `ua` ON (`ua`.`idtbl_supplier` = `u`.`tbl_supplier_idtbl_supplier`) LEFT JOIN `tbl_company_branch` AS `ub` ON (`ub`.`idtbl_company_branch` = `u`.`tbl_company_branch_idtbl_company_branch`) LEFT JOIN `tbl_company` AS `uc` ON (`uc`.`idtbl_company` = `u`.`tbl_company_idtbl_company`) WHERE `u`.`status`=? AND `u`.`idtbl_grn`=?";
 		$respond=$this->db->query($sql, array(1, $recordID));
 
-		$this->db->select('tbl_grndetail.*,tbl_grn.invoicenum,tbl_grn.grndate,tbl_grn.grn_no, tbl_product.product_name, tbl_product.product_code, tbl_unit.unit');
+		$this->db->select('tbl_grndetail.*,tbl_grn.invoicenum,tbl_grn.invoicedate,tbl_grn.grndate,tbl_grn.grn_no, tbl_product.product_name, tbl_product.product_code, tbl_unit.unit');
 		$this->db->from('tbl_grndetail');
 		$this->db->join('tbl_product', 'tbl_product.idtbl_product = tbl_grndetail.tbl_product_idtbl_product', 'left');
 		$this->db->join('tbl_grn', 'tbl_grn.idtbl_grn = tbl_grndetail.tbl_grn_idtbl_grn', 'left');
@@ -391,7 +393,7 @@
 		$html.='
 		<div class="row">
             <div class="col-6 small"><label class="small font-weight-bold text-dark mb-1">Date:</label> '.$responddetail->row(0)->grndate.'<br><label class="small font-weight-bold text-dark mb-1">GRN No:</label> '.$responddetail->row(0)->grn_no.'<br><label class="small font-weight-bold text-dark mb-1">Customer:</label> '.$respond->row(0)->suppliername.'</div>
-            <div class="col-6 small"><label class="small font-weight-bold text-dark mb-1">Company:</label> '.$respond->row(0)->company.'<br><label class="small font-weight-bold text-dark mb-1">Branch:</label> '.$respond->row(0)->branch.'<br><label class="small font-weight-bold text-dark mb-1">Invoice No:</label> '.$respond->row(0)->invoicenum.'</div>
+            <div class="col-6 small"><label class="small font-weight-bold text-dark mb-1">Company:</label> '.$respond->row(0)->company.'<br><label class="small font-weight-bold text-dark mb-1">Branch:</label> '.$respond->row(0)->branch.'<br><label class="small font-weight-bold text-dark mb-1">Invoice No:</label> '.$respond->row(0)->invoicenum.'<br><label class="small font-weight-bold text-dark mb-1">Invoice Date:</label> '.$respond->row(0)->invoicedate.'</div>
         </div>
         <hr class="border-dark"> <table class="table table-striped table-bordered table-sm"> <thead> <tr> <th>Product</th> <th>Unit Price</th> <th class="text-center">Qty</th> <th class="text-center">Free</th> <th class="text-center">Paid Qty</th><th class="text-center">Uom</th> <th class="text-center">Discount</th> <th class="text-right">Total</th> </tr> </thead> <tbody>';
 

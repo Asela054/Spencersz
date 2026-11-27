@@ -72,7 +72,6 @@ $defBranch = (int)(isset($_SESSION['branch_id']) ? $_SESSION['branch_id'] : 0);
 								<label>Product</label>
 								<select id="fProduct" class="form-control">
 									<option value="">Select a product</option>
-									<?php foreach ($products as $p) { echo '<option value="' . $p->idtbl_product . '">' . htmlspecialchars($p->product_code . ' - ' . $p->product_name) . '</option>'; } ?>
 								</select>
 							</div>
 							<?php } ?>
@@ -182,13 +181,13 @@ $(function () {
 		rows.forEach(function (r) { seen[r.idtbl_product] = 1; if (+r.reorder_level > 0 && +r.qty <= +r.reorder_level) low++; });
 		var body = rows.map(function (r, i) {
 			var flag = (+r.reorder_level > 0 && +r.qty <= +r.reorder_level) ? ' ' + badge('warn', 'Low') : '';
-			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + flag + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
+			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + flag + '</td><td>' + esc(r.model_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
 				(d.split ? '<td>' + esc(r.branch) + '</td>' : '') +
 				'<td class="r">' + num(r.qty) + '</td><td class="c">' + esc(r.unit) + '</td>' +
 				'<td class="r">' + money(r.qty > 0 ? r.value / r.qty : 0) + '</td><td class="r">' + money(r.value) + '</td>' +
 				'<td style="width:110px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>';
 		}).join('');
-		var cols = ['#', 'Product', 'Category', 'Brand'].concat(d.split ? ['Branch'] : [], ['>Qty', '^UOM', '>Avg cost', '>Stock value', 'Share']);
+		var cols = ['#', 'Product', 'Model no', 'Category', 'Brand'].concat(d.split ? ['Branch'] : [], ['>Qty', '^UOM', '>Avg cost', '>Stock value', 'Share']);
 		var span = cols.length - 5;
 		return {
 			kpis: kpi('fa-box', Object.keys(seen).length, 'Products in stock') + kpi('fa-cubes', num(tq), 'Units on hand', 'info') +
@@ -206,11 +205,12 @@ $(function () {
 			return '<tr><td>' + esc(r.d) + '</td><td>' + badge(tone[r.t] || 'mute', r.t) + '</td><td>' + esc(r.ref) + '</td><td>' + esc(r.branch) + '</td>' +
 				'<td class="r">' + (+r.qin ? num(r.qin) : '') + '</td><td class="r">' + (+r.qout ? num(r.qout) : '') + '</td><td class="r"><b>' + num(bal) + '</b></td></tr>';
 		}).join('');
+		var pname = esc(d.product.product_name) + (d.product.model_no ? ' (' + esc(d.product.model_no) + ')' : '');
 		return {
 			kpis: kpi('fa-flag-checkered', num(d.opening), 'Opening balance', 'info') + kpi('fa-arrow-down', num(tin), 'Total in') +
 				kpi('fa-arrow-up', num(tout), 'Total out', 'warn') + kpi('fa-balance-scale', num(bal), 'Closing balance'),
 			html: table(th(['Date', 'Type', 'Reference', 'Branch', '>In', '>Out', '>Balance']), body,
-				'<tr><td colspan="4" class="r">' + esc(d.product.product_name) + ' - totals</td><td class="r">' + num(tin) + '</td><td class="r">' + num(tout) + '</td><td class="r">' + num(bal) + '</td></tr>') +
+				'<tr><td colspan="4" class="r">' + pname + ' - totals</td><td class="r">' + num(tin) + '</td><td class="r">' + num(tout) + '</td><td class="r">' + num(bal) + '</td></tr>') +
 				(d.data.length ? '' : empty('No movements in this period.'))
 		};
 	};
@@ -221,15 +221,15 @@ $(function () {
 			var q = +r.qty, lv = +r.reorder_level, gap = Math.max(0, lv - q), st, cls;
 			if (q <= 0) { st = 'Out of stock'; cls = 'bad'; out++; } else if (lv && q <= lv / 2) { st = 'Critical'; cls = 'bad'; crit++; } else { st = 'Low'; cls = 'warn'; }
 			short += gap; cost += gap * (+r.cost_price);
-			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
+			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.model_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
 				'<td class="r">' + num(q) + '</td><td class="r">' + num(lv) + '</td><td class="r"><b>' + num(gap) + '</b></td>' +
 				'<td class="r">' + money(gap * (+r.cost_price)) + '</td><td style="width:100px">' + bar(lv ? q / lv * 100 : 0, cls) + '</td><td>' + badge(cls, st) + '</td></tr>';
 		}).join('');
 		return {
 			kpis: kpi('fa-exclamation-triangle', rows.length, 'Need restocking', 'warn') + kpi('fa-ban', out, 'Out of stock', 'bad') +
 				kpi('fa-fire', crit, 'Below half of reorder level', 'bad') + kpi('fa-coins', 'Rs. ' + money(cost), 'Cost to reach reorder level'),
-			html: rows.length ? table(th(['#', 'Product', 'Category', 'Brand', '>On hand', '>Reorder level', '>Shortfall', '>Cost of shortfall', 'Level', 'Status']), body,
-				'<tr><td colspan="6" class="r">Total</td><td class="r">' + num(short) + '</td><td class="r">' + money(cost) + '</td><td colspan="2"></td></tr>') : empty('Every product is above its reorder level.', 'fa-check-circle')
+			html: rows.length ? table(th(['#', 'Product', 'Model no', 'Category', 'Brand', '>On hand', '>Reorder level', '>Shortfall', '>Cost of shortfall', 'Level', 'Status']), body,
+				'<tr><td colspan="7" class="r">Total</td><td class="r">' + num(short) + '</td><td class="r">' + money(cost) + '</td><td colspan="2"></td></tr>') : empty('Every product is above its reorder level.', 'fa-check-circle')
 		};
 	};
 
@@ -258,15 +258,15 @@ $(function () {
 		var body = rows.map(function (r, i) {
 			var dd = +r.days, cls = dd >= 365 ? 'bad' : (dd >= 180 ? 'warn' : 'info');
 			if (!r.last_sale) never++;
-			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
+			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.model_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
 				'<td class="r">' + num(r.qty) + '</td><td class="r">' + money(r.value) + '</td><td>' + esc(r.first_in || '-') + '</td>' +
 				'<td>' + (r.last_sale ? esc(r.last_sale) : badge('mute', 'Never sold')) + '</td><td class="r"><b>' + num(dd) + '</b></td><td>' + badge(cls, dd >= 365 ? 'Dead' : (dd >= 180 ? 'Very slow' : 'Slow')) + '</td></tr>';
 		}).join('');
 		return {
 			kpis: kpi('fa-hourglass-half', rows.length, 'Items with no sales in ' + d.days + '+ days', 'warn') + kpi('fa-cubes', num(sum(rows, 'qty')), 'Units sitting idle', 'info') +
 				kpi('fa-coins', 'Rs. ' + money(sum(rows, 'value')), 'Cash tied up at cost', 'bad') + kpi('fa-ban', never, 'Never sold'),
-			html: rows.length ? table(th(['#', 'Product', 'Category', 'Brand', '>Qty', '>Stock value', 'First received', 'Last sale', '>Days idle', 'Class']), body,
-				'<tr><td colspan="4" class="r">Total</td><td class="r">' + num(sum(rows, 'qty')) + '</td><td class="r">' + money(sum(rows, 'value')) + '</td><td colspan="4"></td></tr>') : empty('Nothing has been idle that long.', 'fa-check-circle')
+			html: rows.length ? table(th(['#', 'Product', 'Model no', 'Category', 'Brand', '>Qty', '>Stock value', 'First received', 'Last sale', '>Days idle', 'Class']), body,
+				'<tr><td colspan="5" class="r">Total</td><td class="r">' + num(sum(rows, 'qty')) + '</td><td class="r">' + money(sum(rows, 'value')) + '</td><td colspan="4"></td></tr>') : empty('Nothing has been idle that long.', 'fa-check-circle')
 		};
 	};
 
@@ -301,7 +301,7 @@ $(function () {
 			else if (cover < 7)  { cls = 'bad';  txt = 'Under 1 week'; risk++; }
 			else if (cover < 14) { cls = 'warn'; txt = 'Low cover';    risk++; }
 			else                 { cls = 'ok';   txt = 'OK'; }
-			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
+			return '<tr><td>' + (i + 1) + '</td><td>' + prod(r) + '</td><td>' + esc(r.model_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.brand) + '</td>' +
 				'<td class="r"><b>' + num(q) + '</b></td><td class="r">' + money(r.revenue) + '</td><td class="r">' + num(r.invoices) + '</td>' +
 				'<td class="r">' + num(perDay) + '</td><td class="r">' + num(st) + '</td><td class="r">' + (st > 0 ? num(cover) : '0') + '</td>' +
 				'<td>' + (r.last_sale ? esc(r.last_sale) : '-') + '</td><td style="width:100px">' + bar(max ? q / max * 100 : 0) + '</td><td>' + badge(cls, txt) + '</td></tr>';
@@ -309,8 +309,8 @@ $(function () {
 		return {
 			kpis: kpi('fa-bolt', rows.length, 'Products sold') + kpi('fa-cubes', num(tq), 'Units sold in ' + d.days + ' days', 'info') +
 				kpi('fa-coins', 'Rs. ' + money(tr), 'Sales incl. VAT') + kpi('fa-exclamation-triangle', risk, 'Need restocking soon', risk ? 'warn' : ''),
-			html: rows.length ? table(th(['#', 'Product', 'Category', 'Brand', '>Units sold', '>Sales (incl. VAT)', '>Invoices', '>Avg / day', '>In stock', '>Days of cover', 'Last sale', 'Volume', 'Status']), body,
-				'<tr><td colspan="4" class="r">Total</td><td class="r">' + num(tq) + '</td><td class="r">' + money(tr) + '</td><td colspan="8"></td></tr>') : empty('No sales found in this period.', 'fa-info-circle')
+			html: rows.length ? table(th(['#', 'Product', 'Model no', 'Category', 'Brand', '>Units sold', '>Sales (incl. VAT)', '>Invoices', '>Avg / day', '>In stock', '>Days of cover', 'Last sale', 'Volume', 'Status']), body,
+				'<tr><td colspan="5" class="r">Total</td><td class="r">' + num(tq) + '</td><td class="r">' + money(tr) + '</td><td colspan="8"></td></tr>') : empty('No sales found in this period.', 'fa-info-circle')
 		};
 	};
 
@@ -341,7 +341,23 @@ $(function () {
 	$('#btnRun').on('click', run);
 	$('#fBranch,#fFrom,#fTo,#fType,#fStatus,#fSplit,#fProduct,#fTop').on('change', run);
 	$('#fDays').on('keyup', function (e) { if (e.keyCode == 13) run(); });
-	if ($.fn.select2 && $('#fProduct').length) { $('#fProduct').select2({width: '100%'}); }
+
+	/* Stock card product dropdown: loaded from the server (5 on open, 20 per page while typing) */
+	if ($.fn.select2 && $('#fProduct').length) {
+		$('#fProduct').select2({
+			width: '100%',
+			placeholder: 'Select a product',
+			minimumInputLength: 0,
+			ajax: {
+				url: SCRIPT,
+				type: 'POST',
+				dataType: 'json',
+				delay: 250,
+				data: function (p) { return {report: 'productsearch', q: p.term || '', page: p.page || 1}; },
+				processResults: function (data) { return data; }
+			}
+		});
+	}
 	run();
 
 	/* ---------- export (works from whatever table is on screen) ---------- */

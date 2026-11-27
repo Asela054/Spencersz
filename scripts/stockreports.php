@@ -1,7 +1,7 @@
 <?php
 /*
- * Data endpoint for the 6 Stock Reports (JSON).
- * POST: report = current | card | reorder | transfer | dead | valuation
+ * Data endpoint for the Stock Reports (JSON).
+ * POST: report = productsearch | current | card | reorder | transfer | dead | valuation | fast
  */
 require('config.php');
 
@@ -28,12 +28,49 @@ try {
 
     switch ($report) {
 
+       /* PRODUCT SEARCH for the stock card dropdown (select2 ajax) ------- */
+    case 'productsearch':
+        $q    = trim($_POST['q'] ?? '');
+        $page = max(1, (int)($_POST['page'] ?? 1));
+        $per  = 20;
+
+        if ($q === '') {
+            // dropdown just opened: only the first 5
+            $rows = fetch($conn, "SELECT idtbl_product, product_code, product_name, model_no
+                                  FROM tbl_product WHERE status = 1
+                                  ORDER BY product_name LIMIT 5");
+            $more = false;
+        } else {
+            $like  = '%' . $conn->real_escape_string(addcslashes($q, '%_')) . '%';
+            $start = ($page - 1) * $per;
+            $rows = fetch($conn, "SELECT idtbl_product, product_code, product_name, model_no
+                                  FROM tbl_product
+                                  WHERE status = 1
+                                    AND (product_code LIKE '$like' OR product_name LIKE '$like' OR model_no LIKE '$like')
+                                  ORDER BY product_name
+                                  LIMIT $start, " . ($per + 1));
+            $more = count($rows) > $per;
+            $rows = array_slice($rows, 0, $per);
+        }
+
+        $results = [];
+        foreach ($rows as $r) {
+            $model = trim((string)$r['model_no']);
+            $results[] = [
+                'id'   => $r['idtbl_product'],
+                // show: Product name - Model no (falls back to the product code if there is no model no)
+                'text' => $r['product_name'] . ' - ' . ($model !== '' ? $model : $r['product_code'])
+            ];
+        }
+        echo json_encode(['results' => $results, 'pagination' => ['more' => $more]]);
+        break;
+
     /* 7. CURRENT STOCK ------------------------------------------------ */
     case 'current':
         $split = !empty($_POST['split']);
         $bcols = $split ? "cb.branch AS branch, cb.type AS btype" : "'' AS branch, 0 AS btype";
         $bgrp  = $split ? ", cb.idtbl_company_branch, cb.branch, cb.type" : "";
-        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.reorder_level,
+        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.model_no, p.reorder_level,
                     c.category, b.brand, u.unit, $bcols,
                     SUM(s.qty) AS qty, SUM(s.qty * s.costunitprice) AS value
              FROM tbl_stock s
@@ -41,7 +78,7 @@ try {
              $prodJoins
              JOIN tbl_company_branch cb ON cb.idtbl_company_branch = s.tbl_company_branch_idtbl_company_branch
              WHERE s.status IN (1,2) AND s.qty > 0 $bs
-             GROUP BY p.idtbl_product, p.product_code, p.product_name, p.reorder_level, c.category, b.brand, u.unit $bgrp
+             GROUP BY p.idtbl_product, p.product_code, p.product_name, p.model_no, p.reorder_level, c.category, b.brand, u.unit $bgrp
              ORDER BY p.product_name");
         echo json_encode(['data' => $out, 'split' => $split]);
         break;
@@ -92,13 +129,13 @@ try {
             $r['branch'] = $bm[$r['b']] ?? '';
             $rows[] = $r;
         }
-        $pinfo = fetch($conn, "SELECT product_code, product_name FROM tbl_product WHERE idtbl_product = $pid");
+        $pinfo = fetch($conn, "SELECT product_code, product_name, model_no FROM tbl_product WHERE idtbl_product = $pid");
         echo json_encode(['data' => $rows, 'opening' => $opening, 'product' => $pinfo[0] ?? null]);
         break;
 
     /* 9. LOW STOCK & REORDER ------------------------------------------ */
     case 'reorder':
-        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.reorder_level, p.cost_price,
+        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.model_no, p.reorder_level, p.cost_price,
                     c.category, b.brand, u.unit, COALESCE(st.qty, 0) AS qty
              FROM tbl_product p $prodJoins
              LEFT JOIN (SELECT s.tbl_product_idtbl_product AS pid, SUM(s.qty) AS qty
@@ -119,7 +156,9 @@ try {
         if ($branch > 0) $w .= " AND (t.from_branch_id = $branch OR t.to_branch_id = $branch)";
         $out = fetch($conn, "SELECT t.transfer_no, t.transfer_date, t.transfer_type, t.transfer_status, t.total_qty,
                     t.vehicle_no, t.driver_name, fb.branch AS from_branch, tb.branch AS to_branch,
-                    (SELECT GROUP_CONCAT(CONCAT(p.product_name, ' x ', td.qty) SEPARATOR '||')
+                    (SELECT GROUP_CONCAT(CONCAT(p.product_name,
+                                IF(IFNULL(p.model_no,'') <> '', CONCAT(' (', p.model_no, ')'), ''),
+                                ' x ', td.qty) SEPARATOR '||')
                        FROM tbl_stock_transfer_detail td JOIN tbl_product p ON p.idtbl_product = td.tbl_product_idtbl_product
                       WHERE td.tbl_stock_transfer_idtbl_stock_transfer = t.idtbl_stock_transfer AND td.status = 1) AS items
              FROM tbl_stock_transfer t
@@ -133,7 +172,7 @@ try {
     case 'dead':
         $days = max(0, (int)($_POST['days'] ?? 90));
         $bi   = $branch > 0 ? " AND i.tbl_company_branch_idtbl_company_branch = $branch" : "";
-        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, c.category, b.brand, u.unit,
+        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.model_no, c.category, b.brand, u.unit,
                     SUM(s.qty) AS qty, SUM(s.qty * s.costunitprice) AS value,
                     MIN(g.grndate) AS first_in, ls.last_sale,
                     DATEDIFF(CURDATE(), COALESCE(ls.last_sale, MIN(g.grndate), MIN(DATE(s.insertdatetime)))) AS days
@@ -146,7 +185,7 @@ try {
                          WHERE i.status = 1 AND d.status = 1 $bi GROUP BY d.tbl_product_idtbl_product) ls
                     ON ls.pid = p.idtbl_product
              WHERE s.status IN (1,2) AND s.qty > 0 $bs
-             GROUP BY p.idtbl_product, p.product_code, p.product_name, c.category, b.brand, u.unit, ls.last_sale
+             GROUP BY p.idtbl_product, p.product_code, p.product_name, p.model_no, c.category, b.brand, u.unit, ls.last_sale
              HAVING days >= $days
              ORDER BY days DESC, value DESC");
         echo json_encode(['data' => $out, 'days' => $days]);
@@ -171,7 +210,7 @@ try {
         $top  = (int)($_POST['top'] ?? 20);
         $top  = ($top > 0 && $top <= 500) ? $top : 500;
         $bv   = $branch > 0 ? " AND v.branch_id = $branch" : "";
-        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.reorder_level,
+        $out = fetch($conn, "SELECT p.idtbl_product, p.product_code, p.product_name, p.model_no, p.reorder_level,
                     c.category, b.brand, u.unit,
                     sl.qty_sold, sl.revenue, sl.invoices, sl.last_sale,
                     COALESCE(st.qty, 0) AS stock
