@@ -296,6 +296,39 @@ class Productinfo extends CI_Model{
         );
     }
 
+    /* Returns the existing product row that already uses this model no, or NULL.
+   - compared trimmed + case-insensitive
+   - deleted products (status 3) are ignored, so their model no can be reused
+   - $excludeID skips the product being edited
+   - empty model no is not checked (the field is optional) */
+    private function Findmodelno($modelNo, $excludeID = NULL, $lock = FALSE){
+        $modelNo = trim((string)$modelNo);
+        if($modelNo === ''){ return NULL; }
+
+        $sql = "SELECT `idtbl_product`, `product_code`, `product_name`
+                FROM `tbl_product`
+                WHERE `status` <> 3 AND LOWER(TRIM(`model_no`)) = LOWER(?)";
+        $params = array($modelNo);
+
+        if(!empty($excludeID)){
+            $sql .= " AND `idtbl_product` <> ?";
+            $params[] = (int)$excludeID;
+        }
+        $sql .= " LIMIT 1".($lock ? " FOR UPDATE" : "");
+
+        $row = $this->db->query($sql, $params)->row();
+        return $row ? $row : NULL;
+    }
+
+    /* AJAX check for the form (the real check runs again when saving) */
+    public function Checkmodelno(){
+        $row = $this->Findmodelno($this->input->post('model_no'), $this->input->post('recordID'), FALSE);
+        echo json_encode(array(
+            'exists'  => $row ? 1 : 0,
+            'message' => $row ? 'Model No already used by '.$row->product_code.' - '.$row->product_name : ''
+        ));
+    }
+
     public function Productinsertupdate(){
         $this->db->trans_begin();
 
@@ -304,7 +337,7 @@ class Productinfo extends CI_Model{
         // product_code and barcode are NOT taken from the form any more:
         // they are generated on insert and kept unchanged on update
         $product_name=$this->input->post('product_name');
-        $model_no=$this->input->post('model_no');
+        $model_no=trim((string)$this->input->post('model_no'));
         $description=$this->input->post('description');
         $tbl_category_idtbl_category=!empty($this->input->post('tbl_category_idtbl_category')) ? $this->input->post('tbl_category_idtbl_category') : NULL;
         $tbl_brand_idtbl_brand=!empty($this->input->post('tbl_brand_idtbl_brand')) ? $this->input->post('tbl_brand_idtbl_brand') : NULL;
@@ -317,6 +350,23 @@ class Productinfo extends CI_Model{
 
         // discount percentage, start date and end date
         $discount=$this->Getdiscountdata();
+        // model no must be unique
+        $recordIDCheck = !empty($this->input->post('recordID')) ? $this->input->post('recordID') : NULL;
+        $dupModel = $this->Findmodelno($model_no, ($this->input->post('recordOption') == 2 ? $recordIDCheck : NULL), TRUE);
+        if($dupModel){
+            $this->db->trans_rollback();
+
+            $actionObj=new stdClass();
+            $actionObj->icon='fas fa-warning';
+            $actionObj->title='';
+            $actionObj->message='Model No "'.$model_no.'" is already used by '.$dupModel->product_code.' - '.$dupModel->product_name;
+            $actionObj->url='';
+            $actionObj->target='_blank';
+            $actionObj->type='danger';
+
+            $this->session->set_flashdata('msg', json_encode($actionObj));
+            redirect('Product');
+        }
         if($discount['error'] !== ''){
             $this->db->trans_rollback();
 

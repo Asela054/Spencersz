@@ -3,40 +3,62 @@ class PdfGRNinfo extends CI_Model {
 
     /* =====================================================================
        GRN on pre-printed continuous stationery (LQ-310)
-       Artwork = 1382 x 1600 px  =  9.5in x 11in  =  684 x 792 pt
-       Every x / y / w / h used by the GRN print is in ARTWORK PIXELS measured
-       from the top-left corner of the artwork (converted to pt by px()).
+       Sheet = 9.5in x 11in = 24.13cm x 27.94cm = 684 x 792 pt
+       Field positions are in ARTWORK PIXELS (artwork = 1382 x 1600 px), measured
+       from the top-left corner of the sheet. The items-grid COLUMNS are set in cm
+       ($colX0 / $colW below, taken from the pen measurements on the real form).
        Only DATA is printed - the form design is already on the paper.
 
-       PRINT SETTINGS (important): print on a 9.5 x 11 in paper size, margins
-       None, scale 100% (turn OFF "Fit to page"). If the page is scaled the
-       data will not line up with the form.
+       PRINT SETTINGS: paper size 9.5 x 11 in, margins None, scale 100%.
+
+       CALIBRATION (use when the printer shrinks / moves the page):
+         ?ruler=1   cm ruler on the top and left edge. Measure it with a real ruler.
+                    10cm must be 10cm. If 10cm prints as 8.7cm  ->  sx = 10 / 8.7 = 1.15
+         ?guide=1   red outline round every field
+         ?sx=1.15   horizontal enlargement   (same as $kx)
+         ?sy=1.20   vertical enlargement     (same as $ky)
+         ?dx=-4     move left 4mm   (+ right)   (same as $shiftX)
+         ?dy=-6     move up 6mm     (+ down)    (same as $shiftY)
+       When the numbers are right, write them into $kx $ky $shiftX $shiftY below.
        ===================================================================== */
     private $paperW = 684;     // 9.5in in pt
     private $paperH = 792;     // 11in in pt
     private $artW   = 1382;    // artwork width in px
 
-    // printer calibration in mm (+ moves right / down). Keep 0 when printing at 100% on 9.5 x 11 in paper;
-    // the old -18 was only compensating for the page being shrunk by the print dialog.
-    private $shiftX = 0;
-    private $shiftY = 0;
-    private $guide  = false;   // true = red outline around every field (alignment test)
+    // calibration (physical paper units)
+    private $kx     = 1.0;     // >1 enlarges the PDF to cancel a printer that shrinks the page
+    private $ky     = 1.0;
+    private $shiftX = 0;       // mm, + moves right
+    private $shiftY = 0;       // mm, + moves down
+    private $guide  = false;
+    private $ruler  = false;
 
     private $fontSize   = 9;    // pt
     private $lineHeight = 10.5; // pt
 
-    // GRN items grid (body of the form: y 466 - 1342)
-    private $rowsPerPage = 17;    // GRN item rows per page
+    // items grid columns (cm): x of the first column line from the left edge of the sheet, then the width of each column
+    // order: Stock Code | Model No. | Description | Qty. | Unit Price | Total   (pen measurements)
+    private $colX0  = 2.27;
+    private $colW   = array(1.9, 2.0, 8.0, 1.7, 2.6, 3.8);
+    private $colPad = 0.12;     // cm of space kept inside every column
+
+    // GRN items grid rows
+    private $rowsPerPage = 17;
     private $rowTop      = 476;   // first row y
     private $rowH        = 44;    // row height (2 text lines fit)
-    private $totalsY     = 1236;  // first totals line (3 lines, 22 px apart) / "continued" line is the 3rd
+    private $totalsY     = 1236;  // Sub Total / Discount lines (22 px apart); "continued" is the 3rd line
 
-    private $voucherRowsPerPage = 9;   // voucher item rows per page (leaves room for the importation split)
+    // wide box under the grid: Remarks on the left, grand Total on the right
+    private $boxY = 1327;
+    private $boxH = 44;
+
+    private $voucherRowsPerPage = 9;
 
     /* ------------------------------------------------------------------
      * GOODS RECEIVED NOTE  (data only, pre-printed continuous paper)
      * ------------------------------------------------------------------ */
     public function pdfgrnget($x) {
+        $this->lq_flags();
         $recordID = $x;
 
         $this->db->select("
@@ -146,18 +168,21 @@ class PdfGRNinfo extends CI_Model {
         foreach ($pages as $index => $lines) {
             $isLast = ($index == $totalPages - 1);
 
-            // ---------- top right boxes ----------
-            $p  = $this->at(1093, 125, 170, 24, $this->lq_e($grnNo));                       // No.      (GRN No)
-            $p .= $this->at(1093, 177, 170, 24, ($index + 1) . ' of ' . $totalPages);       // Page No.
-            $p .= $this->at(1093, 229, 170, 24, $this->lq_e($q->porder_no));                // No.      (PO No)
+            $p = '';
+            if ($this->ruler && $index == 0) { $p .= $this->lq_ruler(); }
 
-            // ---------- title box ----------
-            $p .= $this->at(536, 219, 311, 26, 'GOODS RECEIVED NOTE', 'center', true, 10);
+            // ---------- top right boxes (centred vertically in the boxes) ----------
+            $p .= $this->at(1093, 115, 170, 45, $this->lq_e($grnNo), 'left', false, null, true);                  // No.      (GRN No)
+            $p .= $this->at(1093, 167, 170, 45, ($index + 1) . ' of ' . $totalPages, 'left', false, null, true);  // Page No.
+            $p .= $this->at(1093, 219, 170, 45, $this->lq_e($q->porder_no), 'left', false, null, true);           // No.      (PO No)
 
-            // ---------- two big boxes ----------
-            $p .= $this->at(125, 281, 545, 128, $leftBox);
+            // ---------- title: centred (both ways) in the title box under the logo ----------
+            $p .= $this->at(533, 206, 309, 52, 'GOODS RECEIVED NOTE', 'center', true, 10, true);
+
+            // ---------- two big boxes (text kept ~2mm inside the box top) ----------
+            $p .= $this->at(125, 292, 545, 109, $leftBox);
             foreach ($details as $i => $d) {
-                $y = 281 + $i * 24;
+                $y = 292 + $i * 24;
                 $p .= $this->at(712, $y, 165, 22, $this->lq_e($d[0]) . ' :');
                 $p .= $this->at(885, $y, 380, 22, $this->lq_e($d[1]), 'left', true);
             }
@@ -173,31 +198,31 @@ class PdfGRNinfo extends CI_Model {
                 $free   = (float)$r->free_qty;
                 $qtyTxt = $this->lq_e((float)$r->qty) . ($free > 0 ? ' (' . $this->lq_e($free) . ')' : '');
 
-                $p .= $this->at(119,  $y, 124, $this->rowH, $this->lq_e($r->product_code));                         // Stock Code
-                $p .= $this->at(257,  $y, 100, $this->rowH, $this->lq_e($r->model_no));                             // Model No.
-                $p .= $this->at(372,  $y, 438, $this->rowH, $this->lq_e($desc));                                    // Description
-                $p .= $this->at(816,  $y, 95,  $this->rowH, $qtyTxt, 'center', false, (strlen($qtyTxt) > 8) ? 7 : null); // Qty. (free)
-                $p .= $this->at(911,  $y, 137, $this->rowH, number_format((float)$price, 2), 'right');              // Unit Price
-                $p .= $this->at(1058, $y, 205, $this->rowH, number_format((float)$r->total, 2), 'right');           // Total
+                $p .= $this->cell(0, $y, $this->lq_e($r->product_code));                                    // Stock Code
+                $p .= $this->cell(1, $y, $this->lq_e($r->model_no));                                        // Model No.
+                $p .= $this->cell(2, $y, $this->lq_e($desc));                                               // Description
+                $p .= $this->cell(3, $y, $qtyTxt, 'center', false, null, null, (strlen($qtyTxt) > 8) ? 7 : null); // Qty. (free)
+                $p .= $this->cell(4, $y, number_format((float)$price, 2), 'right');                         // Unit Price
+                $p .= $this->cell(5, $y, number_format((float)$r->total, 2), 'right');                      // Total
             }
 
-            // ---------- totals / continued (bottom of the grid) ----------
+            // ---------- bottom of the grid: Sub Total / Discount, or "continued" ----------
             if ($isLast) {
-                $p .= $this->at(911, $this->totalsY,       137, 22, 'Sub Total', 'right');
-                $p .= $this->at(1058, $this->totalsY,      205, 22, number_format($grn_gross, 2), 'right');
-                $p .= $this->at(911, $this->totalsY + 22,  137, 22, 'Discount', 'right');
-                $p .= $this->at(1058, $this->totalsY + 22, 205, 22, number_format($grn_discount, 2), 'right');
-                // $p .= $this->at(911, $this->totalsY + 22, 137, 22, 'VAT', 'right');
-                // $p .= $this->at(1058, $this->totalsY + 22, 205, 22, number_format((float)$grn_vat, 2), 'right');
-                $p .= $this->at(911, $this->totalsY + 44, 137, 22, 'Total', 'right', true);
-                $p .= $this->at(1058, $this->totalsY + 44, 205, 22, number_format((float)$grn_total, 2), 'right', true);
+                $p .= $this->cell(4, $this->totalsY,      'Sub Total', 'right', false, 22);
+                $p .= $this->cell(5, $this->totalsY,      number_format($grn_gross, 2), 'right', false, 22);
+                $p .= $this->cell(4, $this->totalsY + 22, 'Discount', 'right', false, 22);
+                $p .= $this->cell(5, $this->totalsY + 22, number_format($grn_discount, 2), 'right', false, 22);
+                // $p .= $this->cell(4, $this->totalsY + 22, 'VAT', 'right', false, 22);
+                // $p .= $this->cell(5, $this->totalsY + 22, number_format((float)$grn_vat, 2), 'right', false, 22);
 
-                // ---------- wide box under the grid ----------
+                // ---------- wide box under the grid: Remarks (left) + grand Total (right), centred in the box ----------
                 if ($remark !== '') {
-                    $p .= $this->at(125, 1360, 1135, 42, 'Remarks : ' . $this->lq_e($remark));
+                    $p .= $this->at(125, $this->boxY, 770, $this->boxH, 'Remarks : ' . $this->lq_e($remark), 'left', false, null, true);
                 }
+                $p .= $this->cell(4, $this->boxY, 'Total', 'right', true, $this->boxH, null, null, true);
+                $p .= $this->cell(5, $this->boxY, number_format((float)$grn_total, 2), 'right', true, $this->boxH, null, null, true);
             } else {
-                $p .= $this->at(372, $this->totalsY + 44, 438, 22, 'Continued on next page...', 'right', true);
+                $p .= $this->cell(2, $this->totalsY + 44, 'Continued on next page...', 'right', true, 22);
             }
 
             $body .= $this->grn_page($p, $isLast);
@@ -206,7 +231,7 @@ class PdfGRNinfo extends CI_Model {
         $html = $this->grn_doc('Goods Received Note - ' . $grnNo, $body);
 
         $this->load->library('pdf');
-        $this->pdf->setPaper(array(0, 0, $this->paperW, $this->paperH));
+        $this->pdf->setPaper(array(0, 0, $this->paperW * $this->kx, $this->paperH * $this->ky));
         $this->pdf->loadHtml($html);
         $this->pdf->render();
         $this->lq_noscale();
@@ -390,6 +415,16 @@ class PdfGRNinfo extends CI_Model {
 
     /* ================= data-only print helpers (GRN on pre-printed stationery) ================= */
 
+    // ?guide ?ruler ?sx ?sy ?dx ?dy test / calibration switches
+    private function lq_flags(){
+        if ($this->input->get('guide')) { $this->guide = true; }
+        if ($this->input->get('ruler')) { $this->ruler = true; }
+        $v = $this->input->get('sx'); if (is_numeric($v) && $v > 0.5 && $v < 2) { $this->kx = (float)$v; }
+        $v = $this->input->get('sy'); if (is_numeric($v) && $v > 0.5 && $v < 2) { $this->ky = (float)$v; }
+        $v = $this->input->get('dx'); if (is_numeric($v) && abs($v) < 100) { $this->shiftX = (float)$v; }
+        $v = $this->input->get('dy'); if (is_numeric($v) && abs($v) < 100) { $this->shiftY = (float)$v; }
+    }
+
     // ask the PDF viewer to print at 100% (no "Fit to page"); best effort, depends on the Dompdf version
     private function lq_noscale(){
         $c = method_exists($this->pdf, 'getCanvas') ? $this->pdf->getCanvas() : $this->pdf->get_canvas();
@@ -398,19 +433,58 @@ class PdfGRNinfo extends CI_Model {
         }
     }
 
+    // cm ruler along the top and left (print with ?ruler=1 and measure it: 10cm must be 10cm)
+    private function lq_ruler(){
+        $cm  = 28.3465;
+        $out = '';
+        for ($i = 0; $i <= 24; $i++) {
+            $x   = round(($i * $cm + $this->shiftX * 2.8346) * $this->kx, 2);
+            $len = ($i % 5 == 0) ? 16 : 8;
+            $out .= '<div style="position:absolute;left:' . $x . 'pt;top:8pt;width:0.7pt;height:' . $len . 'pt;background:#000;"></div>';
+            if ($i % 5 == 0) {
+                $out .= '<div style="position:absolute;left:' . ($x + 2) . 'pt;top:25pt;font-size:7pt;line-height:8pt;">' . $i . 'cm</div>';
+            }
+        }
+        for ($j = 0; $j <= 27; $j++) {
+            $y   = round(($j * $cm + $this->shiftY * 2.8346) * $this->ky, 2);
+            $len = ($j % 5 == 0) ? 16 : 8;
+            $out .= '<div style="position:absolute;left:30pt;top:' . $y . 'pt;width:' . $len . 'pt;height:0.7pt;background:#000;"></div>';
+            if ($j % 5 == 0) {
+                $out .= '<div style="position:absolute;left:48pt;top:' . ($y - 4) . 'pt;font-size:7pt;line-height:8pt;">' . $j . 'cm</div>';
+            }
+        }
+        return $out;
+    }
+
+    // cm -> artwork px
+    private function cm($v){
+        return $v * $this->artW / 24.13;
+    }
+
     // artwork px -> pt
     private function px($v){
         return round($v * $this->paperW / $this->artW, 2);
     }
 
-    // one absolutely positioned data field; $html must already be escaped
-    private function at($x, $y, $w, $h, $html, $align = 'left', $bold = false, $size = null){
-        $left = $this->px($x) + $this->shiftX * 2.8346;
-        $top  = $this->px($y) + $this->shiftY * 2.8346;
-        $st = 'position:absolute;left:' . $left . 'pt;top:' . $top . 'pt;width:' . $this->px($w) . 'pt;height:' . $this->px($h) . 'pt;'
+    // one cell of the items grid: columns $i .. $to (widths come from $colW, in cm)
+    private function cell($i, $y, $html, $align = 'left', $bold = false, $h = null, $to = null, $size = null, $vc = false){
+        $to   = ($to === null) ? $i : $to;
+        $left = $this->colX0 + array_sum(array_slice($this->colW, 0, $i)) + $this->colPad;
+        $w    = array_sum(array_slice($this->colW, $i, $to - $i + 1)) - 2 * $this->colPad;
+        return $this->at($this->cm($left), $y, $this->cm($w), ($h === null ? $this->rowH : $h), $html, $align, $bold, $size, $vc);
+    }
+
+    // one absolutely positioned data field; $html must already be escaped; $vc = centre a single line vertically in the box
+    private function at($x, $y, $w, $h, $html, $align = 'left', $bold = false, $size = null, $vc = false){
+        $left = round(($this->px($x) + $this->shiftX * 2.8346) * $this->kx, 2);
+        $top  = round(($this->px($y) + $this->shiftY * 2.8346) * $this->ky, 2);
+        $wpt  = round($this->px($w) * $this->kx, 2);
+        $hpt  = round($this->px($h) * $this->ky, 2);
+        $st = 'position:absolute;left:' . $left . 'pt;top:' . $top . 'pt;width:' . $wpt . 'pt;height:' . $hpt . 'pt;'
             . 'overflow:hidden;text-align:' . $align . ';';
         if ($bold) { $st .= 'font-weight:bold;'; }
-        if ($size) { $st .= 'font-size:' . $size . 'pt;'; }
+        if ($size) { $st .= 'font-size:' . round($size * $this->kx, 2) . 'pt;'; }
+        if ($vc)   { $st .= 'line-height:' . $hpt . 'pt;'; }
         if ($this->guide) { $st .= 'outline:0.4pt solid #f00;'; }
         return '<div style="' . $st . '">' . $html . '</div>';
     }
@@ -426,14 +500,14 @@ class PdfGRNinfo extends CI_Model {
     }
 
     private function grn_page($inner, $isLast){
-        return '<div style="position:relative;width:' . $this->paperW . 'pt;height:' . ($this->paperH - 6) . 'pt;'
+        return '<div style="position:relative;width:' . round($this->paperW * $this->kx, 2) . 'pt;height:' . round(($this->paperH - 6) * $this->ky, 2) . 'pt;'
             . ($isLast ? '' : 'page-break-after:always;') . '">' . $inner . '</div>';
     }
 
     private function grn_doc($title, $body){
         $css = '@page { margin: 0; } html, body { margin: 0; padding: 0; } '
-             . 'body { font-family: "Courier", monospace; font-size: ' . $this->fontSize . 'pt; '
-             . 'line-height: ' . $this->lineHeight . 'pt; color: #000; }';
+             . 'body { font-family: "Courier", monospace; font-size: ' . round($this->fontSize * $this->kx, 2) . 'pt; '
+             . 'line-height: ' . round($this->lineHeight * $this->ky, 2) . 'pt; color: #000; }';
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' . $this->lq_e($title) . '</title><style>'
             . $css . '</style></head><body>' . $body . '</body></html>';
     }

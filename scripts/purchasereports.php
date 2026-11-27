@@ -44,9 +44,9 @@ try {
         $items = [];
         switch ($group) {
         case 'product':
-            $sql = "SELECT p.idtbl_product, p.product_code, p.product_name, c.category, COUNT(DISTINCT s.idtbl_supplier) AS suppliers,
+            $sql = "SELECT p.idtbl_product, p.product_code, p.product_name, p.model_no, c.category, COUNT(DISTINCT s.idtbl_supplier) AS suppliers,
                            SUM(gd.qty) AS qty, SUM(gd.total) AS value, MAX(g.grndate) AS last_in
-                    $from_sql GROUP BY p.idtbl_product, p.product_code, p.product_name, c.category ORDER BY value DESC";
+                    $from_sql GROUP BY p.idtbl_product, p.product_code, p.product_name, p.model_no, c.category ORDER BY value DESC";
             /* price-wise: one line per unit price */
             $items = fetch($conn, "SELECT p.idtbl_product AS k, gd.unitprice, COUNT(DISTINCT s.idtbl_supplier) AS suppliers,
                            COUNT(DISTINCT g.idtbl_grn) AS grns, SUM(gd.qty) AS qty, SUM(gd.total) AS value, MAX(g.grndate) AS last_in
@@ -55,21 +55,21 @@ try {
         case 'month':
             $sql = "SELECT DATE_FORMAT(g.grndate, '%Y-%m') AS ym, COUNT(DISTINCT g.idtbl_grn) AS grns, SUM(gd.qty) AS qty, SUM(gd.total) AS value
                     $from_sql GROUP BY DATE_FORMAT(g.grndate, '%Y-%m') ORDER BY ym";
-            $items = fetch($conn, "SELECT DATE_FORMAT(g.grndate, '%Y-%m') AS k, p.product_code, p.product_name, gd.unitprice,
+            $items = fetch($conn, "SELECT DATE_FORMAT(g.grndate, '%Y-%m') AS k, p.product_code, p.product_name, p.model_no, gd.unitprice,
                            COUNT(DISTINCT g.idtbl_grn) AS grns, SUM(gd.qty) AS qty, SUM(gd.total) AS value
-                    $from_sql GROUP BY DATE_FORMAT(g.grndate, '%Y-%m'), p.idtbl_product, p.product_code, p.product_name, gd.unitprice
+                    $from_sql GROUP BY DATE_FORMAT(g.grndate, '%Y-%m'), p.idtbl_product, p.product_code, p.product_name, p.model_no, gd.unitprice
                     ORDER BY k, value DESC");
             break;
         case 'detail':
-            $sql = "SELECT g.grndate, g.grn_no, g.invoicenum, s.suppliername, p.product_code, p.product_name, gd.qty, gd.unitprice, gd.total AS value
+            $sql = "SELECT g.grndate, g.grn_no, g.invoicenum, s.suppliername, p.product_code, p.product_name, p.model_no, gd.qty, gd.unitprice, gd.total AS value
                     $from_sql ORDER BY g.grndate DESC, g.idtbl_grn DESC LIMIT 5000";
             break;
         default:
             $sql = "SELECT s.idtbl_supplier, s.suppliername, COUNT(DISTINCT g.idtbl_grn) AS grns, SUM(gd.qty) AS qty, SUM(gd.total) AS value
                     $from_sql GROUP BY s.idtbl_supplier, s.suppliername ORDER BY value DESC";
-            $items = fetch($conn, "SELECT s.idtbl_supplier AS k, p.product_code, p.product_name, gd.unitprice,
+            $items = fetch($conn, "SELECT s.idtbl_supplier AS k, p.product_code, p.product_name, p.model_no, gd.unitprice,
                            COUNT(DISTINCT g.idtbl_grn) AS grns, SUM(gd.qty) AS qty, SUM(gd.total) AS value
-                    $from_sql GROUP BY s.idtbl_supplier, p.idtbl_product, p.product_code, p.product_name, gd.unitprice
+                    $from_sql GROUP BY s.idtbl_supplier, p.idtbl_product, p.product_code, p.product_name, p.model_no, gd.unitprice
                     ORDER BY s.idtbl_supplier, value DESC");
         }
         echo json_encode(['data' => fetch($conn, $sql), 'items' => $items, 'totals' => $totals, 'group' => $group]);

@@ -213,6 +213,14 @@ include "include/topnavbar.php";
                                         required>
                                 </div>
                             </div>
+                            <div class="form-row mb-1">
+                                <div class="col-12">
+                                    <label class="small font-weight-bold text-dark">Invoice Date*</label>
+                                    <input type="date" class="form-control form-control-sm" placeholder=""
+                                        name="invoicedate" id="invoicedate"
+                                        value="<?php echo date('Y-m-d') ?>" required>
+                                </div>
+                            </div>
                             <div class="form-group mb-1">
 
                             </div>
@@ -2092,6 +2100,7 @@ $(document).ready(function() {
             var batchno = $('#batchno').val();
             var supplier = $('#supplier').val();
             var invoice = $('#invoice').val();
+            var invoicedate = $('#invoicedate').val();
             var vat_type = $('#vat_type').val();
             var discount = $('#discount').val();
             var discount_type = $('#discount_type').val();  
@@ -2123,6 +2132,7 @@ $(document).ready(function() {
                         location: location,
                         porder: porder,
                         invoice: invoice,
+                        invoicedate: invoicedate,
                         subtotal: subtotal,
                         batchno: batchno,
                         supplier: supplier,

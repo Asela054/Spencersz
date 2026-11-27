@@ -479,6 +479,27 @@ include "include/topnavbar.php";
         }
         $('#tbl_category_idtbl_category').on('change', loadNextCode);
 
+        // ---------- Model No unique check (live) ----------
+        var modelDuplicate = false;
+        $('#model_no').on('blur', function(){
+            var model = $.trim($(this).val());
+            modelDuplicate = false;
+            if(model === ''){ return; }
+            $.ajax({
+                type: "POST",
+                url: '<?php echo base_url() ?>Product/Checkmodelno',
+                data: { model_no: model, recordID: $('#recordOption').val() == '2' ? $('#recordID').val() : '' },
+                success: function(result){
+                    var obj = JSON.parse(result);
+                    if(obj.exists == 1){
+                        modelDuplicate = true;
+                        alert(obj.message);
+                        $('#model_no').focus();
+                    }
+                }
+            });
+        });
+
         // ---------- Discount validation ----------
         // When a discount % is entered, both dates are required and the end date cannot be before the start date.
         function checkDiscountDates(){
@@ -504,6 +525,11 @@ include "include/topnavbar.php";
         }
 
         $('#productForm').on('submit', function(){
+            if(modelDuplicate){
+                alert('This Model No is already used by another product.');
+                $('#model_no').focus();
+                return false;
+            }
             return checkDiscountDates() && checkSchemes();
         });
 

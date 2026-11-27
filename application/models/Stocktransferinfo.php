@@ -57,7 +57,7 @@ class Stocktransferinfo extends CI_Model{
         $n=$respondnote->row();
         $t->note_no=$n ? $n->note_no : '';
 
-        $details=$this->db->query("SELECT d.idtbl_stock_transfer_detail AS did, p.product_code AS code, p.product_name AS name
+        $details=$this->db->query("SELECT d.idtbl_stock_transfer_detail AS did, d.qty AS qty, p.product_code AS code, p.product_name AS name
                                    FROM tbl_stock_transfer_detail d
                                    JOIN tbl_product p ON p.idtbl_product = d.tbl_product_idtbl_product
                                    WHERE d.tbl_stock_transfer_idtbl_stock_transfer = ? AND d.status = 1
@@ -86,20 +86,54 @@ class Stocktransferinfo extends CI_Model{
         $obj->data=$t;
         echo json_encode($obj);
     }
+
+    /* All products that have stock at the sending location.
+       tracked = 1 -> the product has serial numbers here, free = free serial numbers
+       tracked = 0 -> plain stock item, free = tbl_stock qty minus qty reserved by open (not yet dispatched) transfers */
     public function Getproducts(){
         $from=(int)$this->input->post('from');
+        $term=trim((string)$this->input->post('term'));
 
-        $respond=$this->db->query("SELECT p.idtbl_product AS id, p.product_code AS code, p.product_name AS name, COUNT(ps.idtbl_product_serial) AS free
-                                   FROM tbl_product_serial ps
-                                   JOIN tbl_product p ON p.idtbl_product = ps.tbl_product_idtbl_product
-                                   WHERE ps.status = 1 AND p.status = 1
-                                   AND ps.tbl_company_branch_idtbl_company_branch = ?
-                                   AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial ts
-                                                   WHERE ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1)
-                                   ".$this->transferable()."
-                                   GROUP BY p.idtbl_product, p.product_code, p.product_name
-                                   ORDER BY p.product_name", array($from));
-        echo json_encode($respond->result());
+        $params=array($from, $from, $from);   // stock, serial and reserved sub-queries
+
+        $search='';
+        if($term!==''){
+            $like='%'.$this->db->escape_like_str($term).'%';
+            $search=" AND (p.product_name LIKE ? OR p.product_code LIKE ? OR p.barcode LIKE ?)";
+            array_push($params, $like, $like, $like);
+        }
+
+        $sql="SELECT x.id, x.code, x.name, x.tracked, x.free FROM (
+                SELECT p.idtbl_product AS id, p.product_code AS code, p.product_name AS name,
+                       IF(COALESCE(sr.total, 0) > 0, 1, 0) AS tracked,
+                       IF(COALESCE(sr.total, 0) > 0, COALESCE(sr.free, 0), COALESCE(sk.qty, 0) - COALESCE(rs.reserved, 0)) AS free
+                FROM tbl_product p
+                JOIN (SELECT tbl_product_idtbl_product AS pid, SUM(qty) AS qty
+                      FROM tbl_stock
+                      WHERE status IN (1,2) AND qty > 0 AND tbl_company_branch_idtbl_company_branch = ?
+                      GROUP BY tbl_product_idtbl_product) sk ON sk.pid = p.idtbl_product
+                LEFT JOIN (SELECT ps.tbl_product_idtbl_product AS pid, COUNT(*) AS total,
+                                  SUM(IF(ts.idtbl_stock_transfer_serial IS NULL, 1, 0)) AS free
+                           FROM tbl_product_serial ps
+                           LEFT JOIN tbl_stock_transfer_serial ts
+                                  ON ts.tbl_product_serial_idtbl_product_serial = ps.idtbl_product_serial AND ts.status = 1
+                           WHERE ps.status = 1 AND ps.tbl_company_branch_idtbl_company_branch = ?
+                             ".$this->transferable()."
+                           GROUP BY ps.tbl_product_idtbl_product) sr ON sr.pid = p.idtbl_product
+                LEFT JOIN (SELECT d.tbl_product_idtbl_product AS pid, SUM(d.qty) AS reserved
+                           FROM tbl_stock_transfer_detail d
+                           JOIN tbl_stock_transfer t ON t.idtbl_stock_transfer = d.tbl_stock_transfer_idtbl_stock_transfer
+                           WHERE d.status = 1 AND t.status = 1 AND t.transfer_status < 3 AND t.from_branch_id = ?
+                             AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial s2
+                                             WHERE s2.tbl_stock_transfer_detail_idtbl_stock_transfer_detail = d.idtbl_stock_transfer_detail)
+                           GROUP BY d.tbl_product_idtbl_product) rs ON rs.pid = p.idtbl_product
+                WHERE p.status = 1 ".$search."
+              ) x
+              WHERE x.free > 0
+              ORDER BY x.name
+              LIMIT ".($term==='' ? 5 : 30);   // 5 on first open, up to 30 while searching
+
+        echo json_encode($this->db->query($sql, $params)->result());
     }
     public function Getserials(){
         $pid=(int)$this->input->post('pid');
@@ -228,9 +262,35 @@ class Stocktransferinfo extends CI_Model{
         $total=0;
         foreach($items as $it){
             $productID=(int)$it['pid'];
-            $ids=array_values(array_unique(array_map('intval', (array)$it['serials'])));
-            if(!$productID || !count($ids)){ return $this->fail('Invalid item in the transfer.'); }
+            $ids=array_values(array_unique(array_map('intval', (array)(isset($it['serials']) ? $it['serials'] : array()))));
+            if(!$productID){ return $this->fail('Invalid item in the transfer.'); }
 
+            /* ---- product without serial numbers: quantity based ---- */
+            if(!count($ids)){
+                $qty=round((float)(isset($it['qty']) ? $it['qty'] : 0), 3);
+                if($qty<=0){ return $this->fail('Enter a quantity for every item.'); }
+
+                $chk=$this->plainavailable($productID, $from);
+                if($chk['tracked']){ return $this->fail('This product has serial numbers. Select the serial numbers to transfer.'); }
+                if($qty > $chk['available']+0.0005){
+                    return $this->fail('Not enough stock at the sending location. Available: '.round($chk['available'], 3).'.');
+                }
+
+                $data=array(
+                    'tbl_stock_transfer_idtbl_stock_transfer'=> $transferID,
+                    'tbl_product_idtbl_product'=> $productID,
+                    'qty'=> $qty,
+                    'status'=> '1',
+                    'insertdatetime'=> $insertdatetime,
+                    'tbl_user_idtbl_user'=> $userID,
+                );
+                $this->db->insert('tbl_stock_transfer_detail', $data);
+
+                $total+=$qty;
+                continue;
+            }
+
+            /* ---- product with serial numbers ---- */
             $ph=$this->placeholders($ids);
                         $rows=$this->db->query("SELECT ps.idtbl_product_serial AS id, ps.serialno FROM tbl_product_serial ps
                                     WHERE ps.tbl_product_idtbl_product = ? AND ps.status = 1
@@ -370,7 +430,9 @@ class Stocktransferinfo extends CI_Model{
         echo json_encode($obj);
     }
 
-    /* Step 3: stock reduced at sending location, serials set to In Transit */
+    /* Step 3: stock reduced at sending location.
+       Serial products: serials set to In Transit.
+       Plain products: stock is taken from the oldest GRN first. */
     private function dispatch($t, $userID){
         $insertdatetime=date('Y-m-d H:i:s');
         $transferID=(int)$t->idtbl_stock_transfer;
@@ -390,6 +452,27 @@ class Stocktransferinfo extends CI_Model{
                                        JOIN tbl_product_serial ps ON ps.idtbl_product_serial = ts.tbl_product_serial_idtbl_product_serial
                                        WHERE ts.tbl_stock_transfer_detail_idtbl_stock_transfer_detail = ? AND ts.status = 1 FOR UPDATE", array($detailID))->result();
 
+            /* ---- plain product (no serial numbers): FIFO by GRN date ---- */
+            if(!count($serials)){
+                $need=(float)$d->qty;
+                $rows=$this->db->query("SELECT s.idtbl_stock, s.qty, s.tbl_grn_idtbl_grn AS grn
+                                        FROM tbl_stock s
+                                        LEFT JOIN tbl_grn g ON g.idtbl_grn = s.tbl_grn_idtbl_grn
+                                        WHERE s.tbl_product_idtbl_product = ? AND s.tbl_company_branch_idtbl_company_branch = ?
+                                          AND s.status IN (1,2) AND s.qty > 0
+                                        ORDER BY g.grndate, s.tbl_grn_idtbl_grn, s.idtbl_stock FOR UPDATE",
+                                        array($d->tbl_product_idtbl_product, $t->from_branch_id))->result();
+                foreach($rows as $r){
+                    if($need<=0.0005){ break; }
+                    $take=min($need, (float)$r->qty);
+                    $this->takestock($transferID, $detailID, $r, $take, $userID, $insertdatetime);
+                    $need-=$take;
+                }
+                if($need>0.0005){ return 'Not enough stock at the sending location to dispatch this transfer.'; }
+                continue;
+            }
+
+            /* ---- serial product ---- */
             $bygrn=array();
             foreach($serials as $s){
                 if(!in_array((int)$s->stock_status, array(1, 5, 6)) || (int)$s->br!=(int)$t->from_branch_id){
@@ -400,32 +483,14 @@ class Stocktransferinfo extends CI_Model{
 
             // reduce tbl_stock (by GRN so batch and cost are carried over later)
             foreach($bygrn as $grn => $need){
-                $rows=$this->db->query("SELECT idtbl_stock, qty FROM tbl_stock
+                $rows=$this->db->query("SELECT idtbl_stock, qty, tbl_grn_idtbl_grn AS grn FROM tbl_stock
                                         WHERE tbl_product_idtbl_product = ? AND tbl_grn_idtbl_grn = ?
                                           AND tbl_company_branch_idtbl_company_branch = ? AND status = 1 AND qty > 0
                                         ORDER BY idtbl_stock FOR UPDATE", array($d->tbl_product_idtbl_product, $grn, $t->from_branch_id))->result();
                 foreach($rows as $r){
                     if($need<=0){ break; }
                     $take=min($need, (float)$r->qty);
-
-                    $this->db->set('qty', 'qty - '.(float)$take, FALSE);
-                    $this->db->set('updateuser', $userID);
-                    $this->db->set('updatedatetime', $insertdatetime);
-                    $this->db->where('idtbl_stock', $r->idtbl_stock);
-                    $this->db->update('tbl_stock');
-
-                    $data=array(
-                        'tbl_stock_transfer_idtbl_stock_transfer'=> $transferID,
-                        'tbl_stock_transfer_detail_idtbl_stock_transfer_detail'=> $detailID,
-                        'tbl_stock_idtbl_stock'=> $r->idtbl_stock,
-                        'tbl_grn_idtbl_grn'=> $grn,
-                        'qty'=> $take,
-                        'new_stock_id'=> NULL,
-                        'status'=> '1',
-                        'insertdatetime'=> $insertdatetime,
-                    );
-                    $this->db->insert('tbl_stock_transfer_detail_stock', $data);
-
+                    $this->takestock($transferID, $detailID, $r, $take, $userID, $insertdatetime);
                     $need-=$take;
                 }
                 if($need>0){ return 'Not enough stock at the sending location to dispatch this transfer.'; }
@@ -446,6 +511,27 @@ class Stocktransferinfo extends CI_Model{
             }
         }
         return true;
+    }
+
+    /* reduces one stock row and records how much was taken from it */
+    private function takestock($transferID, $detailID, $stockRow, $take, $userID, $datetime){
+        $this->db->set('qty', 'qty - '.(float)$take, FALSE);
+        $this->db->set('updateuser', $userID);
+        $this->db->set('updatedatetime', $datetime);
+        $this->db->where('idtbl_stock', $stockRow->idtbl_stock);
+        $this->db->update('tbl_stock');
+
+        $data=array(
+            'tbl_stock_transfer_idtbl_stock_transfer'=> $transferID,
+            'tbl_stock_transfer_detail_idtbl_stock_transfer_detail'=> $detailID,
+            'tbl_stock_idtbl_stock'=> $stockRow->idtbl_stock,
+            'tbl_grn_idtbl_grn'=> $stockRow->grn,
+            'qty'=> $take,
+            'new_stock_id'=> NULL,
+            'status'=> '1',
+            'insertdatetime'=> $datetime,
+        );
+        $this->db->insert('tbl_stock_transfer_detail_stock', $data);
     }
 
     /* Step 6: new stock records at the receiving location, serials now belong to it */
@@ -530,6 +616,33 @@ class Stocktransferinfo extends CI_Model{
     }
 
     /* ---------------------------------------------------------- common functions */
+
+    /* plain (non-serial) product: is it serial tracked at this location, and how much can still be transferred.
+       Locks the stock rows (call inside a transaction). */
+    private function plainavailable($productID, $branchID){
+        $rows=$this->db->query("SELECT qty FROM tbl_stock
+                                WHERE tbl_product_idtbl_product = ? AND tbl_company_branch_idtbl_company_branch = ?
+                                  AND status IN (1,2) AND qty > 0 FOR UPDATE", array($productID, $branchID))->result();
+        $stock=0;
+        foreach($rows as $r){ $stock+=(float)$r->qty; }
+
+        $res=$this->db->query("SELECT COALESCE(SUM(d.qty), 0) AS reserved
+                               FROM tbl_stock_transfer_detail d
+                               JOIN tbl_stock_transfer t ON t.idtbl_stock_transfer = d.tbl_stock_transfer_idtbl_stock_transfer
+                               WHERE d.tbl_product_idtbl_product = ? AND d.status = 1 AND t.status = 1
+                                 AND t.transfer_status < 3 AND t.from_branch_id = ?
+                                 AND NOT EXISTS (SELECT 1 FROM tbl_stock_transfer_serial s2
+                                                 WHERE s2.tbl_stock_transfer_detail_idtbl_stock_transfer_detail = d.idtbl_stock_transfer_detail)",
+                               array($productID, $branchID))->row();
+        $reserved=$res ? (float)$res->reserved : 0;
+
+        $sr=$this->db->query("SELECT COUNT(*) AS c FROM tbl_product_serial ps
+                              WHERE ps.tbl_product_idtbl_product = ? AND ps.status = 1
+                                AND ps.tbl_company_branch_idtbl_company_branch = ? ".$this->transferable(),
+                              array($productID, $branchID))->row();
+
+        return array('tracked'=> ($sr && (int)$sr->c>0), 'available'=> $stock-$reserved);
+    }
 
     private function fifooverride($token){
         $o=isset($_SESSION['fifo_override']) ? $_SESSION['fifo_override'] : null;

@@ -19,6 +19,14 @@ include "include/topnavbar.php";
 <style>
     .st-picklist .st-batch{flex:0 0 100%;width:100%;font-size:12px;font-weight:600;background:#f1f3f5;border-radius:3px;padding:4px 8px;margin:6px 0 4px}
 </style>
+<style>
+    .st-prod{display:flex;justify-content:space-between;align-items:center}
+    .st-prod .st-qty{font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:#d4edda;color:#155724}
+    .st-prod.st-low .st-qty{background:#dc3545;color:#fff}
+    .select2-results__option .st-prod.st-low{color:#b02a37;font-weight:600}
+    .select2-results__option--highlighted .st-prod.st-low{color:#fff}
+    .st-prod .st-noser{font-size:10px;color:#6c757d;margin-left:6px;font-weight:400}
+</style>
 <div id="layoutSidenav">
 
 <div id="layoutSidenav_nav">
@@ -153,7 +161,7 @@ include "include/topnavbar.php";
                         </div>
                         <div class="col-md-8 mb-2">
                             <div class="d-flex justify-content-between">
-                                <label class="small font-weight-bold">Serial numbers*</label>
+                                <label class="small font-weight-bold" id="n_serlabel">Serial numbers*</label>
                                 <a href="#" id="n_selall" class="small">Select all</a>
                             </div>
                             <div class="st-picklist" id="n_serials"></div>
@@ -262,10 +270,10 @@ include "include/topnavbar.php";
         var STEPS = [
             { key: 1, short: 'Created',        card: 'Created',    label: 'Transfer Created',         icon: 'fa-file-alt',        color: '#6c757d', by: 'from' },
             { key: 2, short: 'Loaded',         card: 'Loaded',     label: 'Loaded to Lorry',          icon: 'fa-dolly',           color: '#fd7e14', by: 'from', action: 'Mark as Loaded',     effect: 'Goods are loaded onto the lorry at the sending location.' },
-            { key: 3, short: 'Dispatched',     card: 'In Transit', label: 'Dispatched from Location', icon: 'fa-truck-moving',    color: '#007bff', by: 'from', action: 'Approve & Dispatch', effect: 'The sending location approves the transfer and the lorry leaves. Stock is reduced at the sending location and the serial numbers move to In Transit.' },
+            { key: 3, short: 'Dispatched',     card: 'In Transit', label: 'Dispatched from Location', icon: 'fa-truck-moving',    color: '#007bff', by: 'from', action: 'Approve & Dispatch', effect: 'The sending location approves the transfer and the lorry leaves. Stock is reduced at the sending location and serial numbers (if any) move to In Transit.' },
             { key: 4, short: 'Lorry Arrived',  card: 'Arrived',    label: 'Lorry Arrived',            icon: 'fa-map-marker-alt',  color: '#17a2b8', by: 'to',   action: 'Mark Lorry Arrived', effect: 'The receiving location confirms the lorry has arrived.' },
             { key: 5, short: 'Unloaded',       card: 'Unloaded',   label: 'Unloaded',                 icon: 'fa-dolly-flatbed',   color: '#6f42c1', by: 'to',   action: 'Mark as Unloaded',   effect: 'Goods are unloaded and checked at the receiving location.' },
-            { key: 6, short: 'Added to Stock', card: 'Completed',  label: 'Added to Stock',           icon: 'fa-check-circle',    color: '#28a745', by: 'to',   action: 'Add to Stock',       effect: 'A new stock record is created for the receiving location and the serial numbers now belong to it.' }
+            { key: 6, short: 'Added to Stock', card: 'Completed',  label: 'Added to Stock',           icon: 'fa-check-circle',    color: '#28a745', by: 'to',   action: 'Add to Stock',       effect: 'A new stock record is created for the receiving location and any serial numbers now belong to it.' }
         ];
 
         $('#fifomodal, #fifoauthmodal').on('hidden.bs.modal', function() {
@@ -372,6 +380,38 @@ include "include/topnavbar.php";
             }
         });
 
+        function prodTemplate(item){
+            if(!item.id){ return item.text; }          // placeholder / "searching…"
+            var low = item.free < 3;
+            return $('<div class="st-prod' + (low ? ' st-low' : '') + '"><span>' + esc(item.text) +
+                    (item.tracked ? '' : '<span class="st-noser">no serial</span>') + '</span>' +
+                    '<span class="st-qty">' + (low ? 'Low · ' : '') + fq(item.free) + ' available</span></div>');
+        }
+        function prodSelection(item){
+            return item.id ? item.text + ' (' + fq(item.free) + ')' : item.text;
+        }
+
+        $('#n_product').select2({
+            dropdownParent: $('#newmodal'),          // required inside a modal
+            width: '100%',
+            placeholder: 'Type to search product',
+            ajax: {
+                url: '<?php echo base_url() ?>Stocktransfer/Getproducts',
+                type: 'POST',
+                dataType: 'json',
+                delay: 250,
+                data: function(p){ return { from: $('#n_from').val(), term: p.term || '' }; },
+                processResults: function(rows){
+                    return { results: $.map(rows, function(r){
+                        return { id: r.id, text: r.code + ' - ' + r.name, code: r.code, name: r.name,
+                                 free: parseFloat(r.free) || 0, tracked: parseInt(r.tracked, 10) === 1 };
+                    })};
+                }
+            },
+            templateResult: prodTemplate,
+            templateSelection: prodSelection
+        });
+
         /* ============ events ============ */
         $('#tbltransfer tbody').on('click', '.btntrack', function(e) { e.preventDefault(); $('[data-toggle="tooltip"]').tooltip('hide'); opentrack($(this).attr('data-id')); });
         $('#tbltransfer tbody').on('click', '.btnnote', function() { $('[data-toggle="tooltip"]').tooltip('hide'); opennote($(this).attr('data-id')); });
@@ -395,17 +435,36 @@ include "include/topnavbar.php";
         $('#btnadditem').on('click', function() {
             var pid = parseInt($('#n_product').val(), 10), picked = [];
             if (!pid) { notify('Select a product first.', 'warn'); return; }
-             if (!fifoEnforce()) { return; }
+            var d = $('#n_product').select2('data')[0];
+
+            /* ---- product without serial numbers: quantity ---- */
+            if (!d.tracked) {
+                var q = parseFloat($('#n_qty').val());
+                var rem = plainRemaining(d);
+                if (!(q > 0)) { notify('Enter the quantity to transfer.', 'warn'); return; }
+                q = Math.round(q * 1000) / 1000;
+                if (q > rem + 0.0005) { notify('Only ' + fq(rem) + ' available.', 'warn'); return; }
+                var hit = false;
+                $.each(draft, function(i, it) {
+                    if (it.pid === pid) { it.qty = Math.round((it.qty + q) * 1000) / 1000; hit = true; }
+                });
+                if (!hit) { draft.push({ pid: pid, code: d.code, name: d.name, tracked: false, serials: [], qty: q, ignored: false }); }
+                drawDraft();
+                showSerials();
+                return;
+            }
+
+            /* ---- product with serial numbers ---- */
+            if (!fifoEnforce()) { return; }
             $('#n_serials input:checked').each(function() { picked.push({ id: parseInt($(this).val(), 10), no: $(this).attr('data-no') }); });
             if (!picked.length) { notify('Tick at least one serial number.', 'warn'); return; }
             var viol = fifoToken ? fifoViolates() : false;   // added while FIFO is ignored
             var found = false;
             $.each(draft, function(i, it) {
-                if (it.pid === pid) { it.serials = it.serials.concat(picked); it.ignored = it.ignored || viol; found = true; }
+                if (it.pid === pid) { it.serials = it.serials.concat(picked); it.qty = it.serials.length; it.ignored = it.ignored || viol; found = true; }
             });
-            if (!found) {
-                var txt = $('#n_product option:selected').text().split(' - ');
-                draft.push({ pid: pid, code: txt[0], name: txt.slice(1).join(' - ').replace(/\s\(\d+\)$/, ''), serials: picked, ignored: viol });
+            if(!found){
+                draft.push({ pid: pid, code: d.code, name: d.name, tracked: true, serials: picked, qty: picked.length, ignored: viol });
             }
             drawDraft();
             showSerials();
@@ -424,7 +483,7 @@ include "include/topnavbar.php";
             if (!draft.length) { notify('Add at least one item to the transfer.', 'warn'); return; }
 
             var items = $.map(draft, function(it) {
-                return { pid: it.pid, ignored: it.ignored ? 1 : 0, serials: $.map(it.serials, function(s) { return s.id; }) };
+                return { pid: it.pid, ignored: it.ignored ? 1 : 0, qty: it.qty, serials: $.map(it.serials, function(s) { return s.id; }) };
             });
             $('#btnsave').prop('disabled', true);
             api('Stocktransferinsert', {
@@ -465,7 +524,7 @@ include "include/topnavbar.php";
             setTimeout(function() { w.print(); }, 300);
         });
 
-                $('#btnfifoignore').on('click', function() {
+        $('#btnfifoignore').on('click', function() {
             $('#fifomodal').one('hidden.bs.modal', function() {
                 $('#fa_user, #fa_pass, #fa_reason').val('');
                 $('#fifoauthmodal').modal('show');
@@ -507,7 +566,16 @@ include "include/topnavbar.php";
         function today() { var d = new Date(); function p(n) { return n < 10 ? '0' + n : n; } return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
         function find(id) { for (var i = 0; i < transfers.length; i++) { if (parseInt(transfers[i].id, 10) === parseInt(id, 10)) { return transfers[i]; } } return null; }
         function tname(t) { return t === 1 ? 'Showroom' : 'Warehouse'; }
-        function qty(t) { var n = 0; $.each(t.items, function(i, it) { n += it.serials.length; }); return n; }
+        function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fq(v) { return String(Math.round(num(v) * 1000) / 1000); }   // 5 -> "5", 2.5 -> "2.5"
+
+        /* quantity already added to the draft for a product */
+        function draftedQty(pid) {
+            var q = 0;
+            $.each(draft, function(i, it) { if (it.pid === pid) { q += num(it.qty); } });
+            return q;
+        }
+        function plainRemaining(d) { return Math.max(0, num(d.free) - draftedQty(parseInt(d.id, 10))); }
 
         function api(method, data, cb) {
             $.ajax({
@@ -540,6 +608,19 @@ include "include/topnavbar.php";
             setTimeout(function() { $n.removeClass('show'); setTimeout(function() { $n.remove(); }, 300); }, 3200);
         }
         function logfor(t, key) { for (var i = 0; i < t.log.length; i++) { if (parseInt(t.log[i].step, 10) === key) { return t.log[i]; } } return null; }
+
+        function actorName(t, step) { var l = logfor(t, step); return l ? l.user : ''; }
+        function productCount(t) { return t.items ? t.items.length : 0; }
+
+        function summaryBar(t) {
+            var cr = actorName(t, 1), rc = actorName(t, 6);
+            return '<div class="row mb-3">' +
+                '<div class="col-6 col-md-3 mb-2"><div class="border rounded p-2 h-100"><small class="text-muted d-block">Products</small><b>' + productCount(t) + '</b></div></div>' +
+                '<div class="col-6 col-md-3 mb-2"><div class="border rounded p-2 h-100"><small class="text-muted d-block">Total Qty</small><b>' + fq(t.qty) + '</b></div></div>' +
+                '<div class="col-6 col-md-3 mb-2"><div class="border rounded p-2 h-100"><small class="text-muted d-block">Created by (' + esc(t.from_name) + ')</small><b>' + (cr ? esc(cr) : '-') + '</b></div></div>' +
+                '<div class="col-6 col-md-3 mb-2"><div class="border rounded p-2 h-100"><small class="text-muted d-block">Received by (' + esc(t.to_name) + ')</small><b>' + (rc ? esc(rc) : '<span class="text-muted">Pending</span>') + '</b></div></div>' +
+                '</div>';
+        }
 
         function clearFifo() { fifoToken = ''; lastPick = []; $('#n_fifobanner').addClass('d-none'); }
 
@@ -580,7 +661,7 @@ include "include/topnavbar.php";
                 url: '<?php echo base_url() ?>Stocktransfer/Getlist',
                 success: function(result) {
                     var rows = JSON.parse(result);
-                    $.each(rows, function(i, r) { r.id = parseInt(r.id, 10); r.status = parseInt(r.status, 10); r.type = parseInt(r.type, 10); r.qty = parseInt(r.qty, 10); r.from_type = parseInt(r.from_type, 10); r.to_type = parseInt(r.to_type, 10); });
+                    $.each(rows, function(i, r) { r.id = parseInt(r.id, 10); r.status = parseInt(r.status, 10); r.type = parseInt(r.type, 10); r.qty = num(r.qty); r.from_type = parseInt(r.from_type, 10); r.to_type = parseInt(r.to_type, 10); });
                     transfers = rows; refresh(); if (cb) { cb(); }
                 },
                 error: function() { notify('Could not load transfers.', 'err'); }
@@ -589,13 +670,13 @@ include "include/topnavbar.php";
 
         /* ============ tracking modal ============ */
         function logText(t, step) {
-            var f = t.from_name, to = t.to_name, q = t.qty;
+            var f = t.from_name, to = t.to_name, q = fq(t.qty);
             if (step === 1) { return 'Transfer created and transfer note ' + t.note_no + ' generated.'; }
             if (step === 2) { return 'Goods loaded onto lorry ' + t.vehicle + ' at ' + f + '.'; }
-            if (step === 3) { return 'Approved by ' + f + '. Stock reduced by ' + q + ' and serial numbers set to In Transit.'; }
+            if (step === 3) { return 'Approved by ' + f + '. Stock reduced by ' + q + ' and any serial numbers set to In Transit.'; }
             if (step === 4) { return 'Lorry arrived at ' + to + '.'; }
             if (step === 5) { return 'Goods unloaded and checked at ' + to + '.'; }
-            return 'Added to stock at ' + to + '. Stock increased by ' + q + ' and serial numbers now belong to ' + to + '.';
+            return 'Added to stock at ' + to + '. Stock increased by ' + q + ' and any serial numbers now belong to ' + to + '.';
         }
         function stepper(t) {
             var h = '<div class="st-stepper">';
@@ -628,11 +709,12 @@ include "include/topnavbar.php";
             return { l: 'In stock at ' + t.to_name, c: '#28a745' };
         }
         function itemsTab(t) {
-            var st = serialState(t), h = '<div class="table-responsive"><table class="table table-bordered table-sm mb-0"><thead class="bg-light"><tr><th>Product</th><th class="text-right">Qty</th><th>Serial numbers</th><th>Serial status</th></tr></thead><tbody>';
+            var st = serialState(t), h = '<div class="table-responsive"><table class="table table-bordered table-sm mb-0"><thead class="bg-light"><tr><th>Product</th><th class="text-right">Qty</th><th>Serial numbers</th><th>Status</th></tr></thead><tbody>';
             $.each(t.items, function(i, it) {
                 var chips = '';
                 $.each(it.serials, function(k, s) { chips += '<span class="st-chip">' + esc(s) + '</span>'; });
-                h += '<tr><td><div class="font-weight-bold">' + esc(it.name) + '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + it.serials.length + '</td><td>' + chips + '</td>' +
+                if (!it.serials.length) { chips = '<span class="text-muted small">No serial numbers</span>'; }
+                h += '<tr><td><div class="font-weight-bold">' + esc(it.name) + '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + fq(it.qty) + '</td><td>' + chips + '</td>' +
                      '<td><span class="st-badge" style="background:' + st.c + '">' + esc(st.l) + '</span></td></tr>';
             });
             return h + '</tbody></table></div>';
@@ -641,13 +723,13 @@ include "include/topnavbar.php";
             var f = esc(t.from_name), to = esc(t.to_name);
             var h = '<div class="table-responsive"><table class="table table-bordered table-sm mb-2"><thead class="bg-light"><tr><th>Product</th><th class="text-right">Qty</th><th>' + f + ' (sending)</th><th>' + to + ' (receiving)</th></tr></thead><tbody>';
             $.each(t.items, function(i, it) {
-                var q = it.serials.length;
+                var q = fq(it.qty);
                 h += '<tr><td>' + esc(it.name) + '</td><td class="text-right">' + q + '</td>' +
                      '<td>' + (t.status >= 3 ? '<span class="text-danger font-weight-bold">-' + q + '</span> deducted' : '<span class="text-muted">-' + q + ' on dispatch</span>') + '</td>' +
                      '<td>' + (t.status >= 6 ? '<span class="text-success font-weight-bold">+' + q + '</span> added to stock' : '<span class="text-muted">+' + q + ' when added to stock</span>') + '</td></tr>';
             });
             h += '</tbody></table></div>';
-            h += '<div class="small text-muted"><i class="fas fa-barcode mr-1"></i>Dispatch and Add to Stock each write a serial number movement record (movement type: Transfer). When the goods are added to stock, each serial number moves to <b>' + to + '</b>.</div>';
+            h += '<div class="small text-muted"><i class="fas fa-barcode mr-1"></i>Items with serial numbers also write a serial number movement record (movement type: Transfer). Items without serial numbers are taken from the oldest stock batch first.</div>';
             return h;
         }
         function logTab(t) {
@@ -662,7 +744,7 @@ include "include/topnavbar.php";
         }
         function prepare(t) {
             t.id = parseInt(t.id, 10); t.status = parseInt(t.status, 10); t.type = parseInt(t.type, 10);
-            t.qty = parseInt(t.qty, 10); t.from_type = parseInt(t.from_type, 10); t.to_type = parseInt(t.to_type, 10);
+            t.qty = num(t.qty); t.from_type = parseInt(t.from_type, 10); t.to_type = parseInt(t.to_type, 10);
             return t;
         }
         function renderTrack(t) {
@@ -672,7 +754,7 @@ include "include/topnavbar.php";
                     '<div class="pt"><small>From</small><b>' + esc(t.from_name) + '</b><div>' + typeTag(t.from_type) + '</div></div>' +
                     '<div class="mid"><i class="fas fa-truck fa-lg"></i><div class="small mt-1">' + esc(t.vehicle) + ' &middot; ' + esc(t.driver) + (t.contact ? ' &middot; ' + esc(t.contact) : '') + '</div><div class="ln"></div></div>' +
                     '<div class="pt text-right"><small>To</small><b>' + esc(t.to_name) + '</b><div>' + typeTag(t.to_type) + '</div></div></div>' +
-                    stepper(t) + actionPanel(t) +
+                    summaryBar(t) + stepper(t) + actionPanel(t) +
                     '<ul class="nav nav-tabs" role="tablist">' +
                     '<li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#tabitems" role="tab">Items & serial numbers</a></li>' +
                     '<li class="nav-item"><a class="nav-link" data-toggle="tab" href="#tabstock" role="tab">Stock impact</a></li>' +
@@ -707,10 +789,12 @@ include "include/topnavbar.php";
         /* ============ transfer note ============ */
         function noteHtml(t) {
             var rows = '', i = 0, total = 0;
+            var cr = actorName(t, 1), rc = actorName(t, 6);
             $.each(t.items, function(k, it) {
-                i++; total += it.serials.length;
-                rows += '<tr><td>' + i + '</td><td>' + esc(it.code) + '</td><td>' + esc(it.name) + '</td><td style="text-align:center">' + it.serials.length + '</td><td>' + esc(it.serials.join(', ')) + '</td></tr>';
+                i++; total += num(it.qty);
+                rows += '<tr><td>' + i + '</td><td>' + esc(it.code) + '</td><td>' + esc(it.name) + '</td><td style="text-align:center">' + fq(it.qty) + '</td><td>' + (it.serials.length ? esc(it.serials.join(', ')) : '-') + '</td></tr>';
             });
+            total = Math.round(total * 1000) / 1000;
             return '<div class="tn">' +
                 '<div class="tn-head"><div><div class="tn-co">Spencersz (Pvt) Ltd</div><div>Stock Transfer Note</div></div>' +
                 '<div class="tn-title">' + esc(t.note_no) + '<div style="font-size:12px;font-weight:400">Transfer: ' + esc(t.no) + '</div><div style="font-size:12px;font-weight:400">Date: ' + esc(t.date) + '</div></div></div>' +
@@ -718,10 +802,19 @@ include "include/topnavbar.php";
                 '<div class="tn-box"><small>From (' + tname(t.from_type) + ')</small><b>' + esc(t.from_name) + '</b></div>' +
                 '<div class="tn-box"><small>To (' + tname(t.to_type) + ')</small><b>' + esc(t.to_name) + '</b></div>' +
                 '<div class="tn-box"><small>Vehicle / Driver</small><b>' + esc(t.vehicle) + '</b><br>' + esc(t.driver) + (t.contact ? ' (' + esc(t.contact) + ')' : '') + '</div></div>' +
+                '<div class="tn-grid">' +
+                '<div class="tn-box"><small>Created by (' + esc(t.from_name) + ')</small><b>' + (cr ? esc(cr) : '-') + '</b></div>' +
+                '<div class="tn-box"><small>Received by (' + esc(t.to_name) + ')</small><b>' + (rc ? esc(rc) : '-') + '</b></div>' +
+                '<div class="tn-box"><small>Products / Total Qty</small><b>' + i + ' product(s) / ' + fq(total) + ' qty</b></div></div>' +
                 '<table><thead><tr><th style="width:36px">#</th><th style="width:90px">Code</th><th>Product</th><th style="width:60px">Qty</th><th>Serial numbers</th></tr></thead><tbody>' + rows +
-                '<tr><td colspan="3" style="text-align:right"><b>Total</b></td><td style="text-align:center"><b>' + total + '</b></td><td></td></tr></tbody></table>' +
+                '<tr><td colspan="3" style="text-align:right"><b>Total (' + i + ' product' + (i === 1 ? '' : 's') + ')</b></td><td style="text-align:center"><b>' + fq(total) + '</b></td><td></td></tr></tbody></table>' +
                 (t.remark ? '<div style="margin-bottom:10px"><b>Remark:</b> ' + esc(t.remark) + '</div>' : '') +
-                '<div class="tn-sign"><div>Prepared by</div><div>Approved by (sending)</div><div>Driver</div><div>Received by (receiving)</div></div></div>';
+                '<div class="tn-sign">' +
+                    '<div>' + (cr ? '<b>' + esc(cr) + '</b><br>' : '') + 'Prepared by (sending)</div>' +
+                    '<div>Approved by (sending)</div>' +
+                    '<div>Driver</div>' +
+                    '<div>' + (rc ? '<b>' + esc(rc) + '</b><br>' : '') + 'Received by (receiving)</div>' +
+                '</div></div>';
         }
         function opennote(id) {
             loadTransfer(id, function(t) {
@@ -740,17 +833,11 @@ include "include/topnavbar.php";
             $('#n_to').html(h);
             if (MYBRANCH > 0) { $('#n_from').val(MYBRANCH).prop('disabled', true); } else { $('#n_from').prop('disabled', false); }
         }
-        function loadProducts() {
+        function loadProducts(){
             var from = $('#n_from').val();
-            $('#n_product').html('<option value="">Select</option>');
-            $('#n_serials').html('<div class="text-muted small p-2">Select a product to see its available serial numbers.</div>');
+            $('#n_product').html('<option></option>').val(null).prop('disabled', !from).trigger('change');
+            $('#n_serials').html('<div class="text-muted small p-2">Select a product to continue.</div>');
             $('#n_avail').text('');
-            if (!from) { return; }
-            api('Getproducts', { from: from }, function(rows) {
-                var h = '<option value="">Select</option>';
-                $.each(rows, function(i, p) { h += '<option value="' + p.id + '">' + esc(p.code + ' - ' + p.name + ' (' + p.free + ')') + '</option>'; });
-                $('#n_product').html(h);
-            });
         }
         function drafted(pid) {
             var used = [];
@@ -761,11 +848,34 @@ include "include/topnavbar.php";
 
         function showSerials() {
             var pid = parseInt($('#n_product').val(), 10), from = $('#n_from').val();
-            if (!pid || !from) {
-                $('#n_serials').html('<div class="text-muted small p-2">Select a product to see its available serial numbers.</div>');
+            var d = pid ? $('#n_product').select2('data')[0] : null;
+
+            $('#n_selall').show();
+            $('#n_serlabel').text('Serial numbers*');
+
+            if (!pid || !from || !d) {
+                $('#n_serials').html('<div class="text-muted small p-2">Select a product to continue.</div>');
                 $('#n_avail').text('');
                 return;
             }
+
+            /* product without serial numbers: ask for the quantity */
+            if (!d.tracked) {
+                var rem = plainRemaining(d);
+                $('#n_selall').hide();
+                $('#n_serlabel').text('Quantity*');
+                $('#n_serials').html(
+                    '<div class="p-2">' +
+                    '<div class="small text-muted mb-2">This product has no serial numbers. Enter the quantity to transfer. Stock is taken from the oldest batch first.</div>' +
+                    '<div class="form-inline">' +
+                    '<input type="number" id="n_qty" class="form-control form-control-sm mr-2" style="width:150px" min="0" max="' + rem + '" step="any" placeholder="Quantity">' +
+                    '<span class="small text-muted">' + fq(rem) + ' available</span>' +
+                    '</div></div>');
+                $('#n_avail').text(fq(rem) + ' in stock (no serial numbers)');
+                return;
+            }
+
+            /* product with serial numbers: pick the serials */
             api('Getserials', { pid: pid, from: from }, function(rows) {
                 var used = drafted(pid), h = '', cnt = {}, last = null, rank = -1;
                 var free = $.grep(rows, function(s) { return $.inArray(parseInt(s.id, 10), used) === -1; });
@@ -788,9 +898,8 @@ include "include/topnavbar.php";
             });
         }
 
-        /* FIFO: returns true when the selection is valid. Otherwise it swaps the selection for the older
+        /* FIFO (serial products): returns true when the selection is valid. Otherwise it swaps the selection for the older
         serial numbers, shows the popup and returns false. */
-        
         function fifoEnforce() {
             if (fifoToken) { return true; }     // FIFO ignored with approval
             lastPick = [];
@@ -827,14 +936,18 @@ include "include/topnavbar.php";
             }
             $.each(draft, function(i, it) {
                 var chips = '';
-                total += it.serials.length;
-                $.each(it.serials, function(k, s) { chips += '<span class="st-chip">' + esc(s.no) + '</span>'; });
+                total += num(it.qty);
+                if (it.tracked) {
+                    $.each(it.serials, function(k, s) { chips += '<span class="st-chip">' + esc(s.no) + '</span>'; });
+                } else {
+                    chips = '<span class="text-muted small">No serial numbers</span>';
+                }
                 h += '<tr><td><div class="font-weight-bold">' + esc(it.name) +
                      (it.ignored ? ' <span class="badge badge-warning ml-1"><i class="fas fa-unlock-alt mr-1"></i>FIFO ignored</span>' : '') +
-                     '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + it.serials.length + '</td><td>' + chips + '</td>' +
+                     '</div><small class="text-muted">' + esc(it.code) + '</small></td><td class="text-right">' + fq(it.qty) + '</td><td>' + chips + '</td>' +
                      '<td class="text-center"><button type="button" class="btn btn-danger btn-sm btnremove" data-index="' + i + '"><i class="fas fa-trash-alt"></i></button></td></tr>';
             });
-            if (draft.length) { h += '<tr class="bg-light"><td class="text-right font-weight-bold">Total</td><td class="text-right font-weight-bold">' + total + '</td><td colspan="2"></td></tr>'; }
+            if (draft.length) { h += '<tr class="bg-light"><td class="text-right font-weight-bold">Total</td><td class="text-right font-weight-bold">' + fq(total) + '</td><td colspan="2"></td></tr>'; }
             $('#n_items').html(h);
         }
         function resetNew() {

@@ -149,39 +149,39 @@ $(function () {
 		var itemName = function (it) { return esc(it.product_name) + '<div class="sx-code">' + esc(it.product_code) + '</div>'; };
 
 		if (g == 'supplier') {
-			head = ['#', 'Supplier / item', '>GRNs', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Share'];
+			head = ['#', 'Supplier / item', 'Model no', '>GRNs', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Share'];
 			body = rows.map(function (r, i) {
 				var k = r.idtbl_supplier;
-				return '<tr class="grp"><td>' + (i + 1) + '</td><td>' + chev(k) + esc(r.suppliername) + '</td><td class="r">' + num(r.grns) + '</td><td class="r">' + num(r.qty) + '</td><td></td><td class="r">' + money(r.value) + '</td><td style="width:140px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
+				return '<tr class="grp"><td>' + (i + 1) + '</td><td>' + chev(k) + esc(r.suppliername) + '</td><td></td><td class="r">' + num(r.grns) + '</td><td class="r">' + num(r.qty) + '</td><td></td><td class="r">' + money(r.value) + '</td><td style="width:140px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
 					(items[k] || []).map(function (it) {
-						return '<tr class="sub-row" data-p="' + esc(k) + '"><td></td><td class="sx-ind">' + itemName(it) + '</td><td class="r">' + num(it.grns) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td></td></tr>';
+						return '<tr class="sub-row" data-p="' + esc(k) + '"><td></td><td class="sx-ind">' + itemName(it) + '</td><td>' + esc(it.model_no) + '</td><td class="r">' + num(it.grns) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td></td></tr>';
+					}).join('');
+			}).join('');
+			foot = '<tr><td colspan="3" class="r">Total</td><td class="r">' + num(t.grns) + '</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td><td></td></tr>';
+		} else if (g == 'product') {
+			head = ['#', 'Product / price', 'Model no', 'Category', '>Suppliers', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Last received', 'Share'];
+			body = rows.map(function (r, i) {
+				var k = r.idtbl_product;
+				return '<tr class="grp"><td>' + (i + 1) + '</td><td>' + chev(k) + esc(r.product_name) + '<div class="sx-code">' + esc(r.product_code) + '</div></td><td>' + esc(r.model_no) + '</td><td>' + esc(r.category) + '</td><td class="r">' + num(r.suppliers) + '</td><td class="r">' + num(r.qty) + '</td><td class="r">avg ' + money(r.qty > 0 ? r.value / r.qty : 0) + '</td><td class="r">' + money(r.value) + '</td><td>' + esc(r.last_in) + '</td><td style="width:120px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
+					(items[k] || []).map(function (it) {
+						return '<tr class="sub-row" data-p="' + esc(k) + '"><td></td><td class="sx-ind">Bought at this price (' + num(it.grns) + ' GRN)</td><td></td><td></td><td class="r">' + num(it.suppliers) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td>' + esc(it.last_in) + '</td><td></td></tr>';
+					}).join('');
+			}).join('');
+			foot = '<tr><td colspan="5" class="r">Total</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td><td colspan="2"></td></tr>';
+		} else if (g == 'month') {
+			head = ['Month / item', 'Model no', '>GRNs', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Share'];
+			body = rows.map(function (r) {
+				var k = r.ym;
+				return '<tr class="grp"><td>' + chev(k) + esc(r.ym) + '</td><td></td><td class="r">' + num(r.grns) + '</td><td class="r">' + num(r.qty) + '</td><td></td><td class="r">' + money(r.value) + '</td><td style="width:160px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
+					(items[k] || []).map(function (it) {
+						return '<tr class="sub-row" data-p="' + esc(k) + '"><td class="sx-ind">' + itemName(it) + '</td><td>' + esc(it.model_no) + '</td><td class="r">' + num(it.grns) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td></td></tr>';
 					}).join('');
 			}).join('');
 			foot = '<tr><td colspan="2" class="r">Total</td><td class="r">' + num(t.grns) + '</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td><td></td></tr>';
-		} else if (g == 'product') {
-			head = ['#', 'Product / price', 'Category', '>Suppliers', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Last received', 'Share'];
-			body = rows.map(function (r, i) {
-				var k = r.idtbl_product;
-				return '<tr class="grp"><td>' + (i + 1) + '</td><td>' + chev(k) + esc(r.product_name) + '<div class="sx-code">' + esc(r.product_code) + '</div></td><td>' + esc(r.category) + '</td><td class="r">' + num(r.suppliers) + '</td><td class="r">' + num(r.qty) + '</td><td class="r">avg ' + money(r.qty > 0 ? r.value / r.qty : 0) + '</td><td class="r">' + money(r.value) + '</td><td>' + esc(r.last_in) + '</td><td style="width:120px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
-					(items[k] || []).map(function (it) {
-						return '<tr class="sub-row" data-p="' + esc(k) + '"><td></td><td class="sx-ind">Bought at this price (' + num(it.grns) + ' GRN)</td><td></td><td class="r">' + num(it.suppliers) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td>' + esc(it.last_in) + '</td><td></td></tr>';
-					}).join('');
-			}).join('');
-			foot = '<tr><td colspan="4" class="r">Total</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td><td colspan="2"></td></tr>';
-		} else if (g == 'month') {
-			head = ['Month / item', '>GRNs', '>Qty', '>Unit price', '>Purchases (ex VAT)', 'Share'];
-			body = rows.map(function (r) {
-				var k = r.ym;
-				return '<tr class="grp"><td>' + chev(k) + esc(r.ym) + '</td><td class="r">' + num(r.grns) + '</td><td class="r">' + num(r.qty) + '</td><td></td><td class="r">' + money(r.value) + '</td><td style="width:160px">' + bar(tv ? r.value / tv * 100 : 0) + '</td></tr>' +
-					(items[k] || []).map(function (it) {
-						return '<tr class="sub-row" data-p="' + esc(k) + '"><td class="sx-ind">' + itemName(it) + '</td><td class="r">' + num(it.grns) + '</td><td class="r">' + num(it.qty) + '</td><td class="r">' + money(it.unitprice) + '</td><td class="r">' + money(it.value) + '</td><td></td></tr>';
-					}).join('');
-			}).join('');
-			foot = '<tr><td class="r">Total</td><td class="r">' + num(t.grns) + '</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td><td></td></tr>';
 		} else {
-			head = ['Date', 'GRN', 'Supplier invoice', 'Supplier', 'Product', '>Qty', '>Unit cost', '>Value (ex VAT)'];
-			body = rows.map(function (r) { return '<tr><td>' + esc(r.grndate) + '</td><td>' + esc(r.grn_no) + '</td><td>' + esc(r.invoicenum) + '</td><td>' + esc(r.suppliername) + '</td><td>' + esc(r.product_name) + '<div class="sx-code">' + esc(r.product_code) + '</div></td><td class="r">' + num(r.qty) + '</td><td class="r">' + money(r.unitprice) + '</td><td class="r">' + money(r.value) + '</td></tr>'; }).join('');
-			foot = '<tr><td colspan="5" class="r">Total</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td></tr>';
+			head = ['Date', 'GRN', 'Supplier invoice', 'Supplier', 'Product', 'Model no', '>Qty', '>Unit cost', '>Value (ex VAT)'];
+			body = rows.map(function (r) { return '<tr><td>' + esc(r.grndate) + '</td><td>' + esc(r.grn_no) + '</td><td>' + esc(r.invoicenum) + '</td><td>' + esc(r.suppliername) + '</td><td>' + esc(r.product_name) + '<div class="sx-code">' + esc(r.product_code) + '</div></td><td>' + esc(r.model_no) + '</td><td class="r">' + num(r.qty) + '</td><td class="r">' + money(r.unitprice) + '</td><td class="r">' + money(r.value) + '</td></tr>'; }).join('');
+			foot = '<tr><td colspan="6" class="r">Total</td><td class="r">' + num(t.qty) + '</td><td></td><td class="r">' + money(tv) + '</td></tr>';
 		}
 		return {
 			kpis: kpi('fa-file-invoice', num(t.grns), 'Approved GRNs') + kpi('fa-cubes', num(t.qty), 'Units received', 'info') + kpi('fa-coins', 'Rs. ' + money(tv), 'Purchases (ex VAT)') + kpi('fa-truck-loading', num(t.suppliers), 'Suppliers', 'warn'),
@@ -255,7 +255,7 @@ $(function () {
 	$('#btnRun').on('click', run);
 	$('#fFrom,#fTo,#fSupplier,#fProduct,#fBranch,#fGroup,#fPstatus,#fView').on('change', run);
 
-		/* expand / collapse item rows */
+	/* expand / collapse item rows */
 	$(document).on('click', '.sx-tg', function () {
 		var k = String($(this).attr('data-k')), open = $(this).hasClass('open');
 		$(this).toggleClass('open', !open);
